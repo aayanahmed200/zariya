@@ -201,6 +201,6 @@ Built with `llama-cpp-python`, `Streamlit`, `pyttsx3`
 Fully local — no data leaves your device.
 Supports Urdu, Roman Urdu, and English.
 
-[GitHub](https://github.com/aayanahmed20/zariya) · MIT License
+[GitHub](https://github.com/aayanahmed200/zariya) · MIT License
         """)
         st.markdown('</div>', unsafe_allow_html=True)
