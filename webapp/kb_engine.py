@@ -299,6 +299,14 @@ class _ArithmeticError(ValueError):
     by try_math() and treated exactly like a failed match, never surfaced."""
 
 
+class _ResultTooLargeError(_ArithmeticError):
+    """Raised when a well-formed expression's result would be too large to
+    safely compute/display (see _ArithmeticParser._MAX_RESULT_DIGITS) --
+    unlike other _ArithmeticError cases, try_math() surfaces this one as a
+    friendly message instead of silently treating it as a failed match, so
+    the person gets a clear answer instead of no answer at all."""
+
+
 def _tokenize_arithmetic(expr: str):
     """Splits a pre-sanitized arithmetic string (digits, '.', '+', '-', '*',
     '/', '(', ')', whitespace only -- already enforced by try_math's regex
@@ -349,6 +357,17 @@ class _ArithmeticParser:
     """
 
     _MAX_EXPONENT = 1000  # guards against a pathological/huge computation, e.g. 9**9**9
+
+    # A base's own digit count is already bounded by Python's int-string
+    # conversion limit (sys.get_int_max_str_digits(), 4300 by default) at
+    # parse time -- but that says nothing about base ** exponent, whose
+    # result can still land far past that limit even when *both* the base
+    # and the (separately-bounded) exponent look individually reasonable,
+    # e.g. a 4000-digit base squared. Mirror that same 4300-digit ceiling
+    # here so a legal-looking expression never burns real CPU computing (and
+    # then silently failing to even stringify) a result we could never show
+    # anyone anyway.
+    _MAX_RESULT_DIGITS = 4300
 
     def __init__(self, tokens):
         self._tokens = tokens
@@ -405,6 +424,16 @@ class _ArithmeticParser:
             exponent = self._unary()
             if abs(exponent) > self._MAX_EXPONENT:
                 raise _ArithmeticError("Exponent too large")
+            # Estimate the result's decimal digit length *before* computing
+            # it (log10(base) * exponent) rather than after: for a large
+            # enough base, computing base ** exponent is itself real work
+            # (multi-second CPU time for a several-thousand-digit base at an
+            # in-bounds exponent), and it would be wasted anyway once the
+            # answer turns out too big to ever format into a reply string.
+            if base != 0 and exponent != 0:
+                est_digits = abs(exponent) * math.log10(abs(base))
+                if est_digits > self._MAX_RESULT_DIGITS:
+                    raise _ResultTooLargeError("Result too large")
             return base ** exponent
         return base
 
@@ -476,11 +505,34 @@ def try_math(text: str):
             val = _safe_eval_arithmetic(cleaned)
             if isinstance(val, (int, float)):
                 return f"That comes to **{val}**."
+        except _ResultTooLargeError:
+            return "That result is too large to compute here."
         except Exception:
             pass
     return None
 
+_MAX_INLINE_NUMBER_DIGITS = 100  # generous headroom over any real conversion/factorial/etc. value
+
+
+def _has_oversized_number(text: str) -> bool:
+    """True if `text` contains a run of digits longer than any genuine
+    conversion, factorial, base-conversion, etc. input would ever be.
+
+    Both try_convert() and try_number_ops() below match a leading `\\d+`
+    against a required keyword/unit that -- for a message that's mostly one
+    huge digit run and nothing else -- doesn't appear anywhere else in the
+    text. The greedy `\\d+` then backtracks one digit at a time looking for
+    it, and re.search() retries that same backtrack from every subsequent
+    starting position too: quadratic in the length of the run, independent
+    of try_math()'s own _MAX_RESULT_DIGITS/_MAX_EXPONENT bounds above (a
+    different function, checked at a different point) and of whether any
+    matching keyword is even present. Bail out up front instead."""
+    return bool(re.search(rf"\d{{{_MAX_INLINE_NUMBER_DIGITS + 1},}}", text))
+
+
 def try_convert(text: str):
+    if _has_oversized_number(text):
+        return None
     lower = text.lower()
     m = re.search(r"(-?\d+(\.\d+)?)\s*km\b.*\bmiles?", lower)
     if m:
@@ -545,6 +597,8 @@ def try_number_ops(text: str):
     """Small standalone number utilities: factorial, primality, gcd/lcm, and
     base conversion. Kept separate from try_math so try_math's generic
     expression evaluator doesn't have to guess at these special forms."""
+    if _has_oversized_number(text):
+        return None
     lower = text.lower().strip()
 
     m = re.search(r"factorial\s*of\s*(\d+)|(\d+)\s*!", lower)

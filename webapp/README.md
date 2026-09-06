@@ -8,7 +8,7 @@ This is a real Flask backend plus a browser front end, not a single static page,
 
 By default, Zariya talks to a free local model runner called Ollama, which runs open-source models entirely on your own machine, so there's no API key to sign up for and nothing to paste into a settings screen. If you do choose to add optional Claude, Google Search, or GitHub OAuth credentials, they live in a server-side `.env` file - whoever deploys this configures them once, and the person using the app never has to enter a key themselves. GitHub sign-in uses a real OAuth authorization-code flow with the client secret exchanged server-side, the way GitHub's own docs describe, not a public-profile lookup dressed up as a login.
 
-Underneath all of that sits `kb_engine.py`, a genuinely offline core with no dependencies and no network calls: arithmetic, unit conversion, a bilingual Urdu/English dictionary of roughly 680 words, and a curated knowledge base of roughly 775 entries matched with a fuzzy scorer. It's the guaranteed fallback if Ollama isn't installed or running, or while a model is still downloading, so the app never goes blank. When the local model (or Claude, if configured) gives a real answer, it gets cached server-side and reused for similarly worded questions later - a growing local memory, not model retraining.
+Underneath all of that sits `kb_engine.py`, a genuinely offline core with no dependencies and no network calls: arithmetic, unit conversion, a bilingual Urdu/English dictionary of roughly 699 words, and a curated knowledge base of roughly 792 entries matched with a fuzzy scorer. It's the guaranteed fallback if Ollama isn't installed or running, or while a model is still downloading, so the app never goes blank. When the local model (or Claude, if configured) gives a real answer, it gets cached server-side and reused for similarly worded questions later - a growing local memory, not model retraining.
 
 ## Setup
 
@@ -69,7 +69,7 @@ None of this requires a restart -- changes take effect on the next message.
 
 ## An honest limit
 
-The default local model is small (1.5B parameters) so it downloads quickly and runs on ordinary laptop CPUs, but it's noticeably less capable and slower than a large hosted model. The offline knowledge engine below it is a curated lookup table with a fuzzy matcher, not a language model, and will always have gaps outside its ~775 entries. For higher-quality or faster answers, connect the Claude API or point `LOCAL_MODEL_NAME` at a larger Ollama model - there's no way around that trade-off, and I'd rather say so here than pretend otherwise.
+The default local model is small (1.5B parameters) so it downloads quickly and runs on ordinary laptop CPUs, but it's noticeably less capable and slower than a large hosted model. The offline knowledge engine below it is a curated lookup table with a fuzzy matcher, not a language model, and will always have gaps outside its ~792 entries. For higher-quality or faster answers, connect the Claude API or point `LOCAL_MODEL_NAME` at a larger Ollama model - there's no way around that trade-off, and I'd rather say so here than pretend otherwise.
 
 ## Project layout
 

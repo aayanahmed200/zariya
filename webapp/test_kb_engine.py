@@ -24,6 +24,20 @@ like phone numbers ("call me at 555-1234"), dates, and sports scores
 ("we won 3-2") were silently misread as arithmetic and given a nonsense
 numeric answer. It now only evaluates when the rest of the message is just
 normal math phrasing. The "regression" prompts below check this stays fixed.
+
+A second bug this guards against: _MAX_EXPONENT alone bounded the exponent
+of a `**` but not the base's digit count, so a huge base raised to a small,
+in-bounds exponent (e.g. a ~4300-digit number cubed) could still burn real
+CPU computing a result whose decimal string representation blows past
+Python's own int-to-str conversion digit limit -- which then got silently
+swallowed, wasting that CPU time for no answer at all. try_math() now
+estimates the result's digit count up front and returns a friendly "too
+large" message instead. The same huge-digit-run input also used to make
+try_convert()'s and try_number_ops()'s "<number><keyword>" regexes take
+quadratic time backtracking through it (a separate bug, same root cause:
+no bound on how long a run of digits can be) -- both now bail out via
+_has_oversized_number() first. HUGE_BASE_PROMPT below, and the 3s call-time
+ceiling in main(), check all of this stays fixed.
 """
 import sys
 import time
@@ -32,6 +46,14 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 import kb_engine  # noqa: E402
+
+# A base right at the edge of what Python can even parse as one token
+# (4300 digits, matching sys.get_int_max_str_digits()'s default) raised to a
+# small, comfortably in-bounds exponent -- individually "reasonable" by the
+# old exponent-only bound, but base**3 has ~3x the digits of the base alone,
+# well past that same limit once try_math() tries to format it into a reply.
+HUGE_BASE = "9" * 4300
+HUGE_BASE_PROMPT = f"what is {HUGE_BASE}**3"
 
 
 def ask(text):
@@ -103,7 +125,7 @@ def build_prompts():
     # 9. Edge cases: empty/whitespace/very long/garbage/special characters
     prompts += ["", "   ", "?", "......", "a" * 500, "<script>alert(1)</script>",
                 "'; DROP TABLE users; --", "\ud83d\ude00\ud83c\udf89\ud83d\ude80", "\n\n\t",
-                "1" * 50 + "+" + "2" * 50]
+                "1" * 50 + "+" + "2" * 50, HUGE_BASE_PROMPT]
 
     # 10. Mixed language / code-mixed
     prompts += ["hello, aap kaisay hain?", "what is \u067e\u0627\u0646\u06cc", "thank you \u0628\u06c1\u062a \u0634\u06a9\u0631\u06cc\u06c1"]
@@ -128,18 +150,35 @@ def main():
     crashes = []
     fallback_count = 0
     math_regression_hits = []
+    huge_power_hits = []
+    huge_power_max_call_time = 0.0
     regression_markers = ["555-1234", "0301-1234567", "101-102", "3-2", "21-14",
                            "12-25-2001", "5-6", "AI-202", "4587-2210"]
 
     t0 = time.time()
     for p in prompts:
+        call_t0 = time.time()
         try:
             reply = ask(p)
         except Exception:
             crashes.append((p, traceback.format_exc()))
             continue
+        call_elapsed = time.time() - call_t0
         if reply and "comes to **" in reply and any(marker in p for marker in regression_markers):
             math_regression_hits.append((p, reply))
+        if HUGE_BASE in p:
+            # Should return a friendly "too large" message, quickly -- not
+            # silently fall through to something else after burning CPU on
+            # an unbounded huge**small computation (the bug this guards).
+            # Flag it either way: wrong/missing content, OR a call that's
+            # come back slow (generous 3s bar -- everything else in this
+            # whole few-hundred-prompt run finishes in low milliseconds; a
+            # regression here previously took ~10s per call) -- so a
+            # re-introduced quadratic-regex blowup gets caught even on a
+            # call that still eventually lands on the right reply text.
+            huge_power_max_call_time = max(huge_power_max_call_time, call_elapsed)
+            if not reply or "too large" not in reply.lower() or call_elapsed > 3.0:
+                huge_power_hits.append((p, reply, call_elapsed))
         if reply and ("offline knowledge base" in reply or "\u0622\u0641 \u0644\u0627\u0626\u0646" in reply or "\u0645\u0639\u0630\u0631\u062a" in reply):
             fallback_count += 1
     elapsed = time.time() - t0
@@ -149,6 +188,8 @@ def main():
     print(f"Crashes (unhandled exceptions): {len(crashes)}")
     print(f"Fell through to the generic 'I don't know that yet' reply: {fallback_count}")
     print(f"Regression check -- non-math text misread as arithmetic: {len(math_regression_hits)}")
+    print(f"Regression check -- huge base**small exponent mishandled: {len(huge_power_hits)} "
+          f"(slowest call {huge_power_max_call_time:.2f}s)")
 
     if crashes:
         print("\n--- CRASHES ---")
@@ -158,10 +199,15 @@ def main():
         print("\n--- MATH FALSE-POSITIVE REGRESSION (should be empty) ---")
         for p, r in math_regression_hits:
             print(f"Prompt: {p!r} -> {r!r}")
+    if huge_power_hits:
+        print("\n--- HUGE BASE**EXPONENT REGRESSION (should be empty) ---")
+        for p, r, t in huge_power_hits:
+            print(f"Prompt (truncated): {p[:60]!r}... -> {r!r} ({t:.2f}s)")
 
-    if not crashes and not math_regression_hits:
-        print("\nAll good: no crashes, and the phone-number/date/score false-positive bug did not reappear.")
-    sys.exit(1 if (crashes or math_regression_hits) else 0)
+    if not crashes and not math_regression_hits and not huge_power_hits:
+        print("\nAll good: no crashes, the phone-number/date/score false-positive bug did not "
+              "reappear, and a huge base**small-exponent expression got a clean, fast answer.")
+    sys.exit(1 if (crashes or math_regression_hits or huge_power_hits) else 0)
 
 
 if __name__ == "__main__":
