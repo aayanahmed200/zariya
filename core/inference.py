@@ -166,6 +166,7 @@ class InferenceEngine:
             yield f"Error: {self._error}"
             return
 
+        yielded_any = False
         try:
             for chunk in self._llm.create_chat_completion(
                 messages=self._build_chat_messages(messages),
@@ -178,10 +179,25 @@ class InferenceEngine:
                 delta = chunk["choices"][0].get("delta", {})
                 token = delta.get("content")
                 if token:
+                    yielded_any = True
                     yield token
             return
-        except Exception:
-            pass  # model has no usable chat template - fall back below
+        except Exception as e:
+            if yielded_any:
+                # Some of the reply already reached the caller (and, in
+                # app/views/chat.py, is already on screen -- it does
+                # `full += tok` with nothing in between chunks). Falling
+                # through to the raw-prompt completion below would silently
+                # glue a second, unrelated completion onto that partial text
+                # with no separator or indication anything went wrong. Stop
+                # cleanly instead, the same way webapp/local_model.py's
+                # stream_reply() / webapp/app.py's chat_stream() treat "some
+                # tokens already came back" as final rather than layering
+                # another backend's output on top of it.
+                yield f"\n\n[Streaming error, reply cut short: {e}]"
+                return
+            # Nothing yielded yet, so nothing to corrupt -- this is the
+            # "model has no usable chat template" case, fall back below.
 
         prompt = self.build_prompt(messages)
         try:
