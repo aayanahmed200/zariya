@@ -67,8 +67,13 @@ def test_missing_model_file_gives_clear_error(monkeypatch):
 
 
 def test_llama_cpp_not_installed_gives_clear_error():
-    if "llama_cpp" in sys.modules:
-        del sys.modules["llama_cpp"]
+    # Setting the sys.modules entry to None (rather than deleting it) is the
+    # documented way to force `import llama_cpp` to raise ImportError. Just
+    # deleting the entry isn't enough when llama-cpp-python is actually
+    # installed (as requirements.txt requires) -- the real package would
+    # just get re-imported from site-packages and this test would instead
+    # exercise the "failed to load an invalid file" path.
+    sys.modules["llama_cpp"] = None
     import importlib
     import core.inference as inf
     importlib.reload(inf)
