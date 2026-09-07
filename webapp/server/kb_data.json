@@ -2963,7 +2963,7 @@
         "is the github lookup verified",
         "does the github feature prove identity"
       ],
-      "a": "It doesn't — and it isn't meant to. Typing a GitHub username just displays that account's already-public avatar, name, and bio; it never checks that you actually own it, because there's no real sign-in happening (that would need a backend server, which this single file intentionally doesn't have). If you want your sidebar photo to genuinely be yours, use \"Upload a photo\" in Settings → Profile instead — that file only ever comes from your own device."
+      "a": "Yes — this is real GitHub OAuth, the same authorization-code flow GitHub's own docs describe. Clicking \"Sign in with GitHub\" in Settings → Account sends you to GitHub itself to approve access; GitHub then hands this server a one-time code, which is exchanged for an access token server-side using a client secret that never reaches your browser. What you see afterward — avatar, name, bio — comes from the account you actually just authenticated as, not from typing in an arbitrary username."
     },
     {
       "k": [
