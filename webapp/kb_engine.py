@@ -491,7 +491,12 @@ def try_math(text: str):
         "equal", "to", "of", "answer", "result", "please", "and", "plus", "minus",
         "times", "divided", "by", "sum", "value", "it",
     }
-    other_words = [w for w in re.findall(r"[a-zA-Z]{2,}", text.lower()) if w not in _MATH_PHRASE_WORDS]
+    # `+` (any run of letters), not `{2,}`: a `{2,}` minimum silently made
+    # single-letter words (a lone "a", "I", grade letters like "B" in "got a
+    # B-2 on it") invisible to this "any non-math word present?" check, so a
+    # message built mostly out of one-letter words plus a number range could
+    # still slip past this guard and get misread as arithmetic.
+    other_words = [w for w in re.findall(r"[a-zA-Z]+", text.lower()) if w not in _MATH_PHRASE_WORDS]
 
     cleaned = text.replace("^", "**")
     cleaned = re.sub(r"[^0-9+\-*/().\s]", "", cleaned)
@@ -550,19 +555,27 @@ def try_convert(text: str):
     if m:
         v = float(m.group(1))
         return f"{v} lbs is about **{v/2.20462:.2f} kg**."
-    m = re.search(r"(-?\d+(\.\d+)?)\s*(c|celsius)\b.*\b(f|fahrenheit)\b", lower)
+    # Bare single-letter aliases ("c", "f", "in") are deliberately not matched
+    # here -- unlike "km"/"kg"/"cm" they collide with ordinary English (an
+    # amount "of" something, the word "in" as a preposition), so a message
+    # like "10 f candidates applied, c option was..." or "170 cm tall and
+    # I live in Lahore" used to get misread as a unit conversion. Requiring
+    # the unit spelled out keeps the shorthand these two really mean to
+    # support ("30 celsius to fahrenheit", "cm to inches") without matching
+    # unrelated text that merely contains a lone "c"/"f"/"in" later on.
+    m = re.search(r"(-?\d+(\.\d+)?)\s*(?:deg(?:rees)?\s*)?celsius\b.*\bfahrenheit\b", lower)
     if m:
         v = float(m.group(1))
         return f"{v}\u00b0C is **{(v*9/5)+32:.1f}\u00b0F**."
-    m = re.search(r"(-?\d+(\.\d+)?)\s*(f|fahrenheit)\b.*\b(c|celsius)\b", lower)
+    m = re.search(r"(-?\d+(\.\d+)?)\s*fahrenheit\b.*\b(?:deg(?:rees)?\s*)?celsius\b", lower)
     if m:
         v = float(m.group(1))
         return f"{v}\u00b0F is **{(v-32)*5/9:.1f}\u00b0C**."
-    m = re.search(r"(-?\d+(\.\d+)?)\s*cm\b.*\b(inch|inches|in)\b", lower)
+    m = re.search(r"(-?\d+(\.\d+)?)\s*cm\b.*\b(?:inch|inches)\b", lower)
     if m:
         v = float(m.group(1))
         return f"{v} cm is about **{v/2.54:.2f} inches**."
-    m = re.search(r"(-?\d+(\.\d+)?)\s*(inch|inches|in)\b.*\bcm\b", lower)
+    m = re.search(r"(-?\d+(\.\d+)?)\s*(?:inch|inches)\b.*\bcm\b", lower)
     if m:
         v = float(m.group(1))
         return f"{v} inches is about **{v*2.54:.2f} cm**."
@@ -631,11 +644,11 @@ def try_number_ops(text: str):
             a, b = int(nums[0]), int(nums[1])
             return f"The LCM of {a} and {b} is **{math.lcm(a, b)}**."
 
-    m = re.search(r"(\d+)\s*to\s*binary|binary\s*(of|for)\s*(\d+)", lower)
+    m = re.search(r"(\d+)\s*(?:to|in)\s*binary|binary\s*(of|for)\s*(\d+)", lower)
     if m:
         n = int(m.group(1) or m.group(3))
         return f"{n} in binary is **{bin(n)[2:]}**."
-    m = re.search(r"(\d+)\s*to\s*hex(adecimal)?|hex(adecimal)?\s*(of|for)\s*(\d+)", lower)
+    m = re.search(r"(\d+)\s*(?:to|in)\s*hex(adecimal)?|hex(adecimal)?\s*(of|for)\s*(\d+)", lower)
     if m:
         n = int(m.group(1) or m.group(5))
         return f"{n} in hexadecimal is **{hex(n)[2:].upper()}**."
