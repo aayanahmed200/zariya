@@ -6,7 +6,7 @@ Zariya is an offline-first assistant for Urdu and other low-resource languages. 
 
 ## Overview
 
-The repository contains an actively developed Flask web app and an earlier Streamlit application. The web app uses Ollama for local inference; the original app loads a GGUF model through `llama.cpp`.
+The repository contains an actively developed Flask web app and an earlier Streamlit application. The web app uses Ollama for local inference and a curated offline knowledge engine as a fallback; the original app loads a GGUF model through `llama.cpp`.
 
 ## Highlights
 
@@ -39,10 +39,6 @@ streamlit run run.py
 ```
 
 Run the tests with `pytest tests/`, `python webapp/test_kb_engine.py`, and `pytest webapp/test_local_model.py webapp/test_embeddings.py`.
-
-## Notes and limitations
-
-The offline knowledge engine is a curated lookup system, not a full language model, and has gaps outside its stored vocabulary and entries. Local model quality and speed depend on the model and computer. The web app's configuration and tests are documented in `webapp/README.md`.
 
 
 ## License
