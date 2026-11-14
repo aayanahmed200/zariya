@@ -3,14 +3,15 @@
 [![Python](https://img.shields.io/badge/python-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
 [![Flask](https://img.shields.io/badge/flask-000000?style=for-the-badge&logo=flask&logoColor=white)](https://flask.palletsprojects.com/)
 [![Streamlit](https://img.shields.io/badge/streamlit-FF4B4B?style=for-the-badge&logo=streamlit&logoColor=white)](https://streamlit.io/)
+**Repository:** [zariya](https://github.com/aayanahmed200/zariya)
 
 Zariya is an offline-first AI assistant for Urdu and other low-resource languages. Once a model is downloaded, it runs entirely on your own device, so it works without an internet connection and doesn't depend on any cloud API to hold a conversation.
 
-## Why this exists
+## Overview
 
 A lot of AI tools quietly assume two things: that you have a solid internet connection, and that your language already has good support baked into the model. Neither of those is true everywhere, and they're especially not true for a lot of Urdu speakers. I started Zariya to see how far a genuinely local, privacy-first AI system could go, and to make sure Urdu wasn't treated as an afterthought.
 
-## Two versions in this repo
+## Architecture
 
 The project has gone through two iterations, and both still work:
 
@@ -19,7 +20,7 @@ The project has gone through two iterations, and both still work:
 
 If you're only going to run one, use the web app - see [`webapp/README.md`](webapp/README.md) for its full setup.
 
-## Features
+## Capabilities
 
 - Works fully offline once a model is downloaded
 - Bilingual Urdu/English support
@@ -28,7 +29,7 @@ If you're only going to run one, use the web app - see [`webapp/README.md`](weba
 - A small offline knowledge engine as a safety net when no model is loaded yet
 - Semantic fallback search over the knowledge base: when the fast keyword matcher comes up empty, the web app can optionally use a local Ollama embedding model to find the closest entry by meaning, not just shared words - and degrades silently back to keyword-only if Ollama or the embedding model isn't available
 
-## Tech stack
+## Technology
 
 - Python
 - Flask (web app)
@@ -36,7 +37,7 @@ If you're only going to run one, use the web app - see [`webapp/README.md`](weba
 - Ollama for local model inference (web app)
 - Vanilla JS/CSS front end
 
-## Project structure
+## Repository structure
 
 - `webapp/` - Flask app, local model + offline fallback, browser front end
 - `app/`, `core/`, `models/` - original Streamlit app and inference engine
@@ -45,7 +46,7 @@ If you're only going to run one, use the web app - see [`webapp/README.md`](weba
 - `requirements.txt` - dependencies for the Streamlit app
 - `requirements-dev.txt` - adds pytest, for running `tests/`
 
-## Setup
+## Run locally
 
 Run the web app - see [`webapp/README.md`](webapp/README.md) for full setup (Ollama install, `.env` config, optional Claude/search/GitHub sign-in).
 
@@ -55,7 +56,7 @@ To run the original Streamlit app instead: `pip install -r requirements.txt && s
 
 Actively working on this. The offline knowledge engine covers everyday conversation, a general vocabulary bank, and a growing set of Pakistan-specific civic, financial, and cultural terms (CNIC/NADRA, mobile wallets, utilities, Ramadan-related terms, and similar), but it's still primarily a fixed lookup table, not a language model - ask it something outside that set (and outside what semantic search can match) and it says so rather than guessing. The local model path is only as good as whatever you point it at - a 1.5B model on a laptop CPU won't compete with a hosted large model, and I'd rather say that upfront than pretend otherwise.
 
-## Tests
+## Testing
 
 - `tests/` - covers the Streamlit app's core logic (`core/`): session memory, notes, flashcard generation/parsing, TTS markdown stripping, model downloads, and inference (chat + streaming, including the chat-template-unsupported fallback path). Run with `pip install -r requirements-dev.txt && pytest tests/`.
 - `webapp/test_kb_engine.py` - runs 570 varied prompts through the offline knowledge engine and checks for crashes or regressions. Run with `python webapp/test_kb_engine.py` (standard library only, no install needed).
