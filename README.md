@@ -6,7 +6,7 @@ Zariya is an offline-first assistant for Urdu and other low-resource languages. 
 
 ## Overview
 
-The project includes an actively developed Flask web app and an earlier Streamlit application. Both are retained: the web app uses Ollama for local inference, while the original app loads a GGUF model through `llama.cpp`.
+The repository contains an actively developed Flask web app and an earlier Streamlit application. The web app uses Ollama for local inference; the original app loads a GGUF model through `llama.cpp`.
 
 ## Highlights
 
@@ -14,18 +14,15 @@ The project includes an actively developed Flask web app and an earlier Streamli
 - Local model inference through Ollama in the web app.
 - Token-by-token response streaming.
 - Offline knowledge-base fallback when a local model is unavailable.
-- Optional cloud services are configured by the person deploying the app; users do not need to enter provider keys.
+- Optional cloud integrations are configured by the deployer; users do not need to enter provider keys.
 
 ## Technology
 
-- Python and Flask for the web app.
-- Ollama for local model inference.
-- Streamlit and `llama-cpp-python` for the original app.
-- Vanilla JavaScript and CSS for the web interface.
+Python, Flask, Ollama, Streamlit, `llama-cpp-python`, vanilla JavaScript, and CSS.
 
 ## Run locally
 
-For the actively developed web app, follow `webapp/README.md`. The basic setup is:
+For the actively developed web app:
 
 ```bash
 cd webapp
@@ -43,7 +40,7 @@ streamlit run run.py
 
 ## Notes and limitations
 
-The offline knowledge engine is a curated lookup system, not a full language model; it has gaps outside its stored vocabulary and entries. Local model quality and speed depend on the selected model and the computer running it.
+The offline knowledge engine is a curated lookup system, not a full language model, and has gaps outside its stored vocabulary and entries. Local model quality and speed depend on the model and computer. The web app's configuration and tests are documented in `webapp/README.md`.
 
 ## Tests
 
