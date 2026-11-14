@@ -4,7 +4,7 @@ The actively developed Flask application for offline-first Urdu and low-resource
 
 ## Overview
 
-The web app connects to Ollama for local model responses and uses a curated offline knowledge engine as a fallback. Optional integrations run server-side when configured by the deployer.
+The web app connects to Ollama for local model responses and uses a curated offline knowledge engine as a fallback. The default local model is compact, and response quality and speed depend on the model and hardware. Optional integrations run server-side when configured by the deployer.
 
 ## Highlights
 
@@ -48,6 +48,3 @@ Copy `.env.example` and configure only the features you plan to use:
 - `pytest test_local_model.py` — Ollama integration tests.
 - `pytest test_embeddings.py` — embedding parsing, similarity, caching, and fallback tests.
 
-## Notes and limitations
-
-The default local model is small and may be slower or less capable than hosted models. The offline knowledge engine is a curated lookup system, not a general-purpose language model. Browser settings support a per-browser persona prompt, response creativity, and switching between models already downloaded by Ollama.
