@@ -3,40 +3,41 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="theme-color" content="#34745a">
+<meta name="theme-color" content="#2e7655">
 <meta name="color-scheme" content="light dark">
 <meta name="application-name" content="Zariya">
-<meta name="description" content="Zariya is an Urdu and English assistant for learning, writing and everyday questions, with Ollama-powered chat, notes and flashcards.">
+<meta name="description" content="Zariya is a free Urdu and English AI workspace with local Ollama chat, notes and flashcards. Run open models on your own device without a paid cloud API.">
 <meta name="robots" content="index, follow, max-image-preview:large">
 <meta name="author" content="Zariya">
-<title>Zariya — Urdu &amp; English AI Assistant</title>
-<link rel="canonical" href="https://zariya-ebon.vercel.app/">
-<link rel="icon" type="image/svg+xml" href="/favicon.svg">
-<link rel="icon" type="image/png" href="/static/logo.png">
-<link rel="apple-touch-icon" href="/static/logo.png">
-<link rel="manifest" href="/site.webmanifest">
+<title>Zariya — Free Urdu &amp; English AI Workspace</title>
+<link rel="canonical" href="https://zariyas.vercel.app/">
+<link rel="icon" type="image/png" href="/static/logo.png?v=20261121-4">
+<link rel="shortcut icon" type="image/png" href="/static/logo.png?v=20261121-4">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg?v=20261121-4">
+<link rel="apple-touch-icon" href="/static/logo.png?v=20261121-4">
+<link rel="manifest" href="/site.webmanifest?v=20261121-4">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Zariya">
-<meta property="og:title" content="Zariya — Urdu &amp; English AI Assistant">
-<meta property="og:description" content="Ask questions, explore ideas and study in Urdu or English. Keep your chats, notes and flashcards together in one workspace.">
-<meta property="og:url" content="https://zariya-ebon.vercel.app/">
+<meta property="og:title" content="Zariya — Free Urdu &amp; English AI Workspace">
+<meta property="og:description" content="Chat in Urdu or English with local Ollama models. Keep notes and flashcards together in a private, device-first workspace.">
+<meta property="og:url" content="https://zariyas.vercel.app/">
 <meta property="og:locale" content="en_PK">
-<meta property="og:image" content="https://zariya-ebon.vercel.app/static/logo.png">
-<meta property="og:image:alt" content="Zariya">
-<meta name="twitter:card" content="summary">
-<meta name="twitter:title" content="Zariya — Urdu &amp; English AI Assistant">
-<meta name="twitter:description" content="An Urdu and English workspace for questions, notes and learning.">
+<meta property="og:image" content="https://zariyas.vercel.app/static/logo.png">
+<meta property="og:image:alt" content="Zariya orange interlocking mark">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Zariya — Free Urdu &amp; English AI Workspace">
+<meta name="twitter:description" content="A private Urdu and English workspace for local AI chat, notes and flashcards. No paid cloud API required.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Lora:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=Noto+Nastaliq+Urdu:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/static/style.css">
+<link rel="stylesheet" href="/static/style.css?v=20261121-4">
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
   "@type": "WebApplication",
   "name": "Zariya",
-  "url": "https://zariya-ebon.vercel.app/",
-  "description": "An Urdu and English workspace for chat, notes and flashcards, powered by Ollama models.",
+  "url": "https://zariyas.vercel.app/",
+  "description": "A free Urdu and English workspace for local Ollama chat, notes and flashcards.",
   "applicationCategory": "Education",
   "operatingSystem": "Any",
   "inLanguage": ["en", "ur"],
@@ -324,6 +325,29 @@
                 <span class="ollama-status-mark" id="ollamaStatusMark"></span>
               </div>
               <div id="ollamaSetupNote" class="ollama-setup-note">Connect Ollama to start using generative models.</div>
+              <div class="local-device-panel" id="localDevicePanel">
+                <div class="local-device-row">
+                  <div class="local-device-copy">
+                    <label for="localDeviceModelInput">Run a model on this device — free</label>
+                    <span class="sub">Uses your computer, not a paid cloud API. The model stays on your device.</span>
+                  </div>
+                  <div class="local-device-controls">
+                    <input id="localDeviceModelInput" value="qwen2.5:1.5b" autocomplete="off" spellcheck="false" aria-label="Local Ollama model name">
+                    <button class="btn primary" id="localDeviceConnectBtn" type="button">Test &amp; connect</button>
+                  </div>
+                </div>
+                <div class="local-device-help">
+                  <strong>One-time setup</strong>
+                  <ol>
+                    <li>Install and open <a href="https://ollama.com/download" target="_blank" rel="noopener noreferrer">Ollama</a>.</li>
+                    <li>Open PowerShell and download a small model: <code>ollama pull qwen2.5:1.5b</code></li>
+                    <li>Allow this site to access your local Ollama server: <code>setx OLLAMA_ORIGINS "https://zariyas.vercel.app"</code></li>
+                    <li>Quit Ollama from the system tray, reopen it, then press <strong>Test &amp; connect</strong>.</li>
+                  </ol>
+                  <p>On macOS or Linux, use the <a href="https://github.com/ollama/ollama/blob/main/docs/faq.mdx" target="_blank" rel="noopener noreferrer">official Ollama environment setup guide</a> for <code>OLLAMA_ORIGINS</code>.</p>
+                </div>
+                <div class="local-device-status" id="localDeviceStatusNote" role="status" aria-live="polite">Local Ollama is not connected yet.</div>
+              </div>
               <div id="localModelControls">
                 <div class="setting-row model-select-row">
                   <div><label for="modelSelect">Active model</label><div class="sub">Choose an available Ollama model.</div></div>
@@ -385,6 +409,6 @@
   </form>
 </dialog>
 </div>
-<script src="/static/app.js"></script>
+<script src="/static/app.js?v=20261121-4"></script>
 </body>
 </html>
