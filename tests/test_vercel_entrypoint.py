@@ -189,7 +189,8 @@ def test_no_paid_local_ollama_flow_is_present_in_frontend():
     source = (ROOT / "webapp" / "static" / "app.js").read_text(encoding="utf-8")
     assert "function connectLocalDevice()" in source
     assert "function streamLocalOllama(" in source
-    assert "http://127.0.0.1:11434/api/chat" in source
+    assert "LOCAL_OLLAMA_BASE = 'http://127.0.0.1:11434'" in source
+    assert "LOCAL_OLLAMA_BASE+'/api/chat'" in source
     assert "isPureUrdu" in source
     assert "dir','auto'" in source
 
