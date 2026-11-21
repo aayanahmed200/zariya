@@ -21,6 +21,7 @@ let editingDeckId = null;
 let studyQueue = []; let studyIndex = 0; let studyFlipped = false;
 let editingIndex = null;
 let isGenerating = false;
+let isQuickToolBusy = false;
 let stopped = false;
 let currentAbort = null;
 let serverConfig = {
@@ -474,6 +475,7 @@ document.getElementById('sbScrim').addEventListener('click', closeSidebarMobile)
 
 /* ============ SESSIONS ============ */
 function newSession(){
+  if(isGenerating) stopGenerating();
   const s = { id:uid(), title:'New chat', messages:[], createdAt:Date.now() };
   sessions.unshift(s); currentSessionId = s.id;
   saveServerState(); renderSessionList(); renderChat();
@@ -497,7 +499,14 @@ function renderSessionList(){
     const div = document.createElement('div');
     div.className = 'sess-item' + (s.id===currentSessionId?' active':'');
     div.innerHTML = '<span class="sess-title">'+escapeHtml(s.title)+'</span><button class="sess-del" title="Delete chat" aria-label="Delete chat"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0-1 14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2L4 6"/></svg></button>';
-    div.addEventListener('click', ()=>{ currentSessionId = s.id; editingIndex=null; renderSessionList(); renderChat(); closeSidebarMobile(); });
+    div.addEventListener('click', ()=>{
+      if(isGenerating && currentSessionId!==s.id) stopGenerating();
+      currentSessionId = s.id;
+      editingIndex=null;
+      renderSessionList();
+      renderChat();
+      closeSidebarMobile();
+    });
     div.querySelector('.sess-del').addEventListener('click', (e)=>deleteSession(s.id, e));
     wrap.appendChild(div);
   });
@@ -519,6 +528,7 @@ function renderChat(){
   const inner = document.getElementById('chat-inner');
   const scroll = document.getElementById('chat-scroll');
   const session = currentSession();
+  updateQuickToolsState();
   inner.innerHTML = '';
   if(!session || !session.messages.length){
     scroll.classList.add('empty-mode'); inner.classList.add('empty-mode');
@@ -636,6 +646,7 @@ function setGenerating(on){
   isGenerating = on;
   if(on){ sendBtn.dataset.mode='stop'; sendBtn.innerHTML=STOP_ICON; sendBtn.disabled=false; }
   else { sendBtn.dataset.mode='send'; sendBtn.innerHTML=SEND_ICON; syncSendState(); }
+  updateQuickToolsState();
 }
 function showThinking(){
   const inner = document.getElementById('chat-inner');
@@ -759,11 +770,29 @@ function regenerateLast(){
 
 /* ============ QUICK TOOLS ============ */
 document.querySelectorAll('.qt-btn').forEach(btn=> btn.addEventListener('click', ()=>runQuickTool(btn.dataset.tool)));
+function updateQuickToolsState(){
+  const session=currentSession();
+  const ready=!!(session && session.messages.length) && !isGenerating && !isQuickToolBusy;
+  document.querySelectorAll('.qt-btn').forEach(button=>{
+    button.disabled=!ready;
+    button.title=ready ? '' : (isGenerating || isQuickToolBusy ? 'Wait for the current action to finish.' : 'Start a chat before using this tool.');
+  });
+}
 async function runQuickTool(tool){
-  if(isGenerating) return;
+  if(isGenerating || isQuickToolBusy) return;
   const session = currentSession();
-  if(!session || !session.messages.length) return;
+  if(!session || !session.messages.length){
+    const hint=document.getElementById('composerHint');
+    if(hint) hint.textContent='Start a chat and send a message before using these tools.';
+    updateQuickToolsState();
+    return;
+  }
   const payload = { messages: session.messages.map(m=>({role:m.role, content:m.content})) };
+  const button=document.querySelector('.qt-btn[data-tool="'+tool+'"]');
+  const originalLabel=button ? button.textContent : '';
+  isQuickToolBusy=true;
+  if(button) button.textContent='Working…';
+  updateQuickToolsState();
   try{
     if(tool==='summarize'){
       const {result} = await apiPost('/api/tools/summarize', payload);
@@ -810,11 +839,17 @@ async function runQuickTool(tool){
       downloadFile(filename,'# '+session.title+'\n\n'+lines.join('\n\n'));
       return;
     }
-    saveServerState(); renderChat();
+    saveServerState();
+    if(currentSessionId===session.id) renderChat();
   }catch(err){
     removeThinking();
     session.messages.push({role:'assistant',content:'That tool is not available right now: '+(err.message||'request failed'),ts:nowISO()});
-    saveServerState(); renderChat();
+    saveServerState();
+    if(currentSessionId===session.id) renderChat();
+  }finally{
+    isQuickToolBusy=false;
+    if(button) button.textContent=originalLabel;
+    updateQuickToolsState();
   }
 }
 
@@ -1043,6 +1078,14 @@ document.addEventListener('visibilitychange', ()=>{
 
 
 /* ============ NOTEPAD ============ */
+function updateNoteActionState(){
+  const note=notes.find(item=>item.id===currentNoteId);
+  const hasNote=!!note;
+  const hasBody=hasNote && !!document.getElementById('note-body-input').value.trim();
+  document.getElementById('exportNoteBtn').disabled=!hasNote;
+  document.getElementById('deleteNoteBtn').disabled=!hasNote;
+  document.getElementById('noteToFlashBtn').disabled=!hasBody;
+}
 function renderNotesList(){
   const wrap = document.getElementById('notesList'); wrap.innerHTML='';
     renderNoteTagFilterRow();
@@ -1056,7 +1099,12 @@ function renderNotesList(){
     wrap.appendChild(div);
   });
   if(!currentNoteId && notes.length) openNote(notes[0].id);
-  if(!notes.length){ document.getElementById('note-title-input').value=''; document.getElementById('note-body-input').value=''; }
+  if(!notes.length){
+    document.getElementById('note-title-input').value='';
+    document.getElementById('note-body-input').value='';
+    document.getElementById('note-tags-input').value='';
+  }
+  updateNoteActionState();
 }
   function renderNoteTagFilterRow(){
       const row = document.getElementById('noteTagFilterRow');
@@ -1065,7 +1113,7 @@ function renderNotesList(){
       notes.forEach(n=>(n.tags||[]).forEach(t=>{ tagCounts[t] = (tagCounts[t]||0)+1; }));
       const tags = Object.keys(tagCounts).sort();
       if(!tags.length){ row.innerHTML = ''; return; }
-      row.innerHTML = tags.map(t=>'<span class="tag-chip'+(activeNoteTagFilter===t?' active':'')+'" data-tag="'+escapeHtml(t)+'">'+escapeHtml(t)+' ('+tagCounts[t]+')</span>').join('');
+      row.innerHTML = tags.map(t=>'<button type="button" class="tag-chip'+(activeNoteTagFilter===t?' active':'')+'" data-tag="'+escapeHtml(t)+'" aria-pressed="'+(activeNoteTagFilter===t)+'">'+escapeHtml(t)+' ('+tagCounts[t]+')</button>').join('');
       row.querySelectorAll('.tag-chip').forEach(chip=>{
             chip.addEventListener('click', ()=>{
                     const t = chip.dataset.tag;
@@ -1101,12 +1149,14 @@ document.getElementById('note-title-input').addEventListener('input', ()=>{
   noteTitleSaveTimer = setTimeout(()=>{ const n=notes.find(n=>n.id===currentNoteId); if(n){ n.title=document.getElementById('note-title-input').value||'Untitled note'; saveServerState(); renderNotesList(); } }, 400);
 });
 document.getElementById('note-body-input').addEventListener('input', ()=>{
+  updateNoteActionState();
   clearTimeout(noteBodySaveTimer);
   noteBodySaveTimer = setTimeout(()=>{ const n=notes.find(n=>n.id===currentNoteId); if(n){ n.body=document.getElementById('note-body-input').value; saveServerState(); renderNotesList(); } }, 400);
 });
 document.getElementById('exportNoteBtn').addEventListener('click', ()=>{
   const n = notes.find(n=>n.id===currentNoteId); if(!n) return;
-  downloadFile((n.title||'note')+'.md', '# '+n.title+'\n\n'+n.body);
+  const filename=(n.title||'note').replace(/[^\w\- ]/g,'').trim().replace(/\s+/g,'_') || 'note';
+  downloadFile(filename+'.md', '# '+n.title+'\n\n'+n.body,'text/markdown;charset=utf-8');
 });
   let noteTagsSaveTimer;
   document.getElementById('note-tags-input').addEventListener('input', ()=>{
@@ -1420,7 +1470,7 @@ function renderDeckTagFilterRow(){
     decks.forEach(d=>(d.tags||[]).forEach(t=>{ tagCounts[t] = (tagCounts[t]||0)+1; }));
     const tags = Object.keys(tagCounts).sort();
     if(!tags.length){ row.innerHTML = ''; return; }
-    row.innerHTML = tags.map(t=>'<span class="tag-chip'+(activeDeckTagFilter===t?' active':'')+'" data-tag="'+escapeHtml(t)+'">'+escapeHtml(t)+' ('+tagCounts[t]+')</span>').join('');
+    row.innerHTML = tags.map(t=>'<button type="button" class="tag-chip'+(activeDeckTagFilter===t?' active':'')+'" data-tag="'+escapeHtml(t)+'" aria-pressed="'+(activeDeckTagFilter===t)+'">'+escapeHtml(t)+' ('+tagCounts[t]+')</button>').join('');
     row.querySelectorAll('.tag-chip').forEach(chip=>{
           chip.addEventListener('click', ()=>{
                   const t = chip.dataset.tag;
