@@ -2,13 +2,17 @@
 
 **Live application:** [zariyas.vercel.app](https://zariyas.vercel.app/)
 
-A bilingual Urdu and English workspace for AI chat, notes and flashcards. The hosted website uses an open-weight language model through Vercel AI Gateway; visitors do not need to install Ollama or create an API key.
+A bilingual Urdu and English workspace for AI chat, voice typing, notes and flashcards. The hosted website uses an open-weight language model through Vercel AI Gateway; visitors do not need to install Ollama or create an API key.
 
 ## Overview
 
 The Flask web app in `webapp/` is the deployable browser application. Chat requests are sent from the Flask server to Vercel AI Gateway using Vercel's deployment OIDC token. The default model is `nvidia/nemotron-3.5-lightning-free`, which is currently listed at $0 per input and output token in the Vercel AI Gateway catalogue. Free-model capacity and rate limits can change, so the app falls back to its built-in knowledge engine when hosted inference is unavailable.
 
 The model is hosted by a third-party provider. Its current provider listing does not advertise zero-data-retention or a no-training guarantee. Avoid entering passwords, private records or other sensitive information in chat.
+
+The composer also includes browser voice typing with an English/Urdu language choice when the browser supports Web Speech recognition. It requires microphone permission; voice audio may be processed by the browser's speech-recognition provider. Zariya does not store voice recordings.
+
+Quick actions for summaries, key points, translation and flashcard creation use the hosted model with the built-in knowledge engine as a fallback.
 
 The older Streamlit app remains available for local experimentation and uses a separate GGUF model workflow; it is not required to use the hosted website.
 
@@ -65,7 +69,7 @@ The default NVIDIA Nemotron 3.5 Lightning Free model is currently listed at $0 p
 
 ## Data and limitations
 
-Chats, notes and flashcards are stored in the visitor's browser local storage; they are not synced across devices or accounts. Clearing browser storage removes them. For AI chat, message content is transmitted to Vercel AI Gateway and the selected model provider. The current NVIDIA provider listing does not claim zero data retention or a no-training guarantee; do not send sensitive information. Generated answers can be inaccurate.
+Chats, notes and flashcards are stored in the visitor's browser local storage; they are not synced across devices or accounts. Clearing browser storage removes them. For AI chat, message content is transmitted to Vercel AI Gateway and the selected model provider. The current NVIDIA provider listing does not claim zero data retention or a no-training guarantee; do not send sensitive information. Generated answers can be inaccurate. Browser voice recognition availability and its audio handling depend on the browser and its speech service.
 
 The built-in knowledge engine supports selected calculations, translations and curated knowledge entries. It is not a general-purpose language model. Optional Google Search sends search terms to Google when enabled.
 
