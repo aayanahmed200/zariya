@@ -161,16 +161,20 @@
         <div id="composer">
           <div class="composer-inner">
             <div class="composer-box" id="composerBox">
-              <button class="composer-btn mic" id="micBtn" type="button" title="Voice input" aria-label="Voice input">
+              <button class="composer-btn mic" id="micBtn" type="button" title="Start voice typing" aria-label="Start voice typing" aria-pressed="false">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="2.5" width="6" height="12" rx="3"/><path d="M5.5 11.5a6.5 6.5 0 0 0 13 0M12 18v3.5M8.5 21.5h7"/></svg>
               </button>
+              <select id="voiceLanguage" class="voice-language" aria-label="Speech recognition language" title="Choose the language you are speaking">
+                <option value="en-US">EN</option>
+                <option value="ur-PK">اردو</option>
+              </select>
               <textarea id="chat-input" rows="1" placeholder="Message Zariya…  اردو میں بھی لکھیں" aria-label="Message Zariya"></textarea>
               <button class="composer-btn send" id="sendBtn" type="button" data-mode="send" disabled aria-label="Send message">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
               </button>
             </div>
             <div class="composer-footer">
-              <span class="composer-hint" id="composerHint">Start a chat in Urdu or English.</span>
+              <span class="composer-hint" id="composerHint" role="status" aria-live="polite">Start a chat in Urdu or English.</span>
               <span class="composer-enter">Enter to send · Shift + Enter for a new line</span>
             </div>
           </div>
