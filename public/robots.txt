@@ -3,4 +3,4 @@ Allow: /
 Disallow: /api/
 Disallow: /auth/
 
-Sitemap: https://zariya-ebon.vercel.app/sitemap.xml
+Sitemap: https://zariyas.vercel.app/sitemap.xml
