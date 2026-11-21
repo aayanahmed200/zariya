@@ -842,3 +842,17 @@ body{direction:ltr;text-align:left;background:var(--bg);color:var(--text)}
 @media(max-width:700px){
   .voice-language{flex-basis:48px;width:48px;height:32px;font-size:10px}
 }
+
+
+/* Workspace backup and local-storage feedback */
+.workspace-backup{
+  display:grid;
+  gap:10px;
+  padding:14px 0 2px;
+  border-top:1px solid var(--border);
+}
+.workspace-backup strong{display:block;color:var(--text);font-size:11px;font-weight:700}
+.workspace-backup p{margin:4px 0 0;color:var(--muted);font-size:10px;line-height:1.55;max-width:620px}
+.workspace-backup-actions{display:flex;flex-wrap:wrap;gap:8px}
+.storage-status{display:block;color:var(--muted);font-size:9px;line-height:1.5}
+.storage-status.warning{color:var(--danger);font-weight:650}
