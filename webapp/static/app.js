@@ -680,33 +680,207 @@ function speak(text){
   window.speechSynthesis.speak(u);
 }
 const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-let recognizer=null, listening=false;
 const micBtn = document.getElementById('micBtn');
+const voiceLanguage = document.getElementById('voiceLanguage');
 const composerHint = document.getElementById('composerHint');
 const composerBox = document.getElementById('composerBox');
-const defaultHint = composerHint.textContent;
-try{
-  if(!SR){
-    micBtn.style.opacity='0.35'; micBtn.title='Voice input needs Chrome or Edge on desktop.';
-    micBtn.addEventListener('click', ()=>{ composerHint.textContent='Voice input isn\'t supported in this browser.'; setTimeout(()=>composerHint.textContent=defaultHint, 4000); });
-  } else if(!window.isSecureContext){
-    micBtn.addEventListener('click', ()=>{ composerHint.textContent='Voice input needs https or localhost.'; setTimeout(()=>composerHint.textContent=defaultHint, 4000); });
-  } else {
-    recognizer = new SR(); recognizer.continuous=false; recognizer.interimResults=true;
-    recognizer.onresult = (e)=>{
-      let t=''; for(let i=0;i<e.results.length;i++) t+=e.results[i][0].transcript;
-      const base = recognizer._base||''; input.value = (base?base+' ':'')+t;
-      input.style.height='auto'; input.style.height=Math.min(input.scrollHeight,160)+'px'; syncSendState();
-    };
-    recognizer.onstart = ()=>{ listening=true; micBtn.classList.add('active'); composerBox.classList.add('listening'); recognizer._base=input.value.trim(); composerHint.textContent='Listening…'; };
-    recognizer.onend = ()=>{ listening=false; micBtn.classList.remove('active'); composerBox.classList.remove('listening'); composerHint.textContent=defaultHint; input.focus(); };
-    recognizer.onerror = ()=>{ listening=false; micBtn.classList.remove('active'); composerBox.classList.remove('listening'); composerHint.textContent=defaultHint; };
-    micBtn.addEventListener('click', ()=>{
-      if(listening){ try{recognizer.stop();}catch(e){} return; }
-      try{ recognizer.lang = isUrdu(input.value) ? 'ur-PK':'en-US'; recognizer.start(); }catch(e){}
-    });
+let recognizer = null;
+let listening = false;
+let shouldListen = false;
+let voiceBaseText = '';
+let voiceSessionFinal = '';
+let voiceReturnHint = composerHint.textContent;
+let voiceErrorMessage = '';
+let voiceRestartTimer = null;
+
+const savedVoiceLanguage = LS.get('zariya_voice_language', 'en-US');
+if(voiceLanguage){
+  voiceLanguage.value = savedVoiceLanguage === 'ur-PK' ? 'ur-PK' : 'en-US';
+  voiceLanguage.addEventListener('change', ()=>{
+    LS.set('zariya_voice_language', voiceLanguage.value);
+    if(listening){
+      shouldListen = false;
+      try{ recognizer.stop(); }catch(error){}
+      showVoiceHint('Voice typing stopped. Tap the microphone to start in '+voiceLanguage.options[voiceLanguage.selectedIndex].text+'.');
+    }
+  });
+}
+
+function showVoiceHint(message, active=false){
+  composerHint.textContent = message;
+  composerHint.classList.toggle('listening', active);
+}
+function updateVoiceComposer(finalText, interimText=''){
+  const transcript = [voiceBaseText, finalText, interimText]
+    .map(value=>String(value||'').trim())
+    .filter(Boolean)
+    .join(' ')
+    .trim();
+  input.value = transcript;
+  input.style.height = 'auto';
+  input.style.height = Math.min(input.scrollHeight, 160)+'px';
+  syncSendState();
+}
+function voiceErrorText(code){
+  const messages = {
+    'not-allowed': 'Microphone permission was blocked. Allow microphone access for this site in your browser settings, then try again.',
+    'service-not-allowed': 'The browser speech service is unavailable for this site. Check your browser permissions and try again.',
+    'audio-capture': 'No working microphone was found. Connect a microphone and try again.',
+    'network': 'The browser speech service could not be reached. Check your internet connection and try again.',
+    'no-speech': 'I did not hear any speech. Move closer to your microphone and try again.',
+    'language-not-supported': 'This browser speech service does not support the selected language. Try English or update your browser.',
+    'aborted': 'Voice typing was stopped.'
+  };
+  return messages[code] || 'Voice typing could not start. Check your microphone permission and try again.';
+}
+function finishVoiceUI(message){
+  listening = false;
+  micBtn.classList.remove('active');
+  micBtn.setAttribute('aria-pressed','false');
+  micBtn.setAttribute('aria-label','Start voice typing');
+  micBtn.title = 'Start voice typing';
+  composerBox.classList.remove('listening');
+  if(message) showVoiceHint(message);
+  else showVoiceHint(voiceReturnHint);
+}
+function startVoiceRecognition(){
+  if(!recognizer || !window.isSecureContext){
+    showVoiceHint(!window.isSecureContext
+      ? 'Voice typing requires a secure HTTPS connection or localhost.'
+      : 'Voice typing is not supported in this browser. Try the latest Chrome or Edge.');
+    return;
   }
-}catch(e){ micBtn.style.opacity='0.35'; }
+  if(listening || shouldListen) return;
+  voiceReturnHint = composerHint.textContent;
+  voiceBaseText = input.value.trim();
+  voiceSessionFinal = '';
+  voiceErrorMessage = '';
+  shouldListen = true;
+  recognizer.lang = voiceLanguage.value;
+  try{
+    recognizer.start();
+  }catch(error){
+    shouldListen = false;
+    finishVoiceUI(error.name === 'InvalidStateError'
+      ? 'Voice typing is already starting. Tap the microphone again in a moment.'
+      : 'Could not start the microphone. Check browser permission and try again.');
+  }
+}
+function stopVoiceRecognition(){
+  shouldListen = false;
+  if(voiceRestartTimer) clearTimeout(voiceRestartTimer);
+  voiceRestartTimer = null;
+  if(recognizer && listening){
+    try{ recognizer.stop(); }catch(error){ finishVoiceUI(); }
+  }else{
+    finishVoiceUI();
+  }
+}
+
+if(SR && window.isSecureContext){
+  try{
+    recognizer = new SR();
+    recognizer.continuous = true;
+    recognizer.interimResults = true;
+    recognizer.maxAlternatives = 1;
+
+    recognizer.onstart = ()=>{
+      listening = true;
+      voiceSessionFinal = '';
+      voiceErrorMessage = '';
+      micBtn.classList.add('active');
+      micBtn.setAttribute('aria-pressed','true');
+      micBtn.setAttribute('aria-label','Stop voice typing');
+      micBtn.title = 'Stop voice typing';
+      composerBox.classList.add('listening');
+      const selectedLanguage = voiceLanguage.value === 'ur-PK' ? 'Urdu' : 'English';
+      showVoiceHint('Listening in '+selectedLanguage+'… Speak naturally. Tap the microphone to finish.', true);
+    };
+
+    recognizer.onresult = event=>{
+      const finalParts = [];
+      const interimParts = [];
+      for(let i=0;i<event.results.length;i++){
+        const result = event.results[i];
+        const text = result && result[0] ? result[0].transcript : '';
+        if(!text) continue;
+        if(result.isFinal) finalParts.push(text);
+        else interimParts.push(text);
+      }
+      voiceSessionFinal = finalParts.join(' ').trim();
+      updateVoiceComposer(voiceSessionFinal, interimParts.join(' ').trim());
+      if(interimParts.length){
+        showVoiceHint('Listening… your words will appear here as you speak.', true);
+      }
+    };
+
+    recognizer.onerror = event=>{
+      voiceErrorMessage = voiceErrorText(event.error);
+      shouldListen = false;
+      if(voiceRestartTimer) clearTimeout(voiceRestartTimer);
+      voiceRestartTimer = null;
+      showVoiceHint(voiceErrorMessage);
+    };
+
+    recognizer.onend = ()=>{
+      listening = false;
+      micBtn.classList.remove('active');
+      micBtn.setAttribute('aria-pressed','false');
+      micBtn.setAttribute('aria-label','Start voice typing');
+      micBtn.title = 'Start voice typing';
+      composerBox.classList.remove('listening');
+
+      // Commit only confirmed words. Interim hypotheses are not part of the transcript.
+      voiceBaseText = [voiceBaseText, voiceSessionFinal].filter(Boolean).join(' ').trim();
+      voiceSessionFinal = '';
+      updateVoiceComposer('', '');
+
+      if(shouldListen && !voiceErrorMessage){
+        showVoiceHint('Listening… reconnecting the speech recognizer.', true);
+        voiceRestartTimer = setTimeout(()=>{
+          voiceRestartTimer = null;
+          if(!shouldListen) return;
+          try{ recognizer.start(); }
+          catch(error){
+            shouldListen = false;
+            finishVoiceUI('Voice recognition paused. Tap the microphone to continue.');
+          }
+        }, 300);
+        return;
+      }
+
+      shouldListen = false;
+      if(voiceErrorMessage){
+        finishVoiceUI(voiceErrorMessage);
+      }else if(voiceBaseText){
+        finishVoiceUI('Voice captured. Review the transcript before sending.');
+      }else{
+        finishVoiceUI('No speech was captured. Tap the microphone to try again.');
+      }
+      input.focus();
+    };
+  }catch(error){
+    recognizer = null;
+  }
+}
+
+micBtn.addEventListener('click', ()=>{
+  if(!SR || !window.isSecureContext){
+    showVoiceHint(!window.isSecureContext
+      ? 'Voice typing requires a secure HTTPS connection or localhost.'
+      : 'Voice typing needs a supported browser. Try the latest Chrome or Edge.');
+    return;
+  }
+  if(shouldListen || listening) stopVoiceRecognition();
+  else startVoiceRecognition();
+});
+
+document.addEventListener('visibilitychange', ()=>{
+  if(document.hidden && (shouldListen || listening)) stopVoiceRecognition();
+});
+
+// Most browser speech-recognition engines process audio through the browser's
+// speech service. The site does not store the recorded audio.
 
 
 /* ============ NOTEPAD ============ */
