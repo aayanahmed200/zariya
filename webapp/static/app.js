@@ -513,7 +513,29 @@ async function respondTo(session){
   currentAbort=new AbortController();
   let reply='';
   let bubbleEl=null;
+  const handleStreamPayload = payload=>{
+    if(payload.reset){
+      reply='';
+      if(bubbleEl) updateStreamingBubble(bubbleEl,reply);
+    }
+    if(payload.notice){
+      const hint=document.getElementById('composerHint');
+      if(hint) hint.textContent=payload.notice;
+    }
+    if(payload.delta){
+      reply+=payload.delta;
+      if(!bubbleEl){ removeThinking(); bubbleEl=appendStreamingBubble(); }
+      updateStreamingBubble(bubbleEl,reply);
+    }
+    if(payload.done && payload.provider==='knowledge'){
+      const hint=document.getElementById('composerHint');
+      if(hint) hint.textContent='Using Zariya’s built-in knowledge mode. Some questions need the hosted model.';
+    }
+  };
   try{
+    if(!window.ZariyaSSE || typeof window.ZariyaSSE.consume!=='function'){
+      throw new Error('The chat stream parser did not load. Refresh the page and try again.');
+    }
     const res=await fetch('/api/chat/stream',{
       method:'POST',
       headers:{'Content-Type':'application/json','Accept':'text/event-stream'},
@@ -536,33 +558,10 @@ async function respondTo(session){
       const {done,value}=await reader.read();
       if(done) break;
       buffer+=decoder.decode(value,{stream:true});
-      let index;
-      while((index=buffer.indexOf('\\n\\n'))!==-1){
-        const block=buffer.slice(0,index);
-        buffer=buffer.slice(index+2);
-        const line=block.split('\\n').find(item=>item.startsWith('data: '));
-        if(!line) continue;
-        let payload;
-        try{ payload=JSON.parse(line.slice(6)); }catch(error){ continue; }
-        if(payload.reset){
-          reply='';
-          if(bubbleEl) updateStreamingBubble(bubbleEl,reply);
-        }
-        if(payload.notice){
-          const hint=document.getElementById('composerHint');
-          if(hint) hint.textContent=payload.notice;
-        }
-        if(payload.delta){
-          reply+=payload.delta;
-          if(!bubbleEl){ removeThinking(); bubbleEl=appendStreamingBubble(); }
-          updateStreamingBubble(bubbleEl,reply);
-        }
-        if(payload.done && payload.provider==='knowledge'){
-          const hint=document.getElementById('composerHint');
-          if(hint) hint.textContent='Using Zariya’s built-in knowledge mode. Some questions need the hosted model.';
-        }
-      }
+      buffer=window.ZariyaSSE.consume(buffer,handleStreamPayload);
     }
+    buffer+=decoder.decode();
+    window.ZariyaSSE.consume(buffer,handleStreamPayload,true);
   }catch(error){
     if(error.name==='AbortError'){
       removeThinking();
@@ -570,11 +569,15 @@ async function respondTo(session){
       if(stopped && reply.trim()){
         session.messages.push({role:'assistant',content:reply,ts:nowISO()});
         saveServerState();
-        renderChat();
+        if(currentSessionId===session.id) renderChat();
       }
       return;
     }
-    reply='Could not reach hosted AI right now: '+(error.message || 'Please try again.');
+    if(reply.trim()){
+      reply += '\n\n---\n\n*The connection stopped before the full answer arrived. This is the partial response received so far.*';
+    }else{
+      reply='Could not reach hosted AI right now: '+(error.message || 'Please try again.');
+    }
   }
   removeThinking();
   setGenerating(false);
@@ -582,9 +585,10 @@ async function respondTo(session){
   if(!reply) reply='I couldn’t generate a response. Please try again.';
   session.messages.push({role:'assistant',content:reply,ts:nowISO()});
   saveServerState();
-  renderChat();
+  if(currentSessionId===session.id) renderChat();
   if(uiPrefs.ttsEnabled) speak(reply);
 }
+
 function appendStreamingBubble(){
   const inner = document.getElementById('chat-inner');
   const scroll = document.getElementById('chat-scroll');
