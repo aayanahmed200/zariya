@@ -190,7 +190,6 @@ async function loadServerState(){
   if(storageDescription) storageDescription.textContent = serverConfig.hostedMode
     ? 'Saved in this browser. Not synced across devices.'
     : 'Saved by this local development server.';
-  if(!activeOllamaModel) activeOllamaModel = serverConfig.localModelName || '';
 }
 let saveTimer;
 function saveServerState(){
