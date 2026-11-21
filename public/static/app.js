@@ -107,13 +107,13 @@ function renderMarkdown(raw){
       while(i<lines.length && !/^ {0,3}\x60{3}\s*$/.test(lines[i])) codeLines.push(lines[i++]);
       if(i<lines.length) i++;
       const codeId = 'code_'+uid();
-      html.push('<div class="code-block"><div class="code-block-head"><span>'+escapeHtml(language)+'</span><button class="code-copy-btn" type="button" data-code-id="'+codeId+'">Copy</button></div><pre><code id="'+codeId+'">'+escapeHtml(codeLines.join('\n'))+'</code></pre></div>');
+      html.push('<div class="code-block"><div class="code-block-head"><span>'+escapeHtml(language)+'</span><button class="code-copy-btn" type="button" data-code-id="'+codeId+'">Copy</button></div><pre><code dir="ltr" id="'+codeId+'">'+escapeHtml(codeLines.join('\n'))+'</code></pre></div>');
       continue;
     }
     const heading = line.match(/^ {0,3}(#{1,6})\s+(.+)$/);
     if(heading){
       const level = heading[1].length;
-      html.push('<h'+level+'>'+formatInline(heading[2])+'</h'+level+'>');
+      html.push('<h'+level+' dir="auto">'+formatInline(heading[2])+'</h'+level+'>');
       i++; continue;
     }
     if(/^ {0,3}(?:-{3,}|_{3,}|\*{3,})\s*$/.test(line)){
@@ -123,7 +123,7 @@ function renderMarkdown(raw){
     if(/^\s*>/.test(line)){
       const quote = [];
       while(i<lines.length && /^\s*>/.test(lines[i])) quote.push(lines[i++].replace(/^\s*>\s?/, ''));
-      html.push('<blockquote>'+renderMarkdown(quote.join('\n'))+'</blockquote>');
+      html.push('<blockquote dir="auto">'+renderMarkdown(quote.join('\n'))+'</blockquote>');
       continue;
     }
     if(isTableStart(i)){
@@ -131,26 +131,26 @@ function renderMarkdown(raw){
       i += 2;
       const rows = [];
       while(i<lines.length && /^\s*\|/.test(lines[i])){ rows.push(cells(lines[i])); i++; }
-      const headHtml = headers.map(cell=>'<th scope="col">'+formatInline(cell)+'</th>').join('');
-      const bodyHtml = rows.map(row=>'<tr>'+headers.map((header,index)=>'<td>'+formatInline(row[index] || '')+'</td>').join('')+'</tr>').join('');
+      const headHtml = headers.map(cell=>'<th scope="col" dir="auto">'+formatInline(cell)+'</th>').join('');
+      const bodyHtml = rows.map(row=>'<tr>'+headers.map((header,index)=>'<td dir="auto">'+formatInline(row[index] || '')+'</td>').join('')+'</tr>').join('');
       html.push('<div class="markdown-table-wrap"><table class="markdown-table"><thead><tr>'+headHtml+'</tr></thead><tbody>'+bodyHtml+'</tbody></table></div>');
       continue;
     }
     if(/^\s*[-*+]\s+/.test(line)){
       const items = [];
-      while(i<lines.length && /^\s*[-*+]\s+/.test(lines[i])){ items.push('<li>'+formatInline(lines[i].replace(/^\s*[-*+]\s+/,''))+'</li>'); i++; }
+      while(i<lines.length && /^\s*[-*+]\s+/.test(lines[i])){ items.push('<li dir="auto">'+formatInline(lines[i].replace(/^\s*[-*+]\s+/,''))+'</li>'); i++; }
       html.push('<ul>'+items.join('')+'</ul>');
       continue;
     }
     if(/^\s*\d+[.)]\s+/.test(line)){
       const items = [];
-      while(i<lines.length && /^\s*\d+[.)]\s+/.test(lines[i])){ items.push('<li>'+formatInline(lines[i].replace(/^\s*\d+[.)]\s+/,''))+'</li>'); i++; }
+      while(i<lines.length && /^\s*\d+[.)]\s+/.test(lines[i])){ items.push('<li dir="auto">'+formatInline(lines[i].replace(/^\s*\d+[.)]\s+/,''))+'</li>'); i++; }
       html.push('<ol>'+items.join('')+'</ol>');
       continue;
     }
     const paragraph = [];
     while(i<lines.length && lines[i].trim() && !isBlockStart(i)){ paragraph.push(lines[i]); i++; }
-    if(paragraph.length) html.push('<p>'+formatInline(paragraph.join('\n'))+'</p>');
+    if(paragraph.length) html.push('<p dir="auto">'+formatInline(paragraph.join('\n'))+'</p>');
   }
   return html.join('');
 }
