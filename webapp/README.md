@@ -1,12 +1,12 @@
 # Zariya Flask Web App
 
-**Live application:** [zariya-ebon.vercel.app](https://zariya-ebon.vercel.app/)
+**Live application:** [zariyas.vercel.app](https://zariyas.vercel.app/)
 
 The Urdu- and English-language browser workspace, powered by Ollama with a built-in knowledge fallback.
 
 ## Overview
 
-The Flask app provides chat, chat history, notepad, flashcards, deck import/export and browser speech features. Ollama is the only generative model provider. The app connects to a local Ollama server during development or Ollama Cloud when deployed to Vercel. Without an available model connection, selected queries are handled by the built-in rule-based knowledge engine.
+The Flask app provides chat, chat history, notepad, flashcards, deck import/export and browser speech features. Ollama is the only generative model provider. In production, visitors can connect their own local Ollama server directly from the browser without a paid cloud API key. Optional Ollama Cloud inference is supported through a server-side key. Without a model connection, selected queries are handled by the built-in rule-based knowledge engine.
 
 ## Repository contents
 
@@ -38,7 +38,9 @@ Install and start [Ollama](https://ollama.com/download). Zariya uses `http://loc
 
 Import the repository into Vercel with the project root set to `.`. The root `index.py` exports the Flask app, root `requirements.txt` contains the web runtime dependencies, and Vercel serves `public/` from its static asset CDN.
 
-Vercel cannot run an Ollama desktop daemon inside a Function, so hosted mode connects directly to Ollama Cloud. Add `OLLAMA_API_KEY` in Vercel Project Settings → Environment Variables. Create the key in [Ollama settings](https://ollama.com/settings/keys). The default cloud model is `gemma4:31b`; set `OLLAMA_MODEL` to another model name available to your Ollama account. Set `OLLAMA_BASE_URL` only when using a private remote Ollama server instead of Ollama Cloud.
+Vercel cannot run a desktop Ollama daemon inside a Function. The free path is to connect the visitor's Ollama app directly from the browser: install Ollama, download a model (for example `ollama pull qwen2.5:1.5b`), then allow `https://zariyas.vercel.app` in `OLLAMA_ORIGINS`. On Windows use `setx OLLAMA_ORIGINS "https://zariyas.vercel.app"`, quit and reopen Ollama, and press Test & connect in Settings. Local prompts stay on the visitor's computer.
+
+Optional hosted inference uses an `OLLAMA_API_KEY` configured in Vercel Project Settings → Environment Variables. Direct Ollama Cloud API access is metered and can require usage credits; it is not needed for the local connection.
 
 The Cloud API key is used on the server only. Ollama Cloud does not expose the local model inventory endpoint; Settings shows the active cloud model and lets you enter another model name manually.
 
