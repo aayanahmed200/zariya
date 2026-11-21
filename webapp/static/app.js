@@ -285,8 +285,7 @@ function restoreWorkspaceBackup(raw){
   renderChat();
   renderNotesList();
   renderDeckGrid();
-  updateStorageStatus(true,'Backup restored. Your previous browser workspace was replaced.');
-  return true;
+    return true;
 }
 document.getElementById('exportWorkspaceBtn').addEventListener('click',exportWorkspaceBackup);
 document.getElementById('importWorkspaceBtn').addEventListener('click',()=>document.getElementById('importWorkspaceFile').click());
@@ -1174,7 +1173,8 @@ let reviewingAllCards = false;
 
 /* ============ SPACED REPETITION (SM-2) ============ */
 function migrateCardForSpacedRepetition(c){
-  if(c.due === undefined) c.due = new Date(0).toISOString();
+  if(!c.id) c.id = uid();
+  if(c.due === undefined || !Number.isFinite(Date.parse(c.due))) c.due = new Date(0).toISOString();
   if(c.ease === undefined) c.ease = 2.5;
   if(c.interval === undefined) c.interval = 0;
   if(c.reps === undefined) c.reps = 0;
