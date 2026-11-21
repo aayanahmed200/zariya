@@ -436,7 +436,7 @@ def test_workspace_backup_and_flashcard_edit_controls_exist():
     assert "replace the chats, notes and flashcard decks" in source
     assert "browser could not save more data" in source
     assert "function editDeck(id)" in source
-    assert "data-action=\\"edit\\"" in source
+    assert 'data-action="edit"' in source
     assert "previousCards.get(row.dataset.cardId)" in source
 
 
