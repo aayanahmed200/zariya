@@ -1,27 +1,41 @@
 # Zariya
 
-[![Python](https://img.shields.io/badge/python-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/) [![Flask](https://img.shields.io/badge/flask-000000?style=for-the-badge&logo=flask&logoColor=white)](https://flask.palletsprojects.com/) [![Ollama](https://img.shields.io/badge/ollama-000000?style=for-the-badge&logo=ollama&logoColor=white)](https://ollama.com/)
-
-Zariya is an offline-first assistant for Urdu and other low-resource languages.
+An Urdu- and English-language assistant with local model options and a rule-based knowledge fallback. The repository contains two separate applications: a Streamlit app and a Flask web app.
 
 ## Overview
 
-The repository contains an actively developed Flask web app and an earlier Streamlit application. The web app uses Ollama for local inference and a curated offline knowledge engine as a fallback. The original app loads a GGUF model through `llama.cpp`.
+The original application at the repository root uses `llama-cpp-python` to run a GGUF model locally. The launcher is `run.py`; place a compatible model at `models/model.gguf` for local generation.
 
-## Highlights
+The newer application is in `webapp/`. It is a Flask app that uses Ollama for local model responses and a built-in knowledge engine when a model is unavailable. It can also connect to optional services such as Claude, Google Custom Search and GitHub OAuth when the deployer configures the relevant credentials.
 
-- Supports Urdu and English.
-- Runs local model inference through Ollama in the web app.
-- Streams responses token by token.
-- Uses an offline knowledge-base fallback when a local model is unavailable.
+These are separate implementations with separate dependencies and setup steps. See [the web app README](webapp/README.md) for its configuration details.
+
+## Repository contents
+
+- `app/` — Streamlit interface, chat views, settings, notes and flashcards.
+- `core/` — local inference, model download, memory, notes, flashcards, summarisation and text-to-speech helpers.
+- `models/` — location for the GGUF model used by the Streamlit app.
+- `webapp/` — Flask application, Ollama integration, knowledge engine, templates and browser assets.
+- `tests/` — tests for the original application's core functions.
 
 ## Technology
 
-Python, Flask, Ollama, Streamlit, `llama-cpp-python`, vanilla JavaScript, and CSS.
+Python, Streamlit, `llama-cpp-python`, Flask, Ollama, Requests, vanilla JavaScript and CSS. Ollama is installed separately from the Python packages.
 
 ## Run locally
 
-For the actively developed web app:
+### Streamlit application
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+python run.py
+```
+
+The launcher starts Streamlit. Add a compatible GGUF file at `models/model.gguf`; without it, the interface can start but local model responses will not be available.
+
+### Flask web application
 
 ```bash
 cd webapp
@@ -30,25 +44,14 @@ cp .env.example .env
 python app.py
 ```
 
-To run the original Streamlit version from the repository root:
+Install and start [Ollama](https://ollama.com) to use local model generation. If it is unavailable, the app can fall back to its built-in knowledge engine. Configure optional integrations in `webapp/.env.example` only when you intend to use them.
 
-```bash
-pip install -r requirements.txt
-streamlit run run.py
-```
+Run the root tests with `pytest tests/`. The web app has its own checks in `webapp/`; see [webapp/README.md](webapp/README.md).
 
-Run the tests with:
+## Scope and limitations
 
-```bash
-pytest tests/
-python webapp/test_kb_engine.py
-pytest webapp/test_local_model.py webapp/test_embeddings.py
-```
-
-## Notes and limitations
-
-Local model use requires a supported model to be downloaded and configured. The Flask/Ollama web app and the earlier Streamlit app are separate implementations. Optional cloud integrations are configured by the deployer.
+The knowledge engine is a curated, rule-based fallback, not a general-purpose language model. Model output can be incorrect. The local applications can run without cloud credentials, but enabling Claude or web search sends the relevant request to those external services. The Flask web app stores application data in a local JSON file and is documented in its source as a demonstration-scale setup, not a multi-tenant production database.
 
 ## License
 
-MIT — see `LICENSE`.
+MIT. See [LICENSE](LICENSE).
