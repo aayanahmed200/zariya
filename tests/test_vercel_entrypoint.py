@@ -423,3 +423,34 @@ def test_voice_input_has_urdu_english_choice_and_permission_feedback():
     assert "Microphone permission was blocked" in source
     assert "Voice captured. Review the transcript before sending." in source
     assert "stopVoiceRecognition();" in source
+
+
+def test_workspace_backup_and_flashcard_edit_controls_exist():
+    html = (ROOT / "webapp" / "templates" / "index.html").read_text(encoding="utf-8")
+    source = (ROOT / "webapp" / "static" / "app.js").read_text(encoding="utf-8")
+    assert 'id="exportWorkspaceBtn"' in html
+    assert 'id="importWorkspaceBtn"' in html
+    assert 'id="importWorkspaceFile"' in html
+    assert "zariya-workspace-backup" in source
+    assert "function normaliseImportedWorkspace" in source
+    assert "replace the chats, notes and flashcard decks" in source
+    assert "browser could not save more data" in source
+    assert "function editDeck(id)" in source
+    assert "data-action=\\"edit\\"" in source
+    assert "previousCards.get(row.dataset.cardId)" in source
+
+
+def test_browser_sse_parser_is_loaded_and_stream_parser_uses_it():
+    html = (ROOT / "webapp" / "templates" / "index.html").read_text(encoding="utf-8")
+    source = (ROOT / "webapp" / "static" / "app.js").read_text(encoding="utf-8")
+    parser = (ROOT / "webapp" / "static" / "sse.js").read_text(encoding="utf-8")
+    assert '/static/sse.js?' in html
+    assert "window.ZariyaSSE.consume" in source
+    assert 'pending.indexOf("\\\\n\\\\n")' in parser
+    assert "buffer.indexOf('\\\\\\\\n\\\\\\\\n')" not in source
+
+
+def test_srs_migration_assigns_missing_card_ids_and_repairs_invalid_due_dates():
+    source = (ROOT / "webapp" / "static" / "app.js").read_text(encoding="utf-8")
+    assert "if(!c.id) c.id = uid();" in source
+    assert "if(c.due === undefined || !Number.isFinite(Date.parse(c.due)))" in source
