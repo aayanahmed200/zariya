@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=IBM+Plex+Mono:wght@400;500&family=Noto+Nastaliq+Urdu:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+<link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
 
@@ -17,7 +17,7 @@
 <aside id="sidebar">
 <div class="sb-header">
 <div class="sb-brand">
-<img class="sb-mark" src="{{ url_for('static', filename='logo.png') }}" alt="Zariya">
+<img class="sb-mark" src="/static/logo.png" alt="Zariya">
 <div class="sb-name">Zariya</div>
 </div>
 </div>
@@ -71,7 +71,7 @@ Settings
 
 <main id="main">
 <div class="onboarding-banner" id="onboardingBanner" style="display:none;">
-<span class="ob-text">Zariya's local AI model runs through <strong>Ollama</strong>. If replies seem stuck in offline mode, make sure <a href="https://ollama.com" target="_blank" rel="noopener noreferrer">Ollama</a> is installed and running on the machine hosting this server, then use Settings &rarr; Retry download.</span>
+<span class="ob-text">Hosted mode uses Zariya's built-in Urdu/English knowledge engine. Add a server-side AI provider key for generative responses. Your chats and notes are kept in this browser.</span>
 <button class="ob-dismiss" id="onboardingDismissBtn" aria-label="Dismiss">&times;</button>
 </div>
 <div class="topbar">
@@ -106,7 +106,7 @@ Settings
 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
 </button>
 </div>
-<div class="composer-hint" id="composerHint">Zariya can make mistakes. Offline core runs entirely on this server.</div>
+<div class="composer-hint" id="composerHint">Knowledge mode works without an API key. Add a provider key for generative AI.</div>
 </div>
 </div>
 </section>
@@ -115,7 +115,7 @@ Settings
 <section class="view" id="view-notepad">
 <div class="page-head">
 <h1>Notepad</h1>
-<p>Notes saved server-side to your account</p>
+<p id="storageDescription">Notes are saved in this browser when hosted.</p>
 <div class="page-head-actions">
 <button class="btn" id="exportNoteBtn">Export .md</button>
 <button class="btn primary" id="newNoteBtn">New note</button>
@@ -226,8 +226,9 @@ Settings
 
 <div class="setting-group">
 <h3><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:6px;"><path d="M12 2a10 10 0 1 0 10 10"/><path d="M12 2v10l7 4"/></svg>AI status</h3>
-<p class="desc">Local AI model is the default and needs no key -- it downloads and runs entirely on this server. Claude API and web search below are both entirely optional, for whoever deploys this server to add if they want.</p>
-<div class="setting-row"><label>Local AI model (default)</label><span id="localModelStatusText" class="sub"></span></div>
+<p class="desc">Hosted deployments use the built-in bilingual knowledge engine by default. Optional AI and search providers are configured by the site owner; credentials stay server-side.</p>
+<div id="localModelControls">
+<div class="setting-row"><label>Local AI model (local development only)</label><span id="localModelStatusText" class="sub"></span></div>
 <div class="setting-row" id="localModelRetryRow" style="display:none;">
 <div class="progress-bar-track"><div class="progress-bar-fill" id="localModelProgressFill"></div></div>
 <button class="btn" id="localModelRetryBtn">Retry download</button>
@@ -243,6 +244,7 @@ Settings
 <button class="btn" id="pullModelBtn">Pull &amp; use</button>
 </div>
 <div class="small-note" id="modelSwitchNote"></div>
+</div>
 <div class="setting-row"><label>Claude API (optional)</label><span id="claudeStatusText" class="sub"></span></div>
 <div class="setting-row"><label>Web search (optional)</label><span id="searchStatusText" class="sub"></span></div>
 </div>
@@ -256,6 +258,6 @@ Settings
 </main>
 </div>
 
-<script src="{{ url_for('static', filename='app.js') }}"></script>
+<script src="/static/app.js"></script>
 </body>
 </html>

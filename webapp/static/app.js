@@ -82,20 +82,27 @@ async function apiPost(url, body, signal){
 }
 
 async function loadServerState(){
-  const [cfg, meRes, state] = await Promise.all([apiGet('/api/config'), apiGet('/api/me'), apiGet('/api/state')]);
+  const [cfg, meRes] = await Promise.all([apiGet('/api/config'), apiGet('/api/me')]);
   serverConfig = cfg; me = meRes;
-  sessions = state.sessions || [];
-  notes = state.notes || [];
-  decks = state.decks || [];
-  decks.forEach(d=> d.cards.forEach(migrateCardForSpacedRepetition));
+  const state = cfg.hostedMode ? LS.get('zariya_app_state_v1', {}) : await apiGet('/api/state');
+  sessions = Array.isArray(state.sessions) ? state.sessions : [];
+  notes = Array.isArray(state.notes) ? state.notes : [];
+  decks = Array.isArray(state.decks) ? state.decks : [];
+  decks.forEach(d=> (Array.isArray(d.cards) ? d.cards : []).forEach(migrateCardForSpacedRepetition));
   currentSessionId = sessions.length ? sessions[0].id : null;
+  const storageDescription = document.getElementById('storageDescription');
+  if(storageDescription) storageDescription.textContent = cfg.hostedMode
+    ? 'Notes are stored in this browser and are not synced across devices.'
+    : 'Notes are stored by this local development server.';
 }
 let saveTimer;
 function saveServerState(){
   clearTimeout(saveTimer);
-  saveTimer = setTimeout(()=>{
-    apiPost('/api/state', { sessions, notes, decks });
-  }, 300);
+  if(serverConfig.hostedMode){
+    LS.set('zariya_app_state_v1', { sessions, notes, decks });
+    return;
+  }
+  saveTimer = setTimeout(()=>{ apiPost('/api/state', { sessions, notes, decks }).catch(()=>{}); }, 300);
 }
 
 
@@ -129,14 +136,15 @@ function updateCreativityLabel(pct){
 function updateStatusPill(){
   const dot = document.getElementById('statusDot'); const txt = document.getElementById('statusText');
   if(serverConfig.claudeConfigured){ dot.classList.remove('off'); txt.textContent = 'Claude connected'; }
+  else if(serverConfig.hostedMode){ dot.classList.remove('off'); txt.textContent = 'Knowledge mode'; }
   else if(serverConfig.localModelAvailable){ dot.classList.remove('off'); txt.textContent = 'Local model ready'; }
   else if(serverConfig.localModelStatus && /download|loading/i.test(serverConfig.localModelStatus)){ dot.classList.add('off'); txt.textContent = 'Local model starting…'; }
-  else { dot.classList.add('off'); txt.textContent = 'Offline mode'; }
+  else { dot.classList.remove('off'); txt.textContent = 'Knowledge mode'; }
 }
 function updateLocalModelRetryUI(){
   const row = document.getElementById('localModelRetryRow');
   if(!row) return;
-  row.style.display = serverConfig.localModelAvailable ? 'none' : 'flex';
+  row.style.display = (serverConfig.hostedMode || serverConfig.localModelAvailable) ? 'none' : 'flex';
   const prog = serverConfig.localModelProgress;
   const fill = document.getElementById('localModelProgressFill');
   if(fill){
@@ -171,8 +179,10 @@ function renderAccountUI(){
   document.getElementById('githubSignInBtn').disabled = !serverConfig.githubConfigured;
 
   document.getElementById('claudeStatusText').textContent = serverConfig.claudeConfigured ? 'Connected' : 'Not configured (optional)';
-document.getElementById('localModelStatusText').textContent = serverConfig.localModelAvailable ? 'Loaded -- answering your chats' + (serverConfig.localModelName ? ' (' + serverConfig.localModelName + ')' : '') : (serverConfig.localModelStatus || 'Not configured');
+document.getElementById('localModelStatusText').textContent = serverConfig.hostedMode ? 'Not available in Vercel serverless' : (serverConfig.localModelAvailable ? 'Loaded -- answering your chats' + (serverConfig.localModelName ? ' (' + serverConfig.localModelName + ')' : '') : (serverConfig.localModelStatus || 'Not configured'));
   document.getElementById('searchStatusText').textContent = serverConfig.searchConfigured ? 'Connected' : 'Not configured (optional)';
+  const localModelControls = document.getElementById('localModelControls');
+  if(localModelControls) localModelControls.style.display = serverConfig.hostedMode ? 'none' : '';
   updateLocalModelRetryUI();
   updateOnboardingBanner();
 }
@@ -181,7 +191,11 @@ document.getElementById('localModelStatusText').textContent = serverConfig.local
       const banner = document.getElementById('onboardingBanner');
       if(!banner) return;
       const dismissed = LS.get(ONBOARDING_DISMISS_KEY, false);
-      const needsHelp = !serverConfig.claudeConfigured && !serverConfig.localModelAvailable;
+      const needsHelp = serverConfig.hostedMode ? !serverConfig.claudeConfigured
+        : (!serverConfig.claudeConfigured && !serverConfig.localModelAvailable);
+      const copy = banner.querySelector('.ob-text');
+      if(copy && serverConfig.hostedMode) copy.textContent =
+        'Hosted mode is using Zariya’s built-in Urdu/English knowledge engine. Add a server-side ANTHROPIC_API_KEY to enable generative AI. Chats, notes and flashcards are saved in this browser, not synced to an account.';
       banner.style.display = (needsHelp && !dismissed) ? 'flex' : 'none';
   }
   const onboardingDismissBtn = document.getElementById('onboardingDismissBtn');
@@ -939,6 +953,7 @@ document.getElementById('resetPersonaBtn').addEventListener('click', ()=>{ genPr
 async function loadModelList(){
   const sel = document.getElementById('modelSelect');
   if(!sel) return;
+  if(serverConfig.hostedMode){ sel.innerHTML = '<option value="">Local models are disabled on Vercel</option>'; return; }
   try{
     const data = await apiGet('/api/local-model/models');
     const models = data.models || [];
@@ -1018,7 +1033,7 @@ function downloadFile(filename, content){
 /* ============ LIVE STATUS POLLING ============ */
 let statusPollTimer = null;
 function pollLocalModelStatus(){
-  if(serverConfig.localModelAvailable) return;
+  if(serverConfig.hostedMode || serverConfig.localModelAvailable) return;
   if(statusPollTimer) clearInterval(statusPollTimer);
   let elapsed = 0;
   const intervalMs = 4000, maxMs = 15*60*1000;

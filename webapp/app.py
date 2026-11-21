@@ -36,13 +36,16 @@ import local_model
 load_dotenv()
 
 app = Flask(__name__)
-app.secret_key = os.environ.get("FLASK_SECRET_KEY") or secrets.token_hex(32)
+FLASK_SECRET_KEY = os.environ.get("FLASK_SECRET_KEY", "")
+SESSION_SECRET_CONFIGURED = len(FLASK_SECRET_KEY) >= 32 and "change-this" not in FLASK_SECRET_KEY.lower()
+app.secret_key = FLASK_SECRET_KEY or secrets.token_hex(32)
 
 # Debug mode is opt-in only (never on by default) since Flask's debugger
 # exposes an interactive Python console / arbitrary code execution to anyone
 # who can trigger an unhandled exception -- fine for local development,
 # dangerous left on for anything reachable over a network.
 DEBUG_MODE = os.environ.get("FLASK_DEBUG", "0") == "1"
+HOSTED_MODE = bool(os.environ.get("VERCEL"))
 
 # Basic session-cookie hardening: SameSite=Lax blocks the cookie from being
 # sent on most cross-site requests (CSRF mitigation) without breaking normal
@@ -50,7 +53,7 @@ DEBUG_MODE = os.environ.get("FLASK_DEBUG", "0") == "1"
 # mode so plain http://localhost dev still works; a bounded lifetime means a
 # stale session cookie doesn't stay valid forever.
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
-app.config["SESSION_COOKIE_SECURE"] = not DEBUG_MODE
+app.config["SESSION_COOKIE_SECURE"] = HOSTED_MODE or not DEBUG_MODE
 app.config["PERMANENT_SESSION_LIFETIME"] = 60 * 60 * 24 * 7  # 7 days
 
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
@@ -59,7 +62,10 @@ GOOGLE_API_KEY = os.environ.get("GOOGLE_API_KEY", "")
 GOOGLE_CX = os.environ.get("GOOGLE_CX", "")
 GITHUB_CLIENT_ID = os.environ.get("GITHUB_CLIENT_ID", "")
 GITHUB_CLIENT_SECRET = os.environ.get("GITHUB_CLIENT_SECRET", "")
-APP_BASE_URL = os.environ.get("APP_BASE_URL", "http://localhost:5000")
+VERCEL_HOST = os.environ.get("VERCEL_URL", "").strip()
+DEFAULT_BASE_URL = f"https://{VERCEL_HOST}" if VERCEL_HOST else "http://localhost:5000"
+APP_BASE_URL = (os.environ.get("APP_BASE_URL") or DEFAULT_BASE_URL).rstrip("/")
+GITHUB_OAUTH_CONFIGURED = bool(GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET and SESSION_SECRET_CONFIGURED)
 
 DATA_DIR = Path(__file__).parent / "server"
 STORE_PATH = DATA_DIR / "store.json"
@@ -159,7 +165,7 @@ def _generation_params(body):
 # ---------------------------------------------------------------------------
 @app.route("/auth/github/login")
 def github_login():
-    if not GITHUB_CLIENT_ID:
+    if not GITHUB_OAUTH_CONFIGURED:
         return jsonify({"error": "GitHub OAuth isn't configured on this server yet. "
                                   "Set GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET in .env."}), 400
     state = secrets.token_urlsafe(16)
@@ -234,9 +240,9 @@ def me():
             "name": session.get("github_name"),
             "avatar": session.get("github_avatar"),
             "bio": session.get("github_bio"),
-            "githubConfigured": bool(GITHUB_CLIENT_ID),
+            "githubConfigured": GITHUB_OAUTH_CONFIGURED,
         })
-    return jsonify({"signedIn": False, "githubConfigured": bool(GITHUB_CLIENT_ID)})
+    return jsonify({"signedIn": False, "githubConfigured": GITHUB_OAUTH_CONFIGURED})
 
 # ---------------------------------------------------------------------------
 # Chat: Claude API (server-side key) -> local model -> offline knowledge engine.
@@ -432,19 +438,22 @@ def web_search():
 # ---------------------------------------------------------------------------
 @app.route("/api/state", methods=["GET"])
 def get_state():
+    # Vercel Functions do not provide a durable writable project filesystem.
+    # Hosted chat, notes and flashcards are stored in the visitor's browser.
+    if HOSTED_MODE:
+        return jsonify({"sessions": [], "notes": [], "decks": [], "storage": "browser"})
     store = _load_store()
     key = _current_user_key()
     is_new_user = key not in store["users"]
     bucket = _user_bucket(store)
-    # Only persist when a brand-new user bucket was actually just created --
-    # this route runs on every page load/poll, so writing the file on every
-    # GET (even when nothing changed) would mean constant, pointless disk I/O.
     if is_new_user:
         _save_store(store)
     return jsonify(bucket)
 
 @app.route("/api/state", methods=["POST"])
 def save_state():
+    if HOSTED_MODE:
+        return jsonify({"ok": False, "error": "Hosted mode uses browser-local storage."}), 409
     body = request.get_json(silent=True) or {}
     store = _load_store()
     key = _current_user_key()
@@ -482,15 +491,25 @@ def kb_stats():
 
 @app.route("/api/config")
 def config():
-    """Tells the frontend what's available server-side, without ever revealing keys."""
+    """Expose provider availability, never credentials or secret values."""
     return jsonify({
+        "hostedMode": HOSTED_MODE,
         "claudeConfigured": bool(ANTHROPIC_API_KEY),
         "searchConfigured": bool(GOOGLE_API_KEY and GOOGLE_CX),
-        "githubConfigured": bool(GITHUB_CLIENT_ID),
-        "localModelAvailable": local_model.is_available(),
-        "localModelStatus": local_model.load_status(),
-        "localModelProgress": local_model.load_progress(),
+        "githubConfigured": GITHUB_OAUTH_CONFIGURED,
+        "localModelAvailable": False if HOSTED_MODE else local_model.is_available(),
+        "localModelStatus": "Disabled on Vercel serverless" if HOSTED_MODE else local_model.load_status(),
+        "localModelProgress": {"completed": 0, "total": 0} if HOSTED_MODE else local_model.load_progress(),
         "localModelName": local_model.current_model(),
+    })
+
+@app.route("/api/health")
+def health():
+    return jsonify({
+        "ok": True,
+        "service": "zariya",
+        "mode": "hosted" if HOSTED_MODE else "local",
+        "knowledgeEntries": len(kb_engine.KB),
     })
 
 @app.route("/api/local-model/retry", methods=["POST"])

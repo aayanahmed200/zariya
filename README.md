@@ -1,63 +1,74 @@
 # Zariya
 
-An Urdu- and English-language assistant with local model options and a rule-based knowledge fallback. The repository contains two separate applications: a Streamlit app and a Flask web app.
+An Urdu- and English-language assistant with browser-based chat, notes and flashcards, a bundled knowledge fallback, and optional AI integrations.
 
 ## Overview
 
-The original application at the repository root uses `llama-cpp-python` to run a GGUF model locally. The launcher is `run.py`; place a compatible model at `models/model.gguf` for local generation.
+The Flask web app in `webapp/` is the deployable browser application. It runs on Vercel as a Python Flask app and works without API credentials through its bundled Urdu/English knowledge engine. Add an Anthropic API key to enable generative chat, or Google Custom Search credentials to enable web search.
 
-The newer application is in `webapp/`. It is a Flask app that uses Ollama for local model responses and a built-in knowledge engine when a model is unavailable. It can also connect to optional services such as Claude, Google Custom Search and GitHub OAuth when the deployer configures the relevant credentials.
-
-These are separate implementations with separate dependencies and setup steps. See [the web app README](webapp/README.md) for its configuration details.
+The Streamlit app remains available for local experimentation. It uses a separate GGUF model workflow and is not part of the Vercel deployment.
 
 ## Repository contents
 
-- `app/` — Streamlit interface, chat views, settings, notes and flashcards.
-- `core/` — local inference, model download, memory, notes, flashcards, summarisation and text-to-speech helpers.
-- `models/` — location for the GGUF model used by the Streamlit app.
-- `webapp/` — Flask application, Ollama integration, knowledge engine, templates and browser assets.
-- `tests/` — tests for the original application's core functions.
+- `index.py` — Vercel entry point for the Flask app.
+- `webapp/` — Flask routes, knowledge engine, templates and browser interface.
+- `public/static/` — browser assets served by Vercel's static CDN.
+- `app/` and `core/` — local Streamlit interface and model helpers.
+- `tests/` — automated tests for the Vercel entry point and local core modules.
 
 ## Technology
 
-Python, Streamlit, `llama-cpp-python`, Flask, Ollama, Requests, vanilla JavaScript and CSS. Ollama is installed separately from the Python packages.
+Python 3.12, Flask, Requests, python-dotenv, vanilla JavaScript and CSS. Ollama is supported for local development only; Vercel Functions do not host the local Ollama service.
 
 ## Run locally
 
-### Streamlit application
-
-```bash
-python -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-python run.py
-```
-
-The launcher starts Streamlit. Add a compatible GGUF file at `models/model.gguf`; without it, the interface can start but local model responses will not be available.
-
-### Flask web application
+### Flask web app
 
 ```bash
 cd webapp
+python -m venv .venv
+# Activate the environment, then:
 pip install -r requirements.txt
 cp .env.example .env
 python app.py
 ```
 
-Install and start [Ollama](https://ollama.com) to use local model generation. If it is unavailable, the app can fall back to its built-in knowledge engine. Configure optional integrations in `webapp/.env.example` only when you intend to use them.
+Open [http://localhost:5000](http://localhost:5000). Without provider credentials, chat uses the bundled knowledge engine. For local model responses during development, start Ollama separately.
 
-For the Streamlit app's tests, install the development dependency and run them from the repository root:
+### Streamlit app
 
 ```bash
-pip install -r requirements-dev.txt
+python -m venv .venv
+# Activate the environment, then:
+pip install -r requirements-streamlit.txt
+python run.py
+```
+
+Place a compatible GGUF file at `models/model.gguf` to enable local generation in the Streamlit app.
+
+To run the repository tests:
+
+```bash
+pip install -r requirements.txt -r requirements-dev.txt
 pytest tests/
 ```
 
-The Flask app has separate setup and tests documented in [webapp/README.md](webapp/README.md).
+### Vercel
+
+Import the repository into Vercel with the project root set to `.`. Vercel detects the Flask application through `index.py`; the root `requirements.txt` installs only the web runtime dependencies.
+
+The app works without environment variables. Optional project environment variables are:
+
+- `FLASK_SECRET_KEY` — a private random value of at least 32 characters; required for persistent sessions and GitHub OAuth.
+- `ANTHROPIC_API_KEY` and optionally `ANTHROPIC_MODEL` — enables generative chat. Prompts are sent to Anthropic.
+- `GOOGLE_API_KEY` and `GOOGLE_CX` — enables Google Custom Search.
+- `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` and `APP_BASE_URL` — enables GitHub sign-in. Configure the OAuth callback as `<APP_BASE_URL>/auth/github/callback`.
+
+Ollama is automatically disabled in hosted mode. Chats, notes and flashcards are stored in the visitor's browser local storage; they are not synced across devices or accounts. The knowledge engine is rule-based, not a general-purpose language model.
 
 ## Scope and limitations
 
-The knowledge engine is a curated, rule-based fallback, not a general-purpose language model. Model output can be incorrect. The local applications can run without cloud credentials, but enabling Claude or web search sends the relevant request to those external services. The Flask web app stores application data in a local JSON file and is documented in its source as a demonstration-scale setup, not a multi-tenant production database.
+The built-in knowledge engine handles supported operations and curated entries only, so broad open-ended questions need an optional AI provider for generative answers. Answers can be inaccurate. Anthropic and Google integrations send relevant prompts or searches to those services. Browser-local data is not cloud backup or account sync.
 
 ## License
 
