@@ -6,7 +6,7 @@ An Urdu- and English-language workspace for chat, notes and flashcards, powered 
 
 ## Overview
 
-The Flask web app in `webapp/` is the deployable browser application. It uses Ollama as its only generative model provider. On Vercel it connects to Ollama Cloud; during local development it can connect to an Ollama server running on the same computer. If no model endpoint is configured, supported requests use the bundled rule-based knowledge engine.
+The Flask web app in `webapp/` is the deployable browser application. Ollama is its only generative model provider. On the hosted site, visitors can connect directly to Ollama running on their own computer for free local inference; an optional Ollama Cloud key can be configured for hosted inference. If no model is connected, supported requests use the bundled rule-based knowledge engine.
 
 The older Streamlit app remains available for local experimentation and uses a separate GGUF model workflow.
 
@@ -35,7 +35,7 @@ cp .env.example .env
 python app.py
 ```
 
-Install and start [Ollama](https://ollama.com/download), then pull a model such as `qwen2.5:1.5b`. Zariya connects to the local service at `http://localhost:11434` by default.
+Install and start [Ollama](https://ollama.com/download), then pull a model such as `qwen2.5:1.5b`. Zariya connects to the local service at `http://localhost:11434` by default. When using the hosted Zariya site with a local model, add `https://zariyas.vercel.app` to Ollama's `OLLAMA_ORIGINS` setting and restart Ollama so your browser can connect to it directly.
 
 ### Streamlit app
 
@@ -59,13 +59,15 @@ pytest tests/
 
 Import the repository into Vercel with the project root set to `.`. Vercel detects the Flask application through `index.py`; the root `requirements.txt` installs the lightweight web runtime.
 
-To enable generative chat, add these server-side environment variables in Vercel Project Settings → Environment Variables:
+A paid cloud API is not required. In the Zariya Settings page, visitors can connect their own local Ollama installation. The browser connects directly to `http://127.0.0.1:11434`; configure `OLLAMA_ORIGINS` to include `https://zariyas.vercel.app` and restart Ollama. On Windows, run `setx OLLAMA_ORIGINS "https://zariyas.vercel.app"`, then quit and reopen Ollama. Download a model locally with `ollama pull qwen2.5:1.5b`.
+
+Optional hosted inference can be enabled with a server-side Ollama API key in Vercel. This is a metered cloud service and may require usage credits; it is not required for local inference. The optional hosted environment variables are:
 
 - `OLLAMA_API_KEY` — create a key in [Ollama settings](https://ollama.com/settings/keys). Required for direct Ollama Cloud API access.
 - `OLLAMA_MODEL` — optional model name; defaults to `gemma4:31b`. You can change the model in Zariya Settings.
 - `OLLAMA_BASE_URL` — optional endpoint override; defaults to `https://ollama.com` on Vercel. A private remote Ollama server must be reachable over HTTPS and protected with an API key.
 
-The key is used only by the server and is never sent to browser JavaScript. Ollama Cloud processes prompts and responses to generate answers. Without an Ollama key, Zariya falls back to its limited bundled knowledge engine.
+The key is used only by the server and is never sent to browser JavaScript. Ollama Cloud processes prompts and responses to generate answers. Without a local model or hosted Ollama key, Zariya falls back to its limited bundled knowledge engine.
 
 Chats, notes and flashcards are stored in the visitor's browser local storage; they are not synced across devices or accounts. The Streamlit app and local Ollama development workflow are not part of the Vercel deployment.
 
