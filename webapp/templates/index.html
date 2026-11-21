@@ -31,20 +31,21 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Lora:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=Noto+Nastaliq+Urdu:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/static/style.css?v=20261121-5">
+<link rel="stylesheet" href="/static/style.css?v=20261121-6">
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
   "@type": "WebApplication",
   "name": "Zariya",
   "url": "https://zariyas.vercel.app/",
-  "description": "A free Urdu and English workspace for local Ollama chat, notes and flashcards.",
+  "description": "A free Urdu and English AI workspace for hosted chat, voice typing, notes and flashcards.",
   "applicationCategory": "Education",
   "operatingSystem": "Any",
   "inLanguage": ["en", "ur"],
   "featureList": [
     "Urdu and English chat",
-    "Ollama model integration",
+    "Hosted open-model chat",
+    "English and Urdu browser voice typing",
     "Personal notes",
     "Flashcards and study review"
   ]
@@ -303,11 +304,11 @@
           <div class="setting-group">
             <div class="setting-heading">
               <span class="setting-icon">✎</span>
-              <div><h3>Response style</h3><p class="desc">Adjust the tone and creativity of Ollama replies.</p></div>
+              <div><h3>Response style</h3><p class="desc">Adjust the tone and creativity of hosted model replies.</p></div>
             </div>
             <div class="setting-content">
               <div class="setting-row" style="align-items:flex-start;flex-direction:column;gap:8px;">
-                <div><label for="personaInput">Custom instructions</label><span class="sub">Optional. These instructions are sent with your messages to Ollama.</span></div>
+                <div><label for="personaInput">Custom instructions</label><span class="sub">Optional. These instructions are sent with your messages to the hosted model.</span></div>
                 <textarea id="personaInput" placeholder="For example: explain ideas step by step and use simple language." style="width:100%;min-height:76px;padding:10px;background:var(--surface-soft);border:1px solid var(--border);border-radius:9px;color:var(--text);font:11px/1.6 var(--font);resize:vertical;"></textarea>
               </div>
               <div class="setting-row">
@@ -327,6 +328,10 @@
               <div class="setting-row">
                 <div><label>Read replies aloud</label><div class="sub">Uses your browser's speech engine.</div></div>
                 <button class="toggle" id="toggleTTS" type="button" aria-label="Toggle read aloud"><span class="toggle-knob"></span></button>
+              </div>
+              <div class="voice-typing-note">
+                <strong>English and Urdu voice typing</strong>
+                <p>Choose EN or اردو beside the microphone in Chat, then start speaking. Your browser must support speech recognition and have microphone permission. Zariya does not save voice recordings; audio may be processed by the browser's speech-recognition provider.</p>
               </div>
             </div>
           </div>
