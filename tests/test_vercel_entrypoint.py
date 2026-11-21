@@ -51,7 +51,7 @@ def test_hosted_config_reports_ollama_without_exposing_credentials(monkeypatch):
     assert data["ollamaConfigured"] is False
     assert data["ollamaAvailable"] is False
     assert "ollamaApiKey" not in data
-    assert "OLLAMA_API_KEY" not in json.dumps(data)
+    assert "unit-test-ollama-key" not in json.dumps(data)
     assert "claudeConfigured" not in data
 
 
