@@ -524,3 +524,8 @@ def test_speech_output_removes_markdown_before_reading():
     assert "function speak(text)" in source
     assert "new SpeechSynthesisUtterance(readable)" in source
     assert "Speech unavailable" in source
+
+
+def test_local_state_loader_remains_async():
+    source = (ROOT / "webapp" / "static" / "app.js").read_text(encoding="utf-8")
+    assert "async function loadServerState()" in source
