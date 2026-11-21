@@ -20,6 +20,10 @@ def test_homepage_renders_workspace_and_seo():
     assert b"Ollama models" in body
     assert b"newDeckDialog" in body
     assert b'rel="canonical"' in body
+    assert b"https://zariyas.vercel.app/" in body
+    assert b"localDeviceConnectBtn" in body
+    assert b"twitter:card\" content=\"summary_large_image" in body
+    assert b"favicon.svg?v=20261121-4" in body
     assert b'application/ld+json' in body
     assert b"Urdu" in body
     assert b"Flashcards" in body
@@ -157,3 +161,55 @@ def test_chat_has_knowledge_fallback_without_ollama_key(monkeypatch):
     assert data["reply"]
     assert data["usedModel"] is False
     assert data["provider"] == "knowledge"
+
+
+def test_flask_seo_routes_serve_assets():
+    client = index.app.test_client()
+    favicon = client.get("/favicon.svg")
+    robots = client.get("/robots.txt")
+    sitemap = client.get("/sitemap.xml")
+    manifest = client.get("/site.webmanifest")
+    assert favicon.status_code == 200
+    assert favicon.mimetype == "image/svg+xml"
+    assert b"#ff762b" in favicon.data
+    assert robots.status_code == 200
+    assert b"https://zariyas.vercel.app/sitemap.xml" in robots.data
+    assert sitemap.status_code == 200
+    assert b"https://zariyas.vercel.app/" in sitemap.data
+    assert manifest.status_code == 200
+    assert b"/static/logo.png" in manifest.data
+
+
+def test_static_frontend_copies_are_identical():
+    assert (ROOT / "webapp" / "static" / "app.js").read_bytes() == (ROOT / "public" / "static" / "app.js").read_bytes()
+    assert (ROOT / "webapp" / "static" / "style.css").read_bytes() == (ROOT / "public" / "static" / "style.css").read_bytes()
+
+
+def test_no_paid_local_ollama_flow_is_present_in_frontend():
+    source = (ROOT / "webapp" / "static" / "app.js").read_text(encoding="utf-8")
+    assert "function connectLocalDevice()" in source
+    assert "function streamLocalOllama(" in source
+    assert "http://127.0.0.1:11434/api/chat" in source
+    assert "isPureUrdu" in source
+    assert "dir','auto'" in source
+
+
+def test_ollama_cloud_credit_error_recommends_local_mode():
+    class FakeResponse:
+        status_code = 402
+
+    message = local_model._friendly_http_error(FakeResponse())
+    assert "usage credits" in message
+    assert "local Ollama" in message
+
+
+def test_stream_endpoint_remains_available_without_cloud_key(monkeypatch):
+    monkeypatch.setattr(local_model, "OLLAMA_API_KEY", "")
+    response = index.app.test_client().post(
+        "/api/chat/stream",
+        json={"messages": [{"role": "user", "content": "hello"}]},
+        buffered=True,
+    )
+    assert response.status_code == 200
+    assert response.mimetype == "text/event-stream"
+    assert b"data:" in response.data
