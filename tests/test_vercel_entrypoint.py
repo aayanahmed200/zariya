@@ -6,7 +6,7 @@ os.environ["VERCEL"] = "1"
 os.environ.setdefault("FLASK_SECRET_KEY", "test-only-zariya-secret-which-is-long-enough")
 
 import index  # noqa: E402
-from webapp import hosted_model  # noqa: E402
+from webapp.app import hosted_model, kb_engine  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -346,7 +346,7 @@ def test_quick_tool_falls_back_when_hosted_model_fails(monkeypatch):
     def fail(*args, **kwargs):
         raise hosted_model.GatewayError("temporarily unavailable")
     monkeypatch.setattr(hosted_model, "generate_reply", fail)
-    monkeypatch.setattr(index.kb_engine, "summarize_messages", lambda messages: "Fallback summary.")
+    monkeypatch.setattr(kb_engine, "summarize_messages", lambda messages: "Fallback summary.")
     response = index.app.test_client().post(
         "/api/tools/summarize",
         json={"messages": [{"role": "user", "content": "hello"}]},
