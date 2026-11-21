@@ -24,6 +24,14 @@ let stopped = false;
 let currentAbort = null;
 let serverConfig = { hostedMode:false, ollamaConfigured:false, ollamaAvailable:false, ollamaMode:'local', ollamaStatus:'', localModelName:'', searchConfigured:false, githubConfigured:false };
 let activeOllamaModel = LS.get('zariya_active_ollama_model', '');
+let localDeviceConnected = false;
+let localDeviceModel = LS.get('zariya_local_device_model', 'qwen2.5:1.5b');
+let localDeviceModels = [];
+const LOCAL_OLLAMA_BASE = 'http://127.0.0.1:11434';
+function isPureUrdu(text){
+  const value = String(text || '');
+  return /[\u0600-\u06FF]/.test(value) && !/[A-Za-z]/.test(value);
+}
 let me = { signedIn:false };
 
 function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,8); }
@@ -222,20 +230,30 @@ function updateCreativityLabel(pct){
   label.textContent = desc+' ('+t.toFixed(2)+')';
 }
 function updateStatusPill(){
-  const dot = document.getElementById('statusDot'); const txt = document.getElementById('statusText');
-  if(serverConfig.ollamaAvailable){
+  const dot = document.getElementById('statusDot');
+  const txt = document.getElementById('statusText');
+  if(localDeviceConnected){
+    dot.classList.remove('off');
+    txt.textContent = 'Local Ollama';
+  }else if(serverConfig.ollamaAvailable){
     dot.classList.remove('off');
     txt.textContent = serverConfig.ollamaMode==='cloud' ? 'Ollama Cloud' : 'Ollama connected';
-  } else {
+  }else{
     dot.classList.add('off');
     txt.textContent = serverConfig.ollamaConfigured ? 'Ollama unavailable' : 'Knowledge fallback';
   }
   const hint = document.getElementById('composerHint');
-  if(hint && !isGenerating) hint.textContent = serverConfig.ollamaAvailable
-    ? 'Using '+(activeOllamaModel || serverConfig.localModelName || 'your Ollama model')+'. Responses can still be wrong.'
-    : (serverConfig.hostedMode
-      ? 'Connect Ollama Cloud in Settings to enable generative chat. The built-in knowledge mode is limited.'
-      : 'Start Ollama locally to enable generative chat. The built-in knowledge mode is limited.');
+  if(hint && !isGenerating){
+    if(localDeviceConnected){
+      hint.textContent = 'Running '+localDeviceModel+' on this device. No cloud API key or usage credits are needed.';
+    }else if(serverConfig.ollamaAvailable){
+      hint.textContent = 'Using '+(activeOllamaModel || serverConfig.localModelName || 'your Ollama model')+'. Responses can still be wrong.';
+    }else if(serverConfig.hostedMode){
+      hint.textContent = 'Connect a local Ollama model in Settings for free generative chat, or use the built-in knowledge mode.';
+    }else{
+      hint.textContent = 'Start Ollama locally and connect it in Settings. The built-in knowledge mode remains available.';
+    }
+  }
 }
 function updateLocalModelRetryUI(){
   const row = document.getElementById('localModelRetryRow');
@@ -275,17 +293,29 @@ function renderAccountUI(){
   document.getElementById('githubSignInBtn').disabled = !serverConfig.githubConfigured;
 
   const modelStatus=document.getElementById('localModelStatusText');
-  if(modelStatus) modelStatus.textContent = serverConfig.ollamaStatus || 'Checking Ollama…';
+  if(modelStatus) modelStatus.textContent = localDeviceConnected
+    ? 'Connected to this device · '+localDeviceModel
+    : (serverConfig.ollamaStatus || 'Cloud model is optional; local mode is free.');
+  const localModelInput=document.getElementById('localDeviceModelInput');
+  if(localModelInput && document.activeElement!==localModelInput) localModelInput.value=localDeviceModel;
+  const localDeviceStatus=document.getElementById('localDeviceStatusNote');
+  if(localDeviceStatus && !localDeviceConnected && !localDeviceStatus.dataset.userMessage){
+    localDeviceStatus.textContent='No cloud key is needed. Connect the Ollama app running on this computer.';
+  }
+  const localConnectBtn=document.getElementById('localDeviceConnectBtn');
+  if(localConnectBtn) localConnectBtn.textContent=localDeviceConnected ? 'Reconnect' : 'Test & connect';
+  const cloudControls=document.getElementById('localModelControls');
+  if(cloudControls) cloudControls.style.display=(serverConfig.hostedMode && !serverConfig.ollamaConfigured) ? 'none' : '';
   const searchStatus=document.getElementById('searchStatusText');
   if(searchStatus) searchStatus.textContent = serverConfig.searchConfigured ? 'Available' : 'Not configured';
   const setupNote=document.getElementById('ollamaSetupNote');
   if(setupNote){
     if(serverConfig.hostedMode && !serverConfig.ollamaConfigured){
-      setupNote.innerHTML = 'Add <code>OLLAMA_API_KEY</code> in <strong>Vercel → Project → Settings → Environment Variables</strong>. Create a key in <a href="https://ollama.com/settings/keys" target="_blank" rel="noopener noreferrer">Ollama settings</a>. Your key remains on the server.';
+      setupNote.innerHTML = 'You do not need a paid cloud API. Connect Ollama on this computer below to run a model locally. Prompts go directly to your device. <a href="https://ollama.com/download" target="_blank" rel="noopener noreferrer">Install Ollama</a>.';
     } else if(serverConfig.hostedMode){
-      setupNote.textContent = 'Connected to Ollama Cloud. Select a model below; model requests stay server-side.';
+      setupNote.textContent = 'Ollama Cloud is configured as an optional hosted route. Local Ollama on your device remains available without usage charges.';
     } else {
-      setupNote.textContent = 'Local development connects to the Ollama app running on this computer.';
+      setupNote.textContent = 'Local development can use the Ollama app running on this computer. No cloud API key is required.';
     }
   }
   const pullRow=document.getElementById('localModelPullRow');
@@ -304,11 +334,9 @@ function renderAccountUI(){
       const banner = document.getElementById('onboardingBanner');
       if(!banner) return;
       const dismissed = LS.get(ONBOARDING_DISMISS_KEY, false);
-      const needsHelp = !serverConfig.ollamaConfigured || !serverConfig.ollamaAvailable;
+      const needsHelp = !localDeviceConnected && !serverConfig.ollamaAvailable;
       const copy = banner.querySelector('.ob-text');
-      if(copy) copy.textContent = serverConfig.hostedMode
-        ? 'Connect Ollama Cloud in Settings to use generative models. Until then, Zariya answers supported requests with its limited built-in knowledge base.'
-        : 'Start Ollama on this computer and select a downloaded model in Settings. Zariya can still handle supported lookups without it.';
+      if(copy) copy.textContent = 'No paid API is required. Install Ollama, download a local model, and connect it in Settings. The built-in knowledge mode is available without setup.';
       banner.style.display = (needsHelp && !dismissed) ? 'flex' : 'none';
   }
   const onboardingDismissBtn = document.getElementById('onboardingDismissBtn');
@@ -334,7 +362,7 @@ function switchView(name){
   closeSidebarMobile();
   if(name==='notepad') renderNotesList();
   if(name==='flashcards') renderDeckGrid();
-  if(name==='settings') loadModelList();
+  if(name==='settings'){ loadModelList(); renderAccountUI(); }
 }
 document.querySelectorAll('[data-view]').forEach(n=> n.addEventListener('click', ()=>switchView(n.dataset.view)));
 
@@ -432,14 +460,14 @@ function renderBubble(m, idx, isLast){
     return;
   }
 
-  const urduClass = isUrdu(m.content) ? 'is-urdu' : '';
+  const urduClass = isPureUrdu(m.content) ? 'is-urdu' : '';
   if(m.role==='user'){
-    row.innerHTML = '<div class="bubble-col user-col"><div class="bubble user '+urduClass+'">'+formatInline(m.content)+'</div>'+
+    row.innerHTML = '<div class="bubble-col user-col"><div class="bubble user '+urduClass+'" dir="auto">'+formatInline(m.content)+'</div>'+
       (uiPrefs.showTimestamps ? '<div class="msg-meta">'+(m.ts||'')+'</div>' : '')+
       '<div class="msg-actions"><button class="ghost-btn" data-act="edit">Edit</button></div></div>';
     row.querySelector('[data-act="edit"]').addEventListener('click', ()=>{ editingIndex=idx; renderChat(); });
   } else {
-    row.innerHTML = '<img class="avatar-logo" src="/static/logo.png" alt=""><div class="bubble-col assistant-col"><div class="bubble assistant '+urduClass+'">'+(m.html || renderMarkdown(m.content))+'</div>'+
+    row.innerHTML = '<img class="avatar-logo" src="/static/logo.png" alt=""><div class="bubble-col assistant-col"><div class="bubble assistant '+urduClass+'" dir="auto">'+(m.html || renderMarkdown(m.content))+'</div>'+
       (uiPrefs.showTimestamps ? '<div class="msg-meta">'+(m.ts||'')+'</div>' : '')+
       '<div class="msg-actions"><button class="ghost-btn" data-act="copy">Copy</button><button class="ghost-btn" data-act="speak">Read aloud</button><button class="ghost-btn" data-act="up" title="Good answer">Helpful</button><button class="ghost-btn" data-act="down" title="Not helpful">Not helpful</button>'+
       (isLast?'<button class="ghost-btn" data-act="regen">Regenerate</button>':'')+'</div></div>';
@@ -451,12 +479,6 @@ function renderBubble(m, idx, isLast){
     if(upBtn) upBtn.addEventListener('click', ()=>sendFeedback(idx, 'up', upBtn));
     const downBtn = row.querySelector('[data-act="down"]');
     if(downBtn) downBtn.addEventListener('click', ()=>sendFeedback(idx, 'down', downBtn));
-    row.querySelectorAll('.code-copy-btn').forEach(btn=>{
-      btn.addEventListener('click', ()=>{
-        const codeEl = document.getElementById(btn.dataset.codeId);
-        if(codeEl && navigator.clipboard){ navigator.clipboard.writeText(codeEl.textContent); const old=btn.textContent; btn.textContent='Copied'; setTimeout(()=>btn.textContent=old,1200); }
-      });
-    });
   }
   inner.appendChild(row);
 }
@@ -525,13 +547,20 @@ async function respondTo(session){
   let reply = '';
   let bubbleEl = null;
   try{
-    const res = await fetch('/api/chat/stream', {
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-body: JSON.stringify({ messages: session.messages.map(m=>({role:m.role, content:m.content})), systemPrompt: genPrefs.persona || undefined, temperature: typeof genPrefs.temperature==='number' ? genPrefs.temperature : undefined, model: activeOllamaModel || serverConfig.localModelName || undefined }),
-      signal: currentAbort.signal
-    });
-    if(!res.ok || !res.body){
+    if(localDeviceConnected){
+      await streamLocalOllama(session.messages, token=>{
+        reply += token;
+        if(!bubbleEl){ removeThinking(); bubbleEl=appendStreamingBubble(); }
+        updateStreamingBubble(bubbleEl,reply);
+      },currentAbort.signal);
+    }else{
+      const res = await fetch('/api/chat/stream', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ messages: session.messages.map(m=>({role:m.role, content:m.content})), systemPrompt: genPrefs.persona || undefined, temperature: typeof genPrefs.temperature==='number' ? genPrefs.temperature : undefined, model: activeOllamaModel || serverConfig.localModelName || undefined }),
+        signal: currentAbort.signal
+      });
+      if(!res.ok || !res.body){
       let data = {}; try{ data = await res.json(); }catch(e){}
       reply = data.error || 'Something went wrong.';
     } else {
@@ -565,6 +594,7 @@ body: JSON.stringify({ messages: session.messages.map(m=>({role:m.role, content:
         }
       }
     }
+    }
   }catch(err){
     if(err.name==='AbortError'){
       removeThinking();
@@ -576,7 +606,9 @@ body: JSON.stringify({ messages: session.messages.map(m=>({role:m.role, content:
       }
       return;
     }
-    reply = 'Could not reach the server: ' + (err.message||'unknown error');
+    reply = localDeviceConnected
+      ? 'Local Ollama could not complete the reply: '+(err.message||'connection failed')+'. Check that Ollama is still running and that this site is allowed in OLLAMA_ORIGINS.'
+      : 'Could not reach the Zariya server: ' + (err.message||'unknown error');
   }
   removeThinking(); setGenerating(false);
   if(stopped) return;
@@ -591,14 +623,15 @@ function appendStreamingBubble(){
   scroll.classList.remove('empty-mode'); inner.classList.remove('empty-mode');
   const row = document.createElement('div');
   row.className = 'msg-row assistant';
-  row.innerHTML = '<img class="avatar-logo" src="/static/logo.png" alt=""><div class="bubble-col assistant-col"><div class="bubble assistant" id="streamingBubbleContent"></div></div>';
+  row.innerHTML = '<img class="avatar-logo" src="/static/logo.png" alt=""><div class="bubble-col assistant-col"><div class="bubble assistant" id="streamingBubbleContent" dir="auto"></div></div>';
   inner.appendChild(row);
   scroll.scrollTop = 999999;
   return row.querySelector('#streamingBubbleContent');
 }
 function updateStreamingBubble(el, text){
   el.innerHTML = renderMarkdown(text);
-  el.classList.toggle('is-urdu', isUrdu(text));
+  el.classList.toggle('is-urdu', isPureUrdu(text));
+  el.setAttribute('dir','auto');
   document.getElementById('chat-scroll').scrollTop = 999999;
 }
 function stopGenerating(){ stopped = true; if(currentAbort) currentAbort.abort(); removeThinking(); setGenerating(false); }
@@ -1127,6 +1160,103 @@ function renderQuiz(){
     });
   });
   document.getElementById('quizNext').addEventListener('click', ()=>{ quizIndex++; renderQuiz(); });
+}
+
+
+// Browser-local inference. Requests go directly to the visitor's Ollama daemon;
+// no cloud API key is sent or required.
+async function connectLocalDevice(){
+  const button=document.getElementById('localDeviceConnectBtn');
+  const input=document.getElementById('localDeviceModelInput');
+  const note=document.getElementById('localDeviceStatusNote');
+  const requested=(input && input.value.trim()) || localDeviceModel || 'qwen2.5:1.5b';
+  if(button){ button.disabled=true; button.textContent='Connecting…'; }
+  if(note){ note.dataset.userMessage='1'; note.textContent='Checking the Ollama app on this computer…'; }
+  const controller=new AbortController();
+  const timeout=window.setTimeout(()=>controller.abort(),8000);
+  try{
+    const response=await fetch(LOCAL_OLLAMA_BASE+'/api/tags',{
+      method:'GET',mode:'cors',credentials:'omit',cache:'no-store',signal:controller.signal
+    });
+    if(!response.ok) throw new Error('Ollama returned HTTP '+response.status+'.');
+    const data=await response.json();
+    const models=Array.isArray(data.models)?data.models:[];
+    const names=models.map(item=>String(item.name||'')).filter(Boolean);
+    if(!names.length) throw new Error('Ollama is running, but no local models are installed. Run: ollama pull '+requested);
+    const match=names.find(name=>name===requested || name.startsWith(requested+':'));
+    localDeviceModel=match || names[0];
+    localDeviceModels=names;
+    localDeviceConnected=true;
+    LS.set('zariya_local_device_model',localDeviceModel);
+    if(input) input.value=localDeviceModel;
+    if(note){
+      note.textContent=match
+        ? 'Connected. '+localDeviceModel+' is ready on this device.'
+        : 'Connected. Your requested model was not installed, so Zariya selected '+localDeviceModel+'.';
+      note.dataset.userMessage='1';
+    }
+    updateStatusPill();
+    renderAccountUI();
+    updateOnboardingBanner();
+  }catch(error){
+    localDeviceConnected=false;
+    let message=error.name==='AbortError' ? 'Ollama did not respond. Make sure the Ollama app is running.' : (error.message||'Could not connect to Ollama.');
+    if(/Failed to fetch|NetworkError|Load failed/i.test(message)){
+      message='The browser could not reach local Ollama. Install/start Ollama, allow https://zariyas.vercel.app in OLLAMA_ORIGINS, then restart Ollama. See the setup guide below.';
+    }
+    if(note){ note.textContent=message; note.dataset.userMessage='1'; }
+    updateStatusPill();
+    updateOnboardingBanner();
+  }finally{
+    window.clearTimeout(timeout);
+    if(button){ button.disabled=false; button.textContent=localDeviceConnected?'Reconnect':'Test & connect'; }
+  }
+}
+const localDeviceConnectBtn=document.getElementById('localDeviceConnectBtn');
+if(localDeviceConnectBtn) localDeviceConnectBtn.addEventListener('click',connectLocalDevice);
+
+async function streamLocalOllama(messages,onToken,signal){
+  const systemPrompt=genPrefs.persona || 'You are Zariya, a warm and concise Urdu and English assistant. Reply in the language the user uses. Structure explanations with clear headings and lists when helpful.';
+  const payload={
+    model:localDeviceModel,
+    messages:[{role:'system',content:systemPrompt},...messages.filter(message=>['user','assistant'].includes(message.role)).map(message=>({role:message.role,content:message.content}))],
+    stream:true,
+    options:{temperature:typeof genPrefs.temperature==='number'?genPrefs.temperature:0.5,num_predict:1200}
+  };
+  const response=await fetch(LOCAL_OLLAMA_BASE+'/api/chat',{
+    method:'POST',mode:'cors',credentials:'omit',
+    headers:{'Content-Type':'application/json','Accept':'application/x-ndjson'},
+    body:JSON.stringify(payload),signal
+  });
+  if(!response.ok){
+    let detail='';
+    try{ const data=await response.json(); detail=data.error||''; }catch(error){}
+    throw new Error(detail || 'Local Ollama returned HTTP '+response.status+'.');
+  }
+  if(!response.body) throw new Error('Your browser does not support streamed local replies.');
+  const reader=response.body.getReader();
+  const decoder=new TextDecoder();
+  let buffer='';
+  const consumeLine=line=>{
+    const trimmed=line.trim();
+    if(!trimmed) return false;
+    let chunk;
+    try{ chunk=JSON.parse(trimmed); }catch(error){ return false; }
+    if(chunk.error) throw new Error(chunk.error);
+    const token=chunk.message && chunk.message.content;
+    if(typeof token==='string' && token) onToken(token);
+    return !!chunk.done;
+  };
+  while(true){
+    const {done,value}=await reader.read();
+    if(done) break;
+    buffer+=decoder.decode(value,{stream:true});
+    const lines=buffer.split('\n');
+    buffer=lines.pop() || '';
+    for(const line of lines) if(consumeLine(line)) return;
+  }
+  buffer+=decoder.decode();
+  if(buffer.trim()) consumeLine(buffer);
 }
 
 /* ============ SETTINGS WIRING ============ */
