@@ -495,3 +495,32 @@ def test_deleting_or_restoring_notes_selects_a_valid_note():
     assert "currentNoteId = null;" in delete_block
     assert "activeNoteTagFilter = null;" in delete_block
     assert "currentNoteId=null;" in restore_block
+
+
+def test_voice_settings_explain_browser_processing_and_hosted_model_wording():
+    html = (ROOT / "webapp" / "templates" / "index.html").read_text(encoding="utf-8")
+    assert "English and Urdu voice typing" in html
+    assert "Zariya does not save voice recordings" in html
+    assert "browser's speech-recognition provider" in html
+    assert "Ollama replies" not in html
+    assert "sent with your messages to Ollama" not in html
+    assert "Hosted open-model chat" in html
+
+
+def test_flashcard_json_import_is_bounded_and_repairs_review_values():
+    source = (ROOT / "webapp" / "static" / "app.js").read_text(encoding="utf-8")
+    importer = source[source.index("function importDeckFromJson"):source.index("document.getElementById('importDeckBtn')")]
+    assert "cardsSource.slice(0,30)" in importer
+    assert "c.front.slice(0,600)" in importer
+    assert "c.back.slice(0,2400)" in importer
+    assert "Math.min(4,Math.max(1.3,ease))" in importer
+    assert "Number.isFinite(Date.parse(c.due))" in importer
+
+
+def test_speech_output_removes_markdown_before_reading():
+    source = (ROOT / "webapp" / "static" / "app.js").read_text(encoding="utf-8")
+    assert "function speechPlainText(value)" in source
+    assert "Code block omitted." in source
+    assert "function speak(text)" in source
+    assert "new SpeechSynthesisUtterance(readable)" in source
+    assert "Speech unavailable" in source
