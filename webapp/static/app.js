@@ -15,6 +15,7 @@ let decks = [];
 let currentSessionId = null;
 let currentNoteId = null;
 let currentDeckId = null;
+let editingDeckId = null;
   let activeNoteTagFilter = null;
   let activeDeckTagFilter = null;
 let studyQueue = []; let studyIndex = 0; let studyFlipped = false;
@@ -1078,16 +1079,27 @@ function renderDeckGrid(){
     const card = document.createElement('div'); card.className='deck-card';
     card.innerHTML = '<h3>'+escapeHtml(d.name)+'</h3><p>'+d.cards.length+' card'+(d.cards.length!==1?'s':'')+' · '+pct+'% known'+(due? ' · <strong style="color:var(--accent-strong);">'+due+' due</strong>':' · none due')+'</p><div class="deck-progress"><div class="deck-progress-fill" style="width:'+pct+'%"></div></div>'+
         '<div class="deck-card-tags">'+((d.tags&&d.tags.length)?d.tags.map(t=>'<span>'+escapeHtml(t)+'</span>').join(''):'')+'</div>'+
-      '<div class="deck-card-actions"><button class="deck-action-btn" data-action="study">Study</button><button class="deck-action-btn" data-action="quiz"'+(d.cards.length<2?' disabled title="Needs at least 2 cards"':'')+'>Quiz</button><button class="deck-action-btn" data-action="rename" title="Rename deck" aria-label="Rename deck">Rename</button><button class="deck-action-btn" data-action="export" title="Download as JSON">Export</button><button class="deck-action-btn danger" data-action="delete" title="Delete deck" aria-label="Delete deck">Delete</button></div>';
+      '<div class="deck-card-actions"><button class="deck-action-btn" data-action="study">Study</button><button class="deck-action-btn" data-action="quiz"'+(d.cards.length<2?' disabled title="Needs at least 2 cards"':'')+'>Quiz</button><button class="deck-action-btn" data-action="edit" title="Edit cards" aria-label="Edit deck cards">Edit</button><button class="deck-action-btn" data-action="rename" title="Rename deck" aria-label="Rename deck">Rename</button><button class="deck-action-btn" data-action="export" title="Download as JSON">Export</button><button class="deck-action-btn danger" data-action="delete" title="Delete deck" aria-label="Delete deck">Delete</button></div>';
     card.querySelector('[data-action="study"]').addEventListener('click', (e)=>{ e.stopPropagation(); openDeck(d.id); });
     const quizBtn = card.querySelector('[data-action="quiz"]');
     quizBtn.addEventListener('click', (e)=>{ e.stopPropagation(); if(!quizBtn.disabled) startQuiz(d.id); });
+    card.querySelector('[data-action="edit"]').addEventListener('click', (e)=>{ e.stopPropagation(); editDeck(d.id); });
     card.querySelector('[data-action="export"]').addEventListener('click', (e)=>{ e.stopPropagation(); exportDeck(d); });
     card.querySelector('[data-action="rename"]').addEventListener('click', (e)=>{ e.stopPropagation(); renameDeck(d.id); });
     card.querySelector('[data-action="delete"]').addEventListener('click', (e)=>{ e.stopPropagation(); deleteDeck(d.id); });
     card.addEventListener('click', ()=>openDeck(d.id));
     grid.appendChild(card);
   });
+}
+function editDeck(id){
+  const deck = decks.find(d=>d.id===id);
+  if(!deck) return;
+  editingDeckId = id;
+  resetDeckDialog('edit');
+  document.getElementById('newDeckName').value = deck.name || '';
+  document.getElementById('newDeckTags').value = (deck.tags||[]).join(', ');
+  deck.cards.forEach(card=>addDeckCardRow(card.front,card.back,card));
+  if(newDeckDialog && typeof newDeckDialog.showModal==='function') newDeckDialog.showModal();
 }
 function renameDeck(id){
   const deck = decks.find(d=>d.id===id); if(!deck) return;
@@ -1192,10 +1204,11 @@ function renderStudy(){
 }
 const newDeckDialog = document.getElementById('newDeckDialog');
 const newDeckCards = document.getElementById('newDeckCards');
-function addDeckCardRow(front='', back=''){
+function addDeckCardRow(front='', back='', existingCard=null){
   const count=newDeckCards.querySelectorAll('.deck-form-card').length+1;
   const row=document.createElement('div');
   row.className='deck-form-card';
+  if(existingCard && existingCard.id) row.dataset.cardId=existingCard.id;
   row.innerHTML='<div class="deck-form-card-head"><span>Card '+count+'</span><button class="deck-form-remove" type="button" aria-label="Remove card">Remove</button></div>'
     +'<label>Front<input class="deck-front" maxlength="600" required placeholder="Question or term" value="'+escapeHtml(front)+'"></label>'
     +'<label>Back<textarea class="deck-back" maxlength="2400" required rows="2" placeholder="Answer or definition">'+escapeHtml(back)+'</textarea></label>';
@@ -1205,12 +1218,19 @@ function addDeckCardRow(front='', back=''){
   });
   newDeckCards.appendChild(row);
 }
-document.getElementById('newDeckBtn').addEventListener('click',()=>{
+function resetDeckDialog(mode){
+  editingDeckId = mode === 'edit' ? editingDeckId : null;
   document.getElementById('newDeckForm').reset();
   newDeckCards.innerHTML='';
+  document.getElementById('newDeckFormHint').textContent='';
+  document.getElementById('newDeckTitle').textContent = mode === 'edit' ? 'Edit deck' : 'Create a deck';
+  document.getElementById('saveDeckBtn').textContent = mode === 'edit' ? 'Save changes' : 'Create deck';
+}
+document.getElementById('newDeckBtn').addEventListener('click',()=>{
+  editingDeckId = null;
+  resetDeckDialog('create');
   addDeckCardRow();
   if(newDeckDialog && typeof newDeckDialog.showModal==='function') newDeckDialog.showModal();
-  else addDeckCardRow();
 });
 document.getElementById('addDeckCardBtn').addEventListener('click',()=>{
   if(newDeckCards.querySelectorAll('.deck-form-card').length>=30){
@@ -1224,17 +1244,30 @@ document.getElementById('newDeckForm').addEventListener('submit',e=>{
   e.preventDefault();
   const name=document.getElementById('newDeckName').value.trim();
   const tags=document.getElementById('newDeckTags').value.split(',').map(t=>t.trim().toLowerCase()).filter(Boolean).slice(0,12);
-  const cards=[...newDeckCards.querySelectorAll('.deck-form-card')].map(row=>({
-    id:uid(),
-    front:row.querySelector('.deck-front').value.trim(),
-    back:row.querySelector('.deck-back').value.trim(),
-    known:false
-  })).filter(card=>card.front&&card.back).map(migrateCardForSpacedRepetition);
+  const existingDeck = editingDeckId ? decks.find(d=>d.id===editingDeckId) : null;
+  const previousCards = new Map((existingDeck ? existingDeck.cards : []).map(card=>[card.id,card]));
+  const cards=[...newDeckCards.querySelectorAll('.deck-form-card')].map(row=>{
+    const previous = previousCards.get(row.dataset.cardId);
+    return migrateCardForSpacedRepetition({
+      ...(previous||{}),
+      id: previous ? previous.id : uid(),
+      front:row.querySelector('.deck-front').value.trim(),
+      back:row.querySelector('.deck-back').value.trim(),
+      known:previous ? !!previous.known : false
+    });
+  }).filter(card=>card.front&&card.back);
   if(!name||!cards.length){
     document.getElementById('newDeckFormHint').textContent='Add a deck name and at least one complete card.';
     return;
   }
-  decks.unshift({id:uid(),name,tags,cards,createdAt:Date.now()});
+  if(existingDeck){
+    existingDeck.name=name;
+    existingDeck.tags=tags;
+    existingDeck.cards=cards;
+  }else{
+    decks.unshift({id:uid(),name,tags,cards,createdAt:Date.now()});
+  }
+  editingDeckId=null;
   saveServerState();
   renderDeckGrid();
   newDeckDialog.close();
