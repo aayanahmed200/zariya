@@ -253,3 +253,115 @@ def test_no_anthropic_provider_is_used_for_web_chat():
     assert "import hosted_model" in source
     assert "import local_model" not in source
     assert "anthropic" not in source.lower()
+
+
+def test_ai_gateway_chat_uses_json_accept_header(monkeypatch):
+    monkeypatch.setenv("VERCEL_OIDC_TOKEN", "unit-test-oidc-token")
+    captured = {}
+
+    class FakeResponse:
+        ok = True
+        def json(self):
+            return {"choices": [{"message": {"content": "answer"}}]}
+
+    def fake_post(url, headers, json, timeout, **kwargs):
+        captured["headers"] = headers
+        return FakeResponse()
+
+    monkeypatch.setattr(hosted_model.requests, "post", fake_post)
+    hosted_model.generate_reply([{"role": "user", "content": "hello"}], "You are Zariya.")
+    assert captured["headers"]["Accept"] == "application/json"
+
+
+def test_ai_gateway_stream_uses_event_stream_accept_header(monkeypatch):
+    monkeypatch.setenv("VERCEL_OIDC_TOKEN", "unit-test-oidc-token")
+    captured = {}
+
+    class FakeResponse:
+        ok = True
+        def __enter__(self):
+            return self
+        def __exit__(self, exc_type, exc_value, traceback):
+            return False
+        def iter_lines(self, decode_unicode=True):
+            yield "data: [DONE]"
+
+    def fake_post(url, headers, json, stream, timeout):
+        captured["headers"] = headers
+        return FakeResponse()
+
+    monkeypatch.setattr(hosted_model.requests, "post", fake_post)
+    list(hosted_model.stream_reply([{"role": "user", "content": "hello"}], "You are Zariya."))
+    assert captured["headers"]["Accept"] == "text/event-stream"
+
+
+def test_summarize_quick_tool_uses_hosted_model(monkeypatch):
+    calls = []
+    def fake_generate(messages, system_prompt, temperature=None):
+        calls.append((messages, system_prompt, temperature))
+        return "A concise summary."
+    monkeypatch.setattr(hosted_model, "generate_reply", fake_generate)
+    response = index.app.test_client().post(
+        "/api/tools/summarize",
+        json={"messages": [{"role": "user", "content": "A conversation about biology."}]},
+    )
+    assert response.status_code == 200
+    assert response.get_json()["result"] == "A concise summary."
+    assert "Summarise this conversation" in calls[0][1]
+
+
+def test_translate_quick_tool_only_sends_latest_user_text(monkeypatch):
+    calls = []
+    def fake_generate(messages, system_prompt, temperature=None):
+        calls.append(messages)
+        return "السلام علیکم"
+    monkeypatch.setattr(hosted_model, "generate_reply", fake_generate)
+    response = index.app.test_client().post(
+        "/api/tools/translate",
+        json={"messages": [
+            {"role": "user", "content": "Earlier text"},
+            {"role": "assistant", "content": "Previous answer"},
+            {"role": "user", "content": "Hello there"},
+        ]},
+    )
+    assert response.status_code == 200
+    assert response.get_json()["result"] == "السلام علیکم"
+    assert calls[0] == [{"role": "user", "content": "Hello there"}]
+
+
+def test_flashcard_tool_parses_and_filters_model_json(monkeypatch):
+    raw = chr(96)*3 + 'json\n{"cards":[{"front":"What is a cell?","back":"The basic unit of life."},{"front":"Bad card","back":""}]}\n' + chr(96)*3
+    monkeypatch.setattr(hosted_model, "generate_reply", lambda *args, **kwargs: raw)
+    response = index.app.test_client().post(
+        "/api/tools/flashcards",
+        json={"messages": [{"role": "user", "content": "Explain cells."}]},
+    )
+    assert response.status_code == 200
+    assert response.get_json()["cards"] == [
+        {"front": "What is a cell?", "back": "The basic unit of life."}
+    ]
+
+
+def test_quick_tool_falls_back_when_hosted_model_fails(monkeypatch):
+    def fail(*args, **kwargs):
+        raise hosted_model.GatewayError("temporarily unavailable")
+    monkeypatch.setattr(hosted_model, "generate_reply", fail)
+    monkeypatch.setattr(index.kb_engine, "summarize_messages", lambda messages: "Fallback summary.")
+    response = index.app.test_client().post(
+        "/api/tools/summarize",
+        json={"messages": [{"role": "user", "content": "hello"}]},
+    )
+    assert response.status_code == 200
+    assert response.get_json()["result"] == "Fallback summary."
+
+
+def test_voice_input_has_urdu_english_choice_and_permission_feedback():
+    html = (ROOT / "webapp" / "templates" / "index.html").read_text(encoding="utf-8")
+    source = (ROOT / "webapp" / "static" / "app.js").read_text(encoding="utf-8")
+    assert 'id="voiceLanguage"' in html
+    assert 'value="ur-PK"' in html
+    assert "recognizer.continuous = true" in source
+    assert "recognizer.interimResults = true" in source
+    assert "Microphone permission was blocked" in source
+    assert "Voice captured. Review the transcript before sending." in source
+    assert "stopVoiceRecognition();" in source
