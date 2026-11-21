@@ -454,3 +454,27 @@ def test_srs_migration_assigns_missing_card_ids_and_repairs_invalid_due_dates():
     source = (ROOT / "webapp" / "static" / "app.js").read_text(encoding="utf-8")
     assert "if(!c.id) c.id = uid();" in source
     assert "if(c.due === undefined || !Number.isFinite(Date.parse(c.due)))" in source
+
+
+def test_workspace_controls_and_keyboard_filter_buttons_are_wired():
+    html = (ROOT / "webapp" / "templates" / "index.html").read_text(encoding="utf-8")
+    source = (ROOT / "webapp" / "static" / "app.js").read_text(encoding="utf-8")
+    assert 'id="exportWorkspaceBtn"' in html
+    assert 'id="importWorkspaceBtn"' in html
+    assert 'id="storageStatus"' in html
+    assert "function updateQuickToolsState()" in source
+    assert "Start a chat before using this tool." in source
+    assert "isQuickToolBusy=true" in source
+    assert "function updateNoteActionState()" in source
+    assert "aria-pressed=" in source
+    assert "if(isGenerating && currentSessionId!==s.id) stopGenerating();" in source
+    assert "if(isGenerating) stopGenerating();" in source
+
+
+def test_flashcard_editor_preserves_existing_review_data():
+    source = (ROOT / "webapp" / "static" / "app.js").read_text(encoding="utf-8")
+    assert "function editDeck(id)" in source
+    assert "const previousCards = new Map" in source
+    assert "...(previous||{})" in source
+    assert "existingDeck.cards=cards;" in source
+    assert "if(!c.id) c.id = uid();" in source
