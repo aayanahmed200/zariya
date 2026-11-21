@@ -483,6 +483,7 @@ function newSession(){
 function currentSession(){ return sessions.find(s=>s.id===currentSessionId); }
 function deleteSession(id, ev){
   ev.stopPropagation();
+  if(isGenerating && id===currentSessionId) stopGenerating();
   const target = sessions.find(s=>s.id===id);
   if(!confirm('Delete "'+((target&&target.title)||'this chat')+'"? This cannot be undone.')) return;
   sessions = sessions.filter(s=>s.id!==id);
