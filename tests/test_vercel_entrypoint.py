@@ -177,7 +177,7 @@ def test_flask_seo_routes_serve_assets():
     assert sitemap.status_code == 200
     assert b"https://zariyas.vercel.app/" in sitemap.data
     assert manifest.status_code == 200
-    assert b"/static/logo.png" in manifest.data
+    assert b"/favicon.svg" in manifest.data
 
 
 def test_static_frontend_copies_are_identical():
