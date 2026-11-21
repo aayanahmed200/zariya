@@ -584,7 +584,14 @@ function renderBubble(m, idx, isLast){
       '<div class="msg-actions"><button class="ghost-btn" data-act="copy">Copy</button><button class="ghost-btn" data-act="speak">Read aloud</button><button class="ghost-btn" data-act="up" title="Good answer">Helpful</button><button class="ghost-btn" data-act="down" title="Not helpful">Not helpful</button>'+
       (isLast?'<button class="ghost-btn" data-act="regen">Regenerate</button>':'')+'</div></div>';
     row.querySelector('[data-act="copy"]').addEventListener('click', event=>copyMessageContent(event.currentTarget,m.content));
-    row.querySelector('[data-act="speak"]').addEventListener('click', ()=>speak(m.content));
+    row.querySelector('[data-act="speak"]').addEventListener('click', event=>{
+      const button=event.currentTarget;
+      if(!speak(m.content)){
+        const original=button.textContent;
+        button.textContent='Speech unavailable';
+        window.setTimeout(()=>{if(button.isConnected) button.textContent=original;},1800);
+      }
+    });
     const regen = row.querySelector('[data-act="regen"]');
     if(regen) regen.addEventListener('click', regenerateLast);
     const upBtn = row.querySelector('[data-act="up"]');
@@ -888,15 +895,37 @@ async function runQuickTool(tool){
 }
 
 /* ============ SPEECH ============ */
+function speechPlainText(value){
+  return String(value||'')
+    .replace(new RegExp('(?:\\u0060){3}[\\s\\S]*?(?:\\u0060){3}','g'),' Code block omitted. ')
+    .replace(new RegExp('\\u0060([^\\u0060]+)\\u0060','g'),'$1')
+    .replace(/!\[([^\]]*)\]\([^)]+\)/g,'$1')
+    .replace(/\[([^\]]+)\]\((?:https?:\/\/)[^)]+\)/g,'$1')
+    .replace(/https?:\/\/\S+/g,'')
+    .replace(/^#{1,6}\s*/gm,'')
+    .replace(/^\s*[-*+]\s+/gm,'')
+    .replace(/^\s*\d+\.\s+/gm,'')
+    .replace(/\*\*(.*?)\*\*/g,'$1')
+    .replace(/~~(.*?)~~/g,'$1')
+    .replace(/\*(.*?)\*/g,'$1')
+    .replace(/_([^_]+)_/g,'$1')
+    .replace(/^\s*\|?[\s:|-]+\|?\s*$/gm,'')
+    .replace(/[|]/g,' ')
+    .replace(/\n{3,}/g,'\n\n')
+    .trim();
+}
 function speak(text){
-  if(!('speechSynthesis' in window)) return;
+  if(!('speechSynthesis' in window) || typeof SpeechSynthesisUtterance==='undefined') return false;
+  const readable=speechPlainText(text);
+  if(!readable) return false;
   window.speechSynthesis.cancel();
-  const u = new SpeechSynthesisUtterance(text.replace(/\*\*/g,'').replace(/`/g,''));
+  const u = new SpeechSynthesisUtterance(readable);
   u.lang = isUrdu(text) ? 'ur-PK' : 'en-US';
   const voices = window.speechSynthesis.getVoices();
-  const match = voices.find(v=>v.lang===u.lang) || voices.find(v=>v.lang.startsWith(u.lang.slice(0,2)));
+  const match = voices.find(v=>v.lang.toLowerCase()===u.lang.toLowerCase()) || voices.find(v=>v.lang.toLowerCase().startsWith(u.lang.slice(0,2)));
   if(match) u.voice = match;
   window.speechSynthesis.speak(u);
+  return true;
 }
 const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
 const micBtn = document.getElementById('micBtn');
@@ -1357,30 +1386,41 @@ function exportDeck(deck){
 function importDeckFromJson(text){
   let parsed;
   try { parsed = JSON.parse(text); } catch(e){ alert('That file is not valid JSON.'); return; }
-  const cardsSource = Array.isArray(parsed) ? parsed : parsed.cards;
-  const name = Array.isArray(parsed) ? 'Imported deck' : (parsed.name || 'Imported deck');
+  const sourceIsArray=Array.isArray(parsed);
+  const cardsSource = sourceIsArray ? parsed : (parsed && typeof parsed==='object' ? parsed.cards : null);
+  const name = !sourceIsArray && parsed && typeof parsed.name==='string'
+    ? parsed.name.slice(0,100) : 'Imported deck';
   if(!Array.isArray(cardsSource) || !cardsSource.length){ alert('No cards found in that file.'); return; }
   const cards = [];
-  for(const c of cardsSource){
+  for(const c of cardsSource.slice(0,30)){
     if(!c || typeof c.front !== 'string' || typeof c.back !== 'string') continue;
+    const due=typeof c.due==='string' && Number.isFinite(Date.parse(c.due)) ? c.due : new Date(0).toISOString();
+    const ease=Number(c.ease), interval=Number(c.interval), reps=Number(c.reps);
     cards.push(migrateCardForSpacedRepetition({
-      id: uid(), front: c.front, back: c.back, known: !!c.known,
-      ease: typeof c.ease === 'number' ? c.ease : undefined,
-      interval: typeof c.interval === 'number' ? c.interval : undefined,
-      reps: typeof c.reps === 'number' ? c.reps : undefined,
-      due: typeof c.due === 'string' ? c.due : undefined
+      id: uid(),
+      front:c.front.slice(0,600),
+      back:c.back.slice(0,2400),
+      known:!!c.known,
+      ease:Number.isFinite(ease) ? Math.min(4,Math.max(1.3,ease)) : 2.5,
+      interval:Number.isFinite(interval) ? Math.max(0,Math.min(36500,interval)) : 0,
+      reps:Number.isFinite(reps) ? Math.max(0,Math.min(100000,reps)) : 0,
+      due
     }));
   }
   if(!cards.length){ alert('No valid cards (each needs a front and back) found in that file.'); return; }
-  const tags = Array.isArray(parsed) ? [] : (Array.isArray(parsed.tags) ? parsed.tags : []);
+  const tags = !sourceIsArray && parsed && Array.isArray(parsed.tags)
+    ? parsed.tags.filter(tag=>typeof tag==='string').slice(0,12).map(tag=>tag.trim().toLowerCase().slice(0,40))
+    : [];
   decks.unshift({ id: uid(), name, tags, cards, createdAt: Date.now() });
   saveServerState(); renderDeckGrid();
 }
 document.getElementById('importDeckBtn').addEventListener('click', ()=>document.getElementById('importDeckFile').click());
 document.getElementById('importDeckFile').addEventListener('change', (e)=>{
   const file = e.target.files[0]; if(!file) return;
+  if(file.size>5*1024*1024){ alert('That deck file is larger than 5 MB.'); e.target.value=''; return; }
   const reader = new FileReader();
-  reader.onload = ()=>importDeckFromJson(reader.result);
+  reader.onload = ()=>importDeckFromJson(String(reader.result||''));
+  reader.onerror = ()=>alert('The deck file could not be read.');
   reader.readAsText(file);
   e.target.value = '';
 });
