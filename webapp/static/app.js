@@ -470,13 +470,18 @@ const input = document.getElementById('chat-input');
 const sendBtn = document.getElementById('sendBtn');
 const SEND_ICON = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M12 19V5M5 12l7-7 7 7"/></svg>';
 const STOP_ICON = '<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><rect x="5" y="5" width="14" height="14" rx="2"/></svg>';
-function syncSendState(){ if(isGenerating) return; sendBtn.disabled = input.value.trim().length===0; }
+function syncSendState(){ if(isGenerating) return; sendBtn.disabled = input.value.trim().length===0 || shouldListen; }
 input.addEventListener('input', ()=>{ input.style.height='auto'; input.style.height=Math.min(input.scrollHeight,160)+'px'; syncSendState(); });
 input.addEventListener('keydown', (e)=>{ if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); if(!sendBtn.disabled) sendMessage(); } });
 sendBtn.addEventListener('click', ()=>{ if(sendBtn.dataset.mode==='stop'){ stopGenerating(); } else if(!sendBtn.disabled){ sendMessage(); } });
 syncSendState();
 
 function sendMessage(){
+  if(shouldListen || listening){
+    stopVoiceRecognition();
+    showVoiceHint('Voice typing stopped. Review the transcript, then press send again.');
+    return;
+  }
   const text = input.value.trim(); if(!text) return;
   if(!currentSession()) newSession();
   const session = currentSession();
@@ -692,15 +697,15 @@ let voiceSessionFinal = '';
 let voiceReturnHint = composerHint.textContent;
 let voiceErrorMessage = '';
 let voiceRestartTimer = null;
+let stopWhenStarted = false;
 
 const savedVoiceLanguage = LS.get('zariya_voice_language', 'en-US');
 if(voiceLanguage){
   voiceLanguage.value = savedVoiceLanguage === 'ur-PK' ? 'ur-PK' : 'en-US';
   voiceLanguage.addEventListener('change', ()=>{
     LS.set('zariya_voice_language', voiceLanguage.value);
-    if(listening){
-      shouldListen = false;
-      try{ recognizer.stop(); }catch(error){}
+    if(listening || shouldListen){
+      stopVoiceRecognition();
       showVoiceHint('Voice typing stopped. Tap the microphone to start in '+voiceLanguage.options[voiceLanguage.selectedIndex].text+'.');
     }
   });
@@ -770,8 +775,12 @@ function stopVoiceRecognition(){
   shouldListen = false;
   if(voiceRestartTimer) clearTimeout(voiceRestartTimer);
   voiceRestartTimer = null;
-  if(recognizer && listening){
-    try{ recognizer.stop(); }catch(error){ finishVoiceUI(); }
+  if(recognizer){
+    try{ recognizer.stop(); }
+    catch(error){
+      if(!listening) stopWhenStarted = true;
+      else finishVoiceUI();
+    }
   }else{
     finishVoiceUI();
   }
@@ -786,6 +795,11 @@ if(SR && window.isSecureContext){
 
     recognizer.onstart = ()=>{
       listening = true;
+      if(stopWhenStarted || !shouldListen){
+        stopWhenStarted = false;
+        try{ recognizer.stop(); }catch(error){ finishVoiceUI(); }
+        return;
+      }
       voiceSessionFinal = '';
       voiceErrorMessage = '';
       micBtn.classList.add('active');
