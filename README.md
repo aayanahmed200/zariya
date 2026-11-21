@@ -1,6 +1,6 @@
 # Zariya
 
-**Live application:** [zariya-ebon.vercel.app](https://zariya-ebon.vercel.app/)
+**Live application:** [zariyas.vercel.app](https://zariyas.vercel.app/)
 
 An Urdu- and English-language workspace for chat, notes and flashcards, powered by Ollama models with a built-in knowledge fallback.
 
