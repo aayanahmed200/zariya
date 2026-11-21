@@ -180,7 +180,7 @@ function renderAccountUI(){
 
   if(me.signedIn){
     sbName.textContent = me.name || me.login;
-    sbAvatar.innerHTML = '<img src="'+escapeHtml(me.avatar||'')+'" alt="">';
+    sbAvatar.innerHTML = '<img src="'+escapeHtml(me.avatar||'/static/logo.png')+'" alt="">';
     signedOutRow.style.display = 'none';
     signedInRow.style.display = 'flex';
     document.getElementById('accountAvatar').src = me.avatar || '/static/logo.png';
