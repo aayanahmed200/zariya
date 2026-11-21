@@ -359,6 +359,7 @@ def test_voice_input_has_urdu_english_choice_and_permission_feedback():
     html = (ROOT / "webapp" / "templates" / "index.html").read_text(encoding="utf-8")
     source = (ROOT / "webapp" / "static" / "app.js").read_text(encoding="utf-8")
     assert 'id="voiceLanguage"' in html
+    assert 'dir="auto"' in html
     assert 'value="ur-PK"' in html
     assert "recognizer.continuous = true" in source
     assert "recognizer.interimResults = true" in source
