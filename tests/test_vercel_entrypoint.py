@@ -78,6 +78,63 @@ def test_gateway_uses_vercel_oidc_without_a_provider_key(monkeypatch):
     assert "AI_GATEWAY_API_KEY" not in headers
 
 
+def test_config_reads_vercel_runtime_oidc_request_header(monkeypatch):
+    monkeypatch.delenv("VERCEL_OIDC_TOKEN", raising=False)
+    monkeypatch.delenv("AI_GATEWAY_API_KEY", raising=False)
+    response = index.app.test_client().get(
+        "/api/config",
+        headers={"x-vercel-oidc-token": "runtime-oidc-test-token"},
+    )
+    assert response.status_code == 200
+    data = response.get_json()
+    assert data["aiConfigured"] is True
+    assert data["aiAvailable"] is True
+    assert data["aiProvider"] == "Vercel AI Gateway"
+    assert "runtime-oidc-test-token" not in response.get_data(as_text=True)
+
+
+def test_chat_passes_vercel_runtime_oidc_header_to_gateway(monkeypatch):
+    monkeypatch.delenv("VERCEL_OIDC_TOKEN", raising=False)
+    monkeypatch.delenv("AI_GATEWAY_API_KEY", raising=False)
+    calls = []
+
+    def fake_generate(messages, system_prompt, temperature=None, oidc_token=None):
+        calls.append(oidc_token)
+        return "A hosted answer."
+
+    monkeypatch.setattr(hosted_model, "generate_reply", fake_generate)
+    response = index.app.test_client().post(
+        "/api/chat",
+        headers={"x-vercel-oidc-token": "runtime-oidc-test-token"},
+        json={"messages": [{"role": "user", "content": "hello"}]},
+    )
+    assert response.status_code == 200
+    assert response.get_json()["provider"] == "ai_gateway"
+    assert calls == ["runtime-oidc-test-token"]
+
+
+def test_stream_passes_vercel_runtime_oidc_header_to_gateway(monkeypatch):
+    monkeypatch.delenv("VERCEL_OIDC_TOKEN", raising=False)
+    monkeypatch.delenv("AI_GATEWAY_API_KEY", raising=False)
+    calls = []
+
+    def fake_stream(messages, system_prompt, temperature=None, oidc_token=None):
+        calls.append(oidc_token)
+        yield "A hosted stream."
+
+    monkeypatch.setattr(hosted_model, "stream_reply", fake_stream)
+    response = index.app.test_client().post(
+        "/api/chat/stream",
+        headers={"x-vercel-oidc-token": "runtime-oidc-test-token"},
+        json={"messages": [{"role": "user", "content": "hello"}]},
+        buffered=True,
+    )
+    assert response.status_code == 200
+    assert b"A hosted stream." in response.data
+    assert b'"provider": "ai_gateway"' in response.data
+    assert calls == ["runtime-oidc-test-token"]
+
+
 def test_ai_gateway_chat_request_uses_oidc_and_free_open_model(monkeypatch):
     monkeypatch.setenv("VERCEL_OIDC_TOKEN", "unit-test-oidc-token")
     monkeypatch.delenv("AI_GATEWAY_API_KEY", raising=False)
@@ -297,7 +354,7 @@ def test_ai_gateway_stream_uses_event_stream_accept_header(monkeypatch):
 
 def test_summarize_quick_tool_uses_hosted_model(monkeypatch):
     calls = []
-    def fake_generate(messages, system_prompt, temperature=None):
+    def fake_generate(messages, system_prompt, temperature=None, oidc_token=None):
         calls.append((messages, system_prompt, temperature))
         return "A concise summary."
     monkeypatch.setattr(hosted_model, "generate_reply", fake_generate)
@@ -312,7 +369,7 @@ def test_summarize_quick_tool_uses_hosted_model(monkeypatch):
 
 def test_translate_quick_tool_only_sends_latest_user_text(monkeypatch):
     calls = []
-    def fake_generate(messages, system_prompt, temperature=None):
+    def fake_generate(messages, system_prompt, temperature=None, oidc_token=None):
         calls.append(messages)
         return "السلام علیکم"
     monkeypatch.setattr(hosted_model, "generate_reply", fake_generate)
