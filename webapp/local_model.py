@@ -71,6 +71,8 @@ def configured() -> bool:
 def _friendly_http_error(response: requests.Response) -> str:
     if response.status_code in (401, 403):
         return "Ollama rejected the API key. Check OLLAMA_API_KEY in your deployment settings."
+    if response.status_code == 402:
+        return "Ollama Cloud needs usage credits for this model. Connect local Ollama in Settings to use a model on this device without cloud charges."
     if response.status_code == 404:
         return "Ollama could not find that model. Choose a model listed in Settings."
     if response.status_code == 429:
