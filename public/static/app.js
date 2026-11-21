@@ -22,8 +22,8 @@ let studyQueue = []; let studyIndex = 0; let studyFlipped = false;
 let editingIndex = null;
 let isGenerating = false;
 let isQuickToolBusy = false;
-let stopped = false;
-let currentAbort = null;
+let activeGeneration = null;
+let generationSequence = 0;
 let serverConfig = {
   hostedMode:false, aiConfigured:false, aiAvailable:false,
   aiProvider:'Vercel AI Gateway', aiStatus:'Checking hosted AI…',
@@ -700,15 +700,24 @@ function showThinking(){
 function removeThinking(){ const r=document.getElementById('thinkingRow'); if(r) r.remove(); }
 
 async function respondTo(session){
-  stopped=false;
+  const generation={
+    id:++generationSequence,
+    controller:new AbortController(),
+    session,
+    reply:'',
+    stopped:false,
+    partialSaved:false
+  };
+  activeGeneration=generation;
   setGenerating(true);
   showThinking();
-  currentAbort=new AbortController();
   let reply='';
   let bubbleEl=null;
   const handleStreamPayload = payload=>{
+    if(generation.stopped) return;
     if(payload.reset){
       reply='';
+      generation.reply='';
       if(bubbleEl) updateStreamingBubble(bubbleEl,reply);
     }
     if(payload.notice){
@@ -717,6 +726,7 @@ async function respondTo(session){
     }
     if(payload.delta){
       reply+=payload.delta;
+      generation.reply=reply;
       if(!bubbleEl){ removeThinking(); bubbleEl=appendStreamingBubble(); }
       updateStreamingBubble(bubbleEl,reply);
     }
@@ -737,7 +747,7 @@ async function respondTo(session){
         systemPrompt:genPrefs.persona || undefined,
         temperature:typeof genPrefs.temperature==='number' ? genPrefs.temperature : undefined
       }),
-      signal:currentAbort.signal
+      signal:generation.controller.signal
     });
     if(!res.ok || !res.body){
       let data={};
@@ -756,12 +766,16 @@ async function respondTo(session){
     buffer+=decoder.decode();
     window.ZariyaSSE.consume(buffer,handleStreamPayload,true);
   }catch(error){
-    if(error.name==='AbortError'){
-      removeThinking();
-      setGenerating(false);
-      if(stopped && reply.trim()){
-        session.messages.push({role:'assistant',content:reply,ts:nowISO()});
+    if(error.name==='AbortError' || generation.stopped){
+      if(generation.stopped && generation.reply.trim() && !generation.partialSaved){
+        session.messages.push({role:'assistant',content:generation.reply,ts:nowISO()});
+        generation.partialSaved=true;
         saveServerState();
+      }
+      if(activeGeneration===generation){
+        activeGeneration=null;
+        removeThinking();
+        setGenerating(false);
         if(currentSessionId===session.id) renderChat();
       }
       return;
@@ -772,9 +786,12 @@ async function respondTo(session){
       reply='Could not reach hosted AI right now: '+(error.message || 'Please try again.');
     }
   }
-  removeThinking();
-  setGenerating(false);
-  if(stopped) return;
+  if(generation.stopped) return;
+  if(activeGeneration===generation){
+    activeGeneration=null;
+    removeThinking();
+    setGenerating(false);
+  }
   if(!reply) reply='I couldn’t generate a response. Please try again.';
   session.messages.push({role:'assistant',content:reply,ts:nowISO()});
   saveServerState();
@@ -799,7 +816,21 @@ function updateStreamingBubble(el, text){
   el.setAttribute('dir','auto');
   document.getElementById('chat-scroll').scrollTop = 999999;
 }
-function stopGenerating(){ stopped = true; if(currentAbort) currentAbort.abort(); removeThinking(); setGenerating(false); }
+function stopGenerating(){
+  const generation=activeGeneration;
+  if(!generation) return;
+  generation.stopped=true;
+  if(generation.reply.trim() && !generation.partialSaved){
+    generation.session.messages.push({role:'assistant',content:generation.reply,ts:nowISO()});
+    generation.partialSaved=true;
+    saveServerState();
+  }
+  activeGeneration=null;
+  generation.controller.abort();
+  removeThinking();
+  setGenerating(false);
+  if(currentSessionId===generation.session.id) renderChat();
+}
 function regenerateLast(){
     if(isGenerating) return;
   const session = currentSession(); if(!session) return;
