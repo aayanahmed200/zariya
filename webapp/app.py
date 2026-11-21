@@ -240,6 +240,11 @@ def me():
         })
     return jsonify({"signedIn": False, "githubConfigured": GITHUB_OAUTH_CONFIGURED})
 
+def _gateway_oidc_token() -> str | None:
+    """Read Vercel's runtime-injected OIDC token from the incoming request."""
+    return request.headers.get("x-vercel-oidc-token") or None
+
+
 # ---------------------------------------------------------------------------
 # Chat: Vercel AI Gateway hosted open model -> curated knowledge fallback.
 # Gateway authentication is server-side Vercel OIDC; no visitor key is required.
@@ -253,7 +258,12 @@ def chat():
     system_prompt, temperature = _generation_params(body)
 
     try:
-        reply = hosted_model.generate_reply(messages, system_prompt, temperature)
+        reply = hosted_model.generate_reply(
+            messages,
+            system_prompt,
+            temperature,
+            oidc_token=_gateway_oidc_token(),
+        )
     except hosted_model.GatewayError as exc:
         app.logger.info("Hosted AI request fell back to knowledge mode: %s", exc)
         reply = None
@@ -298,9 +308,15 @@ def chat_stream():
         full_reply = None
         collected = []
 
-        if hosted_model.connection_status()["available"]:
+        oidc_token = _gateway_oidc_token()
+        if hosted_model.connection_status(oidc_token=oidc_token)["available"]:
             try:
-                for token in hosted_model.stream_reply(messages, system_prompt, temperature):
+                for token in hosted_model.stream_reply(
+                    messages,
+                    system_prompt,
+                    temperature,
+                    oidc_token=oidc_token,
+                ):
                     collected.append(token)
                     yield _sse({"delta": token})
                 if collected:
@@ -422,6 +438,7 @@ def _tool_model_reply(messages, task_prompt: str):
             messages,
             SYSTEM_PROMPT + "\n\n" + task_prompt,
             temperature=0.2,
+            oidc_token=_gateway_oidc_token(),
         )
     except hosted_model.GatewayError as exc:
         app.logger.info("Hosted quick tool used knowledge fallback: %s", exc)
@@ -537,7 +554,7 @@ def kb_stats():
 @app.route("/api/config")
 def config():
     """Expose hosted-model readiness without returning authentication details."""
-    ai = hosted_model.connection_status()
+    ai = hosted_model.connection_status(oidc_token=_gateway_oidc_token())
     return jsonify({
         "hostedMode": HOSTED_MODE,
         "aiConfigured": ai["configured"],
@@ -552,7 +569,7 @@ def config():
 
 @app.route("/api/health")
 def health():
-    ai = hosted_model.connection_status()
+    ai = hosted_model.connection_status(oidc_token=_gateway_oidc_token())
     return jsonify({
         "ok": True,
         "service": "zariya",
