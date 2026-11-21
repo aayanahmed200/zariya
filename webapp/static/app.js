@@ -311,7 +311,7 @@ document.getElementById('importWorkspaceFile').addEventListener('change',event=>
   event.target.value='';
 });
 
-function loadServerState(){
+async function loadServerState(){
   const results = await Promise.allSettled([apiGet('/api/config'), apiGet('/api/me')]);
   serverConfig = results[0].status === 'fulfilled' ? results[0].value : {
     hostedMode:true, aiConfigured:false, aiAvailable:false, aiProvider:'Vercel AI Gateway',
