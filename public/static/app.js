@@ -4,7 +4,7 @@
 /* ============ LOCAL UI PREFERENCES (theme/font/etc -- not API keys, those are server-side) ============ */
 const LS = {
   get(k, d){ try{ const v = localStorage.getItem(k); return v===null? d : JSON.parse(v); }catch(e){ return d; } },
-  set(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} }
+  set(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); return true; }catch(e){ return false; } }
 };
 let uiPrefs = LS.get('zariya_ui_prefs', { theme:'light', fontSize:15, showTimestamps:true, ttsEnabled:false });
 let genPrefs = LS.get('zariya_gen_prefs', { persona:'', temperature:0.5 });
@@ -171,7 +171,146 @@ async function apiPost(url, body, signal){
   return readApiResponse(await fetch(url, { method:'POST', headers:{'Content-Type':'application/json','Accept':'application/json'}, body:JSON.stringify(body||{}), signal }));
 }
 
-async function loadServerState(){
+async function updateStorageStatus(saved=true, message=''){
+  const status=document.getElementById('storageStatus');
+  if(!status) return;
+  status.classList.toggle('warning',!saved);
+  status.textContent=message || (saved
+    ? 'All changes saved on this device.'
+    : 'This browser could not save more data. Export a backup and free up browser storage.');
+}
+function exportWorkspaceBackup(){
+  const backup={
+    format:'zariya-workspace-backup',
+    version:1,
+    exportedAt:new Date().toISOString(),
+    sessions,notes,decks
+  };
+  const date=new Date().toISOString().slice(0,10);
+  downloadFile('zariya-workspace-'+date+'.json',JSON.stringify(backup,null,2),'application/json;charset=utf-8');
+  updateStorageStatus(true,'Workspace backup exported. Keep the file somewhere safe.');
+}
+function safeImportedText(value,maxLength,fallback=''){
+  return typeof value==='string' ? value.slice(0,maxLength) : fallback;
+}
+function normaliseImportedWorkspace(source){
+  if(!source || typeof source!=='object' || source.format!=='zariya-workspace-backup' || source.version!==1){
+    throw new Error('This file is not a supported Zariya workspace backup.');
+  }
+  if(!Array.isArray(source.sessions) || !Array.isArray(source.notes) || !Array.isArray(source.decks)){
+    throw new Error('The backup is missing chats, notes or flashcards data.');
+  }
+  if(source.sessions.length>500 || source.notes.length>1000 || source.decks.length>500){
+    throw new Error('This backup contains more items than Zariya can safely restore at once.');
+  }
+  let messageCount=0;
+  const restoredSessions=source.sessions.map(item=>{
+    if(!item || typeof item!=='object') return null;
+    const messages=Array.isArray(item.messages) ? item.messages.slice(0,5000).flatMap(message=>{
+      if(!message || !['user','assistant'].includes(message.role) || typeof message.content!=='string') return [];
+      messageCount+=1;
+      if(messageCount>10000) return [];
+      return [{
+        role:message.role,
+        content:message.content.slice(0,50000),
+        ts:safeImportedText(message.ts,80,nowISO())
+      }];
+    }) : [];
+    return {
+      id:uid(),
+      title:safeImportedText(item.title,120,'Imported chat') || 'Imported chat',
+      messages,
+      createdAt:Number.isFinite(Number(item.createdAt)) ? Number(item.createdAt) : Date.now()
+    };
+  }).filter(Boolean);
+  const restoredNotes=source.notes.map(item=>{
+    if(!item || typeof item!=='object') return null;
+    return {
+      id:uid(),
+      title:safeImportedText(item.title,180,'Untitled note') || 'Untitled note',
+      body:safeImportedText(item.body,150000),
+      tags:Array.isArray(item.tags) ? item.tags.filter(tag=>typeof tag==='string').slice(0,20).map(tag=>tag.trim().toLowerCase().slice(0,40)).filter(Boolean) : [],
+      updatedAt:Number.isFinite(Number(item.updatedAt)) ? Number(item.updatedAt) : Date.now()
+    };
+  }).filter(Boolean);
+  const restoredDecks=source.decks.map(item=>{
+    if(!item || typeof item!=='object' || !Array.isArray(item.cards)) return null;
+    const cards=item.cards.slice(0,30).flatMap(card=>{
+      if(!card || typeof card.front!=='string' || typeof card.back!=='string') return [];
+      const ease=Number(card.ease);
+      const interval=Number(card.interval);
+      const reps=Number(card.reps);
+      const due=typeof card.due==='string' && Number.isFinite(Date.parse(card.due))
+        ? card.due : new Date(0).toISOString();
+      return [migrateCardForSpacedRepetition({
+        id:uid(),
+        front:card.front.slice(0,600),
+        back:card.back.slice(0,2400),
+        known:!!card.known,
+        ease:Number.isFinite(ease) ? Math.min(4,Math.max(1.3,ease)) : 2.5,
+        interval:Number.isFinite(interval) ? Math.max(0,Math.min(36500,interval)) : 0,
+        reps:Number.isFinite(reps) ? Math.max(0,Math.min(100000,reps)) : 0,
+        due
+      })];
+    });
+    return {
+      id:uid(),
+      name:safeImportedText(item.name,100,'Imported deck') || 'Imported deck',
+      tags:Array.isArray(item.tags) ? item.tags.filter(tag=>typeof tag==='string').slice(0,20).map(tag=>tag.trim().toLowerCase().slice(0,40)).filter(Boolean) : [],
+      cards,
+      createdAt:Number.isFinite(Number(item.createdAt)) ? Number(item.createdAt) : Date.now()
+    };
+  }).filter(Boolean);
+  return {sessions:restoredSessions,notes:restoredNotes,decks:restoredDecks};
+}
+function restoreWorkspaceBackup(raw){
+  let source;
+  try{ source=JSON.parse(raw); }
+  catch(error){ throw new Error('The selected file is not valid JSON.'); }
+  const restored=normaliseImportedWorkspace(source);
+  const itemCount=restored.sessions.length+restored.notes.length+restored.decks.length;
+  if(!itemCount) throw new Error('This backup does not contain any chats, notes or flashcard decks.');
+  if(!confirm('Restore this backup and replace the chats, notes and flashcard decks currently saved in this browser? Export your current workspace first if you want to keep it.')) return false;
+  sessions=restored.sessions;
+  notes=restored.notes;
+  decks=restored.decks;
+  currentSessionId=sessions.length ? sessions[0].id : null;
+  currentNoteId=notes.length ? notes[0].id : null;
+  currentDeckId=null;
+  editingDeckId=null;
+  activeNoteTagFilter=null;
+  activeDeckTagFilter=null;
+  saveServerState();
+  renderSessionList();
+  renderChat();
+  renderNotesList();
+  renderDeckGrid();
+    return true;
+}
+document.getElementById('exportWorkspaceBtn').addEventListener('click',exportWorkspaceBackup);
+document.getElementById('importWorkspaceBtn').addEventListener('click',()=>document.getElementById('importWorkspaceFile').click());
+document.getElementById('importWorkspaceFile').addEventListener('change',event=>{
+  const file=event.target.files && event.target.files[0];
+  if(!file) return;
+  if(file.size>25*1024*1024){
+    updateStorageStatus(false,'That backup is larger than 25 MB. Choose a smaller backup file.');
+    event.target.value='';
+    return;
+  }
+  const reader=new FileReader();
+  reader.onload=()=>{
+    try{
+      restoreWorkspaceBackup(String(reader.result||''));
+    }catch(error){
+      updateStorageStatus(false,error.message || 'Could not restore that backup.');
+    }
+  };
+  reader.onerror=()=>updateStorageStatus(false,'The backup file could not be read.');
+  reader.readAsText(file);
+  event.target.value='';
+});
+
+function loadServerState(){
   const results = await Promise.allSettled([apiGet('/api/config'), apiGet('/api/me')]);
   serverConfig = results[0].status === 'fulfilled' ? results[0].value : {
     hostedMode:true, aiConfigured:false, aiAvailable:false, aiProvider:'Vercel AI Gateway',
@@ -196,7 +335,8 @@ let saveTimer;
 function saveServerState(){
   clearTimeout(saveTimer);
   if(serverConfig.hostedMode){
-    LS.set('zariya_app_state_v1:' + (me.signedIn && me.login ? me.login : 'guest'), { sessions, notes, decks });
+    const saved = LS.set('zariya_app_state_v1:' + (me.signedIn && me.login ? me.login : 'guest'), { sessions, notes, decks });
+    updateStorageStatus(saved);
     return;
   }
   saveTimer = setTimeout(()=>{ apiPost('/api/state', { sessions, notes, decks }).catch(()=>{}); }, 300);
@@ -1033,7 +1173,8 @@ let reviewingAllCards = false;
 
 /* ============ SPACED REPETITION (SM-2) ============ */
 function migrateCardForSpacedRepetition(c){
-  if(c.due === undefined) c.due = new Date(0).toISOString();
+  if(!c.id) c.id = uid();
+  if(c.due === undefined || !Number.isFinite(Date.parse(c.due))) c.due = new Date(0).toISOString();
   if(c.ease === undefined) c.ease = 2.5;
   if(c.interval === undefined) c.interval = 0;
   if(c.reps === undefined) c.reps = 0;
@@ -1121,7 +1262,7 @@ function exportDeck(deck){
   const payload = { zariyaDeckExport: 1, name: deck.name, tags: deck.tags||[], cards: deck.cards.map(c=>({
     front: c.front, back: c.back, known: !!c.known, ease: c.ease, interval: c.interval, reps: c.reps, due: c.due
   })) };
-  downloadFile(deck.name.replace(/[^\w\- ]/g, '').trim().replace(/\s+/g, '_') + '.json', JSON.stringify(payload, null, 2));
+  downloadFile(deck.name.replace(/[^\w\- ]/g, '').trim().replace(/\s+/g, '_') + '.json', JSON.stringify(payload, null, 2), 'application/json;charset=utf-8');
 }
 function importDeckFromJson(text){
   let parsed;
@@ -1361,8 +1502,8 @@ document.getElementById('personaInput').addEventListener('input', (e)=>{ genPref
 document.getElementById('creativitySlider').addEventListener('input', (e)=>{ const pct=parseInt(e.target.value,10); genPrefs.temperature=pct/100; LS.set('zariya_gen_prefs',genPrefs); updateCreativityLabel(pct); });
 document.getElementById('resetPersonaBtn').addEventListener('click', ()=>{ genPrefs={persona:'', temperature:0.5}; LS.set('zariya_gen_prefs',genPrefs); applyGenPrefs(); });
 
-function downloadFile(filename, content){
-  const blob = new Blob([content], {type:'text/plain;charset=utf-8'});
+function downloadFile(filename, content, type='text/plain;charset=utf-8'){
+  const blob = new Blob([content], {type});
   const a = document.createElement('a');
   const objectUrl = URL.createObjectURL(blob);
   a.href = objectUrl; a.download = filename; a.click();
