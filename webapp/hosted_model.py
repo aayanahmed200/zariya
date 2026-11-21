@@ -24,21 +24,23 @@ class GatewayError(RuntimeError):
     """Safe, user-facing model gateway error without secrets or raw headers."""
 
 
-def _token() -> str:
-    # Vercel provides OIDC to deployments. An API key is optional for non-
-    # Vercel development and is never read by browser code.
+def _token(oidc_token: str | None = None) -> str:
+    # At build time Vercel exposes VERCEL_OIDC_TOKEN as an environment
+    # variable. At function runtime it injects the short-lived token into the
+    # incoming request's x-vercel-oidc-token header instead.
     return (
-        os.environ.get("VERCEL_OIDC_TOKEN", "").strip()
+        (oidc_token or "").strip()
+        or os.environ.get("VERCEL_OIDC_TOKEN", "").strip()
         or os.environ.get("AI_GATEWAY_API_KEY", "").strip()
     )
 
 
-def configured() -> bool:
-    return bool(_token())
+def configured(oidc_token: str | None = None) -> bool:
+    return bool(_token(oidc_token))
 
 
-def connection_status() -> dict:
-    token_present = configured()
+def connection_status(oidc_token: str | None = None) -> dict:
+    token_present = configured(oidc_token)
     if token_present:
         status = "Hosted AI ready · NVIDIA Nemotron 3.5 Lightning Free"
     elif os.environ.get("VERCEL"):
@@ -54,8 +56,11 @@ def connection_status() -> dict:
     }
 
 
-def _headers(accept: str = "application/json") -> dict[str, str]:
-    token = _token()
+def _headers(
+    accept: str = "application/json",
+    oidc_token: str | None = None,
+) -> dict[str, str]:
+    token = _token(oidc_token)
     if not token:
         raise GatewayError(
             "Hosted AI is not connected on this deployment. Please try again later."
@@ -167,13 +172,14 @@ def generate_reply(
     messages: list[dict],
     system_prompt: str,
     temperature: float | None = None,
+    oidc_token: str | None = None,
 ) -> str | None:
-    if not configured():
+    if not configured(oidc_token):
         return None
     try:
         response = requests.post(
             f"{GATEWAY_BASE_URL}/chat/completions",
-            headers=_headers("application/json"),
+            headers=_headers("application/json", oidc_token),
             json=_payload(messages, system_prompt, temperature, stream=False),
             timeout=(10, 60),
         )
@@ -192,9 +198,10 @@ def stream_reply(
     messages: list[dict],
     system_prompt: str,
     temperature: float | None = None,
+    oidc_token: str | None = None,
 ) -> Iterator[str]:
     """Yield content deltas from the OpenAI-compatible Chat Completions SSE API."""
-    if not configured():
+    if not configured(oidc_token):
         raise GatewayError(
             "Hosted AI is not connected on this deployment. The built-in knowledge mode is available."
         )
@@ -202,7 +209,7 @@ def stream_reply(
     try:
         with requests.post(
             f"{GATEWAY_BASE_URL}/chat/completions",
-            headers=_headers("text/event-stream"),
+            headers=_headers("text/event-stream", oidc_token),
             json=_payload(messages, system_prompt, temperature, stream=True),
             stream=True,
             timeout=(10, 60),
