@@ -25,6 +25,7 @@ let currentAbort = null;
 let serverConfig = { hostedMode:false, ollamaConfigured:false, ollamaAvailable:false, ollamaMode:'local', ollamaStatus:'', localModelName:'', searchConfigured:false, githubConfigured:false };
 let activeOllamaModel = LS.get('zariya_active_ollama_model', '');
 let localDeviceConnected = false;
+let localDevicePreferred = LS.get('zariya_local_device_preferred', false);
 let localDeviceModel = LS.get('zariya_local_device_model', 'qwen2.5:1.5b');
 let localDeviceModels = [];
 const LOCAL_OLLAMA_BASE = 'http://127.0.0.1:11434';
@@ -1188,6 +1189,8 @@ async function connectLocalDevice(){
     localDeviceModels=names;
     localDeviceConnected=true;
     LS.set('zariya_local_device_model',localDeviceModel);
+    localDevicePreferred=true;
+    LS.set('zariya_local_device_preferred',true);
     if(input) input.value=localDeviceModel;
     if(note){
       note.textContent=match
@@ -1200,6 +1203,8 @@ async function connectLocalDevice(){
     updateOnboardingBanner();
   }catch(error){
     localDeviceConnected=false;
+    localDevicePreferred=false;
+    LS.set('zariya_local_device_preferred',false);
     let message=error.name==='AbortError' ? 'Ollama did not respond. Make sure the Ollama app is running.' : (error.message||'Could not connect to Ollama.');
     if(/Failed to fetch|NetworkError|Load failed/i.test(message)){
       message='The browser could not reach local Ollama. Install/start Ollama, allow https://zariyas.vercel.app in OLLAMA_ORIGINS, then restart Ollama. See the setup guide below.';
@@ -1372,6 +1377,7 @@ function pollLocalModelStatus(){
   renderSessionList();
   renderChat();
   pollLocalModelStatus();
+  if(localDevicePreferred) connectLocalDevice();
 })();
 
 
