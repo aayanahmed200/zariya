@@ -529,3 +529,15 @@ def test_speech_output_removes_markdown_before_reading():
 def test_local_state_loader_remains_async():
     source = (ROOT / "webapp" / "static" / "app.js").read_text(encoding="utf-8")
     assert "async function loadServerState()" in source
+
+
+def test_chat_generation_state_is_isolated_per_request_and_saves_partial_once():
+    source = (ROOT / "webapp" / "static" / "app.js").read_text(encoding="utf-8")
+    assert "let activeGeneration = null;" in source
+    assert "controller:new AbortController()" in source
+    assert "signal:generation.controller.signal" in source
+    assert "if(activeGeneration===generation)" in source
+    assert "generation.partialSaved=true;" in source
+    assert "generation.controller.abort();" in source
+    assert "let currentAbort = null;" not in source
+    assert "let stopped = false;" not in source
