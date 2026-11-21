@@ -6,7 +6,7 @@ A hosted Urdu and English workspace for chat, notes and flashcards. Visitors can
 
 ## Overview
 
-The Flask app provides chat, bilingual voice typing, chat history, notepad, flashcards, deck import/export and browser text-to-speech. Chat is routed server-side through Vercel AI Gateway using the Vercel deployment OIDC token. The default open-weight model is `nvidia/nemotron-3.5-lightning-free`, currently listed at $0 per input/output token. Free provider capacity and rate limits can change; when hosted inference is unavailable, selected requests use the bundled rule-based knowledge engine.
+The Flask app provides chat, bilingual voice typing, chat history, notepad, flashcards, deck import/export and browser text-to-speech. Chat is routed server-side through Vercel AI Gateway using the short-lived OIDC token injected into each Function request as `x-vercel-oidc-token`. The default open-weight model is `nvidia/nemotron-3.5-lightning-free`, currently listed at $0 per input/output token. Free provider capacity and rate limits can change; when hosted inference is unavailable, selected requests use the bundled rule-based knowledge engine.
 
 The current NVIDIA model-provider listing does not advertise zero-data-retention or a no-training guarantee. Chat prompts are transmitted to the Gateway and model provider. Voice typing uses the browser speech-recognition service; its audio handling depends on the browser's provider. Zariya does not store voice recordings. Users should not enter passwords, private records or sensitive information.
 
@@ -36,13 +36,13 @@ cp .env.example .env
 python app.py
 ```
 
-The local Flask app works without a model token using its built-in knowledge fallback. For local hosted-model testing only, set `AI_GATEWAY_API_KEY` in your uncommitted `.env` file. The deployed website does not require this variable: Vercel provides `VERCEL_OIDC_TOKEN` automatically when OIDC token generation is enabled for the project.
+The local Flask app works without a model token using its built-in knowledge fallback. For local hosted-model testing only, set `AI_GATEWAY_API_KEY` in your uncommitted `.env` file. The deployed website does not require this variable: Vercel injects the OIDC token as `x-vercel-oidc-token` on the incoming Function request when OIDC token generation is enabled.
 
 ## Deploy to Vercel
 
 Import the repository into Vercel with the project root set to `.`. The root `index.py` exports the Flask app, root `requirements.txt` contains the web runtime dependencies, and Vercel serves `public/` from its static asset CDN.
 
-Vercel OIDC token generation is enabled for the project. The backend uses `VERCEL_OIDC_TOKEN` to authenticate to `https://ai-gateway.vercel.sh/v1/chat/completions`. Visitors do not need to install an app, download a model or supply an API key.
+Vercel OIDC token generation is enabled for the project. At Function runtime, Vercel injects the short-lived token as `x-vercel-oidc-token`; the Flask routes pass that header to `https://ai-gateway.vercel.sh/v1/chat/completions`. Visitors do not need to install an app, download a model or supply an API key.
 
 The default Gateway model is `nvidia/nemotron-3.5-lightning-free`. Its live catalogue listing currently shows $0 input and output token pricing. Free model availability and provider rate limits are not guaranteed. Override it with `AI_GATEWAY_MODEL` only if another model is supported and intentionally configured.
 
