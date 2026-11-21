@@ -6,32 +6,32 @@
 <meta name="theme-color" content="#2e7655">
 <meta name="color-scheme" content="light dark">
 <meta name="application-name" content="Zariya">
-<meta name="description" content="Zariya is a free Urdu and English AI workspace with local Ollama chat, notes and flashcards. Run open models on your own device without a paid cloud API.">
+<meta name="description" content="Zariya is a free Urdu and English AI workspace with hosted open-model chat, notes and flashcards. No local model installation or personal API key is required.">
 <meta name="robots" content="index, follow, max-image-preview:large">
 <meta name="author" content="Zariya">
 <title>Zariya — Free Urdu &amp; English AI Workspace</title>
 <link rel="canonical" href="https://zariyas.vercel.app/">
-<link rel="icon" type="image/png" href="/static/logo.png?v=20261121-4">
+<link rel="icon" type="image/png" href="/static/logo.png?v=20261121-5">
 <link rel="shortcut icon" type="image/png" href="/static/logo.png?v=20261121-4">
-<link rel="icon" type="image/svg+xml" href="/favicon.svg?v=20261121-4">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg?v=20261121-5">
 <link rel="apple-touch-icon" href="/static/logo.png?v=20261121-4">
-<link rel="manifest" href="/site.webmanifest?v=20261121-4">
+<link rel="manifest" href="/site.webmanifest?v=20261121-5">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Zariya">
 <meta property="og:title" content="Zariya — Free Urdu &amp; English AI Workspace">
-<meta property="og:description" content="Chat in Urdu or English with local Ollama models. Keep notes and flashcards together in a private, device-first workspace.">
+<meta property="og:description" content="Chat in Urdu or English with a hosted open model. Keep notes and flashcards together in one simple workspace — no software install required.">
 <meta property="og:url" content="https://zariyas.vercel.app/">
 <meta property="og:locale" content="en_PK">
 <meta property="og:image" content="https://zariyas.vercel.app/static/logo.png">
 <meta property="og:image:alt" content="Zariya orange interlocking mark">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Zariya — Free Urdu &amp; English AI Workspace">
-<meta name="twitter:description" content="A private Urdu and English workspace for local AI chat, notes and flashcards. No paid cloud API required.">
+<meta name="twitter:description" content="A free Urdu and English workspace for hosted AI chat, notes and flashcards. No local model installation required.">
 <meta name="twitter:image" content="https://zariyas.vercel.app/static/logo.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Lora:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=Noto+Nastaliq+Urdu:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/static/style.css?v=20261121-4">
+<link rel="stylesheet" href="/static/style.css?v=20261121-5">
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
@@ -132,7 +132,7 @@
 
     <div class="onboarding-banner" id="onboardingBanner" style="display:none;">
       <span class="ob-icon">i</span>
-      <span class="ob-text">Connect Ollama to enable generative chat.</span>
+      <span class="ob-text">Hosted AI is ready to use. No installation required.</span>
       <button class="ob-settings-link" type="button" data-view="settings">Open settings</button>
       <button class="ob-dismiss" id="onboardingDismissBtn" type="button" aria-label="Dismiss">&times;</button>
     </div>
@@ -315,58 +315,31 @@
             </div>
           </div>
 
-          <div class="setting-group ollama-setting">
+          <div class="setting-group hosted-ai-setting">
             <div class="setting-heading">
-              <span class="setting-icon setting-icon-ollama">O</span>
-              <div><h3>Ollama models</h3><p class="desc">Ollama is the only generative AI provider used by Zariya.</p></div>
+              <span class="setting-icon hosted-ai-icon">✦</span>
+              <div><h3>Hosted AI</h3><p class="desc">A ready-to-use open model, hosted for you. Nothing to install.</p></div>
             </div>
             <div class="setting-content">
-              <div class="ollama-status-row">
-                <div><label>Connection</label><div class="sub" id="localModelStatusText">Checking Ollama…</div></div>
-                <span class="ollama-status-mark" id="ollamaStatusMark"></span>
+              <div class="hosted-ai-summary">
+                <div class="hosted-ai-model-copy">
+                  <span class="hosted-ai-overline">ACTIVE MODEL</span>
+                  <strong id="aiModelName">NVIDIA Nemotron 3.5 Lightning Free</strong>
+                  <span class="sub" id="aiModelStatusText">Checking hosted model…</span>
+                </div>
+                <span class="hosted-ai-status-mark" id="aiStatusMark"></span>
               </div>
-              <div id="ollamaSetupNote" class="ollama-setup-note">Connect Ollama to start using generative models.</div>
-              <div class="local-device-panel" id="localDevicePanel">
-                <div class="local-device-row">
-                  <div class="local-device-copy">
-                    <label for="localDeviceModelInput">Run a model on this device — free</label>
-                    <span class="sub">Uses your computer, not a paid cloud API. The model stays on your device.</span>
-                  </div>
-                  <div class="local-device-controls">
-                    <input id="localDeviceModelInput" value="qwen2.5:1.5b" autocomplete="off" spellcheck="false" aria-label="Local Ollama model name">
-                    <button class="btn primary" id="localDeviceConnectBtn" type="button">Test &amp; connect</button>
-                  </div>
-                </div>
-                <div class="local-device-help">
-                  <strong>One-time setup</strong>
-                  <ol>
-                    <li>Install and open <a href="https://ollama.com/download" target="_blank" rel="noopener noreferrer">Ollama</a>.</li>
-                    <li>Open PowerShell and download a small model: <code>ollama pull qwen2.5:1.5b</code></li>
-                    <li>Allow this site to access your local Ollama server: <code>setx OLLAMA_ORIGINS "https://zariyas.vercel.app"</code></li>
-                    <li>Quit Ollama from the system tray, reopen it, then press <strong>Test &amp; connect</strong>.</li>
-                  </ol>
-                  <p>On macOS or Linux, use the <a href="https://github.com/ollama/ollama/blob/main/docs/faq.mdx" target="_blank" rel="noopener noreferrer">official Ollama environment setup guide</a> for <code>OLLAMA_ORIGINS</code>.</p>
-                </div>
-                <div class="local-device-status" id="localDeviceStatusNote" role="status" aria-live="polite">Local Ollama is not connected yet.</div>
+              <p class="hosted-ai-note" id="aiProviderNote">Hosted AI is being checked.</p>
+              <div class="hosted-ai-benefits">
+                <span><i>✓</i> No Windows or Mac install</span>
+                <span><i>✓</i> No personal API key</span>
+                <span><i>✓</i> No model downloads</span>
               </div>
-              <div id="localModelControls">
-                <div class="setting-row model-select-row">
-                  <div><label for="modelSelect">Active model</label><div class="sub">Choose an available Ollama model.</div></div>
-                  <select id="modelSelect" aria-label="Active Ollama model"><option value="">Loading models…</option></select>
-                </div>
-                <div class="setting-row" id="localModelPullRow">
-                  <div class="model-name-entry">
-                    <label for="newModelInput">Use another model</label>
-                    <input id="newModelInput" placeholder="e.g. gemma4:31b" autocomplete="off">
-                  </div>
-                  <button class="btn" id="pullModelBtn" type="button">Use model</button>
-                </div>
-                <div class="setting-row" id="localModelRetryRow" style="display:none;">
-                  <div class="progress-bar-track"><div class="progress-bar-fill" id="localModelProgressFill"></div></div>
-                  <button class="btn" id="localModelRetryBtn" type="button">Retry model download</button>
-                </div>
-                <div class="small-note" id="modelSwitchNote" role="status"></div>
+              <div class="hosted-ai-privacy">
+                <strong>About your chat data</strong>
+                <p>Your messages are sent to Vercel AI Gateway and the model provider to generate replies. The selected provider does not advertise zero-data-retention or a no-training guarantee. Avoid entering passwords, private records or other sensitive information.</p>
               </div>
+              <p class="hosted-ai-limits">The selected model is listed at $0 per token, but it is a shared service and can be rate-limited or temporarily unavailable. Zariya then falls back to its smaller built-in knowledge mode.</p>
             </div>
           </div>
 
@@ -410,6 +383,6 @@
   </form>
 </dialog>
 </div>
-<script src="/static/app.js?v=20261121-4"></script>
+<script src="/static/app.js?v=20261121-5"></script>
 </body>
 </html>
