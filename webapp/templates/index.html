@@ -261,6 +261,18 @@
                 <div class="account-details"><strong id="accountName"></strong><span class="sub" id="accountBio"></span></div>
                 <button class="btn danger" id="githubSignOutBtn" type="button">Sign out</button>
               </div>
+              <div class="workspace-backup">
+                <div>
+                  <strong>Protect your workspace</strong>
+                  <p>Chats, notes and flashcards are saved in this browser only. Export a backup before clearing browser data or moving devices.</p>
+                </div>
+                <div class="workspace-backup-actions">
+                  <button class="btn primary" id="exportWorkspaceBtn" type="button">Export backup</button>
+                  <button class="btn" id="importWorkspaceBtn" type="button">Restore backup</button>
+                  <input id="importWorkspaceFile" type="file" accept="application/json,.json" hidden>
+                </div>
+                <span class="storage-status" id="storageStatus" role="status" aria-live="polite">Changes are saved automatically on this device.</span>
+              </div>
             </div>
           </div>
 
