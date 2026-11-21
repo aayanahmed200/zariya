@@ -520,7 +520,7 @@ def run_tool(name):
         "Prioritise central ideas, definitions and facts. Each card needs a clear "
         "question or term in front and a concise answer in back. Keep both in "
         "the user's language. Do not invent details. Return ONLY one valid JSON "
-        "object in this exact shape: {\\"cards\\":[{\\"front\\":\\"...\\",\\"back\\":\\"...\\"}]}. "
+        "Return a JSON object with a cards array; each card must have front and back string fields. "
         "Do not wrap it in Markdown fences or add commentary."
     )
     raw_cards = _tool_model_reply(messages, flashcard_prompt)
