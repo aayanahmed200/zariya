@@ -14,7 +14,7 @@ from urllib.parse import urlencode
 
 import requests
 from dotenv import load_dotenv
-from flask import Flask, jsonify, redirect, request, session, url_for, render_template, Response, stream_with_context
+from flask import Flask, jsonify, redirect, request, session, url_for, render_template, Response, stream_with_context, send_from_directory
 
 import kb_engine
 import local_model
@@ -55,6 +55,7 @@ APP_BASE_URL = (os.environ.get("APP_BASE_URL") or DEFAULT_BASE_URL).rstrip("/")
 GITHUB_OAUTH_CONFIGURED = bool(GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET and SESSION_SECRET_CONFIGURED)
 
 DATA_DIR = Path(__file__).parent / "server"
+PUBLIC_DIR = Path(__file__).resolve().parents[1] / "public"
 STORE_PATH = DATA_DIR / "store.json"
 
 SYSTEM_PROMPT = (
@@ -472,6 +473,25 @@ def local_model_select():
         return jsonify({"ok": False, "error": "Model name must be text."}), 400
     result = local_model.set_active_model(name)
     return jsonify(result), (200 if result.get("ok") else 400)
+
+
+# SEO assets are served by Vercel's public directory in production. These
+# equivalent Flask routes also make local development and tests behave the same.
+@app.route("/favicon.svg")
+def favicon():
+    return send_from_directory(PUBLIC_DIR, "favicon.svg", mimetype="image/svg+xml", max_age=3600)
+
+@app.route("/robots.txt")
+def robots_txt():
+    return send_from_directory(PUBLIC_DIR, "robots.txt", mimetype="text/plain", max_age=3600)
+
+@app.route("/sitemap.xml")
+def sitemap_xml():
+    return send_from_directory(PUBLIC_DIR, "sitemap.xml", mimetype="application/xml", max_age=3600)
+
+@app.route("/site.webmanifest")
+def site_manifest():
+    return send_from_directory(PUBLIC_DIR, "site.webmanifest", mimetype="application/manifest+json", max_age=3600)
 
 @app.route("/")
 def index():
