@@ -1,7 +1,7 @@
 {
-  "name": "Zariya — Urdu & English Assistant",
+  "name": "Zariya — Free Urdu & English AI Workspace",
   "short_name": "Zariya",
-  "description": "An Urdu and English workspace for chat, notes and learning.",
+  "description": "A private Urdu and English workspace for local Ollama chat, notes and flashcards.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
@@ -9,11 +9,12 @@
   "theme_color": "#2e7655",
   "icons": [
     {
-      "src": "/static/logo.png?v=20261121-4",
+      "src": "/favicon.svg?v=20261121-4",
       "sizes": "any",
-      "type": "image/png",
+      "type": "image/svg+xml",
       "purpose": "any"
     }
   ],
-  "lang": "en"
+  "lang": "en",
+  "categories": ["education", "productivity"]
 }
