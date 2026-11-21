@@ -29,45 +29,122 @@ let me = { signedIn:false };
 function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,8); }
 function nowISO(){ return new Date().toLocaleString([], {month:'short', day:'numeric', hour:'2-digit', minute:'2-digit'}); }
 function isUrdu(text){ return /[\u0600-\u06FF]/.test(text||''); }
-function escapeHtml(s){ return s.replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
-function formatInline(s){
-  const links = [];
-  s = s.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, (m, text, url)=>{ links.push({text,url}); return '\u0000LINK'+(links.length-1)+'\u0000'; });
-  s = escapeHtml(s);
-  s = s.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>');
-  s = s.replace(/`([^`]+)`/g,'<code>$1</code>');
-  s = s.replace(/\n/g,'<br>');
-  s = s.replace(/\u0000LINK(\d+)\u0000/g, (m, idx)=>{ const l = links[parseInt(idx,10)]; return '<a href="'+escapeHtml(l.url)+'" target="_blank" rel="noopener noreferrer">'+escapeHtml(l.text)+'</a>'; });
-  return s;
+function escapeHtml(value){
+  return String(value ?? '').replace(/[&<>"']/g, c=>({
+    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+  }[c]));
+}
+function formatInline(value){
+  const protectedHtml = [];
+  let text = String(value ?? '');
+  const hold = markup=>{
+    const marker = '\u0000'+protectedHtml.length+'\u0000';
+    protectedHtml.push(markup);
+    return marker;
+  };
+  text = text.replace(/\x60([^\x60\n]+)\x60/g, (match, code)=>hold('<code>'+escapeHtml(code)+'</code>'));
+  text = text.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, (match, label, url)=>{
+    return hold('<a href="'+escapeHtml(url)+'" target="_blank" rel="noopener noreferrer">'+escapeHtml(label)+'</a>');
+  });
+  text = escapeHtml(text);
+  text = text.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>');
+  text = text.replace(/~~(.+?)~~/g,'<del>$1</del>');
+  text = text.replace(/(^|[^\w*])\*([^*\n]+)\*(?!\*)/g,'$1<em>$2</em>');
+  text = text.replace(/(^|[^\w_])_([^_\n]+)_(?!\w)/g,'$1<em>$2</em>');
+  text = text.replace(/\n/g,'<br>');
+  text = text.replace(/\u0000(\d+)\u0000/g, (match, index)=>protectedHtml[Number(index)] || '');
+  return text;
 }
 function renderSearchResultsHtml(query, results){
-  // Builds real .search-result/.sr-title/.sr-url/.sr-snippet card markup
-  // (see style.css) instead of a markdown-formatted list, so web-search
-  // results actually get the card styling those classes were made for.
   const heading = formatInline('**Web search results for "'+query+'"**');
-  const cards = results.map(r=>{
-    const title = escapeHtml(r.title || r.link || 'Untitled result');
-    const url = escapeHtml(r.link || '');
-    const snippet = escapeHtml(r.snippet || '');
+  const cards = results.map(result=>{
+    const title = escapeHtml(result.title || result.link || 'Untitled result');
+    const rawUrl = String(result.link || '');
+    let safeUrl = '';
+    try{
+      const parsed = new URL(rawUrl);
+      if(parsed.protocol==='http:' || parsed.protocol==='https:') safeUrl = escapeHtml(rawUrl);
+    }catch(error){}
+    const snippet = escapeHtml(result.snippet || '');
     return '<div class="search-result">'
-      + '<a class="sr-title" href="'+url+'" target="_blank" rel="noopener noreferrer">'+title+'</a>'
-      + '<div class="sr-url">'+url+'</div>'
-      + '<div class="sr-snippet">'+snippet+'</div>'
-      + '</div>';
+      +(safeUrl?'<a class="sr-title" href="'+safeUrl+'" target="_blank" rel="noopener noreferrer">'+title+'</a>':'<span class="sr-title">'+title+'</span>')
+      +'<div class="sr-url">'+safeUrl+'</div>'
+      +'<div class="sr-snippet">'+snippet+'</div>'
+      +'</div>';
   }).join('');
-  return heading + cards;
+  return heading+cards;
 }
 function renderMarkdown(raw){
-  const codeBlockRegex = /```(\w*)\n?([\s\S]*?)```/g;
-  let html=''; let lastIndex=0; let m;
-  while((m = codeBlockRegex.exec(raw))){
-    html += formatInline(raw.slice(lastIndex, m.index));
-    const lang = m[1] || 'code'; const code = m[2]; const codeId = 'code_'+uid();
-    html += '<div class="code-block"><div class="code-block-head"><span>'+escapeHtml(lang)+'</span><button class="code-copy-btn" data-code-id="'+codeId+'">Copy</button></div><pre><code id="'+codeId+'">'+escapeHtml(code)+'</code></pre></div>';
-    lastIndex = codeBlockRegex.lastIndex;
+  const lines = String(raw ?? '').replace(/\r\n?/g,'\n').split('\n');
+  const html = [];
+  const cells = line=>line.trim().replace(/^\|/,'').replace(/\|$/,'').split('|').map(cell=>cell.trim());
+  const isTableSeparator = line=>cells(line).length>0 && cells(line).every(cell=>/^:?-{3,}:?$/.test(cell));
+  const isTableStart = index=>index+1<lines.length && /^\s*\|/.test(lines[index]) && isTableSeparator(lines[index+1]);
+  const isListLine = line=>/^\s*[-*+]\s+/.test(line) || /^\s*\d+[.)]\s+/.test(line);
+  const isBlockStart = index=>{
+    const line = lines[index] || '';
+    return /^ {0,3}\x60{3}/.test(line) || /^ {0,3}#{1,6}\s/.test(line)
+      || /^ {0,3}(?:-{3,}|_{3,}|\*{3,})\s*$/.test(line)
+      || /^\s*>/.test(line) || isListLine(line) || isTableStart(index);
+  };
+  let i=0;
+  while(i<lines.length){
+    const line = lines[i];
+    if(!line.trim()){ i++; continue; }
+    const fence = line.match(/^ {0,3}\x60{3}\s*([\w.+-]*)\s*$/);
+    if(fence){
+      const language = fence[1] || 'code';
+      const codeLines = [];
+      i++;
+      while(i<lines.length && !/^ {0,3}\x60{3}\s*$/.test(lines[i])) codeLines.push(lines[i++]);
+      if(i<lines.length) i++;
+      const codeId = 'code_'+uid();
+      html.push('<div class="code-block"><div class="code-block-head"><span>'+escapeHtml(language)+'</span><button class="code-copy-btn" type="button" data-code-id="'+codeId+'">Copy</button></div><pre><code id="'+codeId+'">'+escapeHtml(codeLines.join('\n'))+'</code></pre></div>');
+      continue;
+    }
+    const heading = line.match(/^ {0,3}(#{1,6})\s+(.+)$/);
+    if(heading){
+      const level = heading[1].length;
+      html.push('<h'+level+'>'+formatInline(heading[2])+'</h'+level+'>');
+      i++; continue;
+    }
+    if(/^ {0,3}(?:-{3,}|_{3,}|\*{3,})\s*$/.test(line)){
+      html.push('<hr class="markdown-rule">');
+      i++; continue;
+    }
+    if(/^\s*>/.test(line)){
+      const quote = [];
+      while(i<lines.length && /^\s*>/.test(lines[i])) quote.push(lines[i++].replace(/^\s*>\s?/, ''));
+      html.push('<blockquote>'+renderMarkdown(quote.join('\n'))+'</blockquote>');
+      continue;
+    }
+    if(isTableStart(i)){
+      const headers = cells(lines[i]);
+      i += 2;
+      const rows = [];
+      while(i<lines.length && /^\s*\|/.test(lines[i])){ rows.push(cells(lines[i])); i++; }
+      const headHtml = headers.map(cell=>'<th scope="col">'+formatInline(cell)+'</th>').join('');
+      const bodyHtml = rows.map(row=>'<tr>'+headers.map((header,index)=>'<td>'+formatInline(row[index] || '')+'</td>').join('')+'</tr>').join('');
+      html.push('<div class="markdown-table-wrap"><table class="markdown-table"><thead><tr>'+headHtml+'</tr></thead><tbody>'+bodyHtml+'</tbody></table></div>');
+      continue;
+    }
+    if(/^\s*[-*+]\s+/.test(line)){
+      const items = [];
+      while(i<lines.length && /^\s*[-*+]\s+/.test(lines[i])){ items.push('<li>'+formatInline(lines[i].replace(/^\s*[-*+]\s+/,''))+'</li>'); i++; }
+      html.push('<ul>'+items.join('')+'</ul>');
+      continue;
+    }
+    if(/^\s*\d+[.)]\s+/.test(line)){
+      const items = [];
+      while(i<lines.length && /^\s*\d+[.)]\s+/.test(lines[i])){ items.push('<li>'+formatInline(lines[i].replace(/^\s*\d+[.)]\s+/,''))+'</li>'); i++; }
+      html.push('<ol>'+items.join('')+'</ol>');
+      continue;
+    }
+    const paragraph = [];
+    while(i<lines.length && lines[i].trim() && !isBlockStart(i)){ paragraph.push(lines[i]); i++; }
+    if(paragraph.length) html.push('<p>'+formatInline(paragraph.join('\n'))+'</p>');
   }
-  html += formatInline(raw.slice(lastIndex));
-  return html;
+  return html.join('');
 }
 
 /* ============ API HELPERS ============ */
@@ -227,7 +304,7 @@ function renderAccountUI(){
       const banner = document.getElementById('onboardingBanner');
       if(!banner) return;
       const dismissed = LS.get(ONBOARDING_DISMISS_KEY, false);
-      const needsHelp = !serverConfig.ollamaConfigured;
+      const needsHelp = !serverConfig.ollamaConfigured || !serverConfig.ollamaAvailable;
       const copy = banner.querySelector('.ob-text');
       if(copy) copy.textContent = serverConfig.hostedMode
         ? 'Connect Ollama Cloud in Settings to use generative models. Until then, Zariya answers supported requests with its limited built-in knowledge base.'
@@ -489,7 +566,16 @@ body: JSON.stringify({ messages: session.messages.map(m=>({role:m.role, content:
       }
     }
   }catch(err){
-    if(err.name==='AbortError'){ removeThinking(); setGenerating(false); return; }
+    if(err.name==='AbortError'){
+      removeThinking();
+      setGenerating(false);
+      if(stopped && reply.trim()){
+        session.messages.push({ role:'assistant', content:reply, ts:nowISO() });
+        saveServerState();
+        renderChat();
+      }
+      return;
+    }
     reply = 'Could not reach the server: ' + (err.message||'unknown error');
   }
   removeThinking(); setGenerating(false);
@@ -1121,8 +1207,10 @@ if(localModelRetryBtn){
 
 function downloadFile(filename, content){
   const blob = new Blob([content], {type:'text/plain;charset=utf-8'});
-  const a = document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=filename; a.click();
-  URL.revokeObjectURL(a.href);
+  const a = document.createElement('a');
+  const objectUrl = URL.createObjectURL(blob);
+  a.href = objectUrl; a.download = filename; a.click();
+  window.setTimeout(()=>URL.revokeObjectURL(objectUrl), 1000);
 }
 
 /* ============ LIVE STATUS POLLING ============ */
@@ -1155,4 +1243,32 @@ function pollLocalModelStatus(){
   renderChat();
   pollLocalModelStatus();
 })();
+
+
+// Dynamically rendered code blocks share one delegated copy action.
+document.addEventListener('click', async event=>{
+  const button = event.target.closest('.code-copy-btn');
+  if(!button) return;
+  const code = document.getElementById(button.dataset.codeId);
+  if(!code) return;
+  const originalLabel = button.textContent;
+  try{
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      await navigator.clipboard.writeText(code.textContent || '');
+    }else{
+      const range = document.createRange();
+      range.selectNodeContents(code);
+      const selection = window.getSelection();
+      selection.removeAllRanges();
+      selection.addRange(range);
+      const copied = document.execCommand('copy');
+      selection.removeAllRanges();
+      if(!copied) throw new Error('Clipboard unavailable');
+    }
+    button.textContent = 'Copied';
+  }catch(error){
+    button.textContent = 'Copy failed';
+  }
+  window.setTimeout(()=>{ if(button.isConnected) button.textContent = originalLabel; }, 1400);
+});
 })();
