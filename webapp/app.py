@@ -281,7 +281,7 @@ def chat():
 
 
 def _sse(data):
-    return f"data: {json.dumps(data, ensure_ascii=False)}\\n\\n"
+    return f"data: {json.dumps(data, ensure_ascii=False)}\n\n"
 
 
 @app.route("/api/chat/stream", methods=["POST"])
