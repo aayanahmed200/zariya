@@ -10,7 +10,7 @@ The Flask app provides chat, bilingual voice typing, chat history, notepad, flas
 
 The current NVIDIA model-provider listing does not advertise zero-data-retention or a no-training guarantee. Chat prompts are transmitted to the Gateway and model provider. Voice typing uses the browser speech-recognition service; its audio handling depends on the browser's provider. Zariya does not store voice recordings. Users should not enter passwords, private records or sensitive information.
 
-Quick actions for conversation summaries, key points, translation and flashcards use the hosted model where it is available, and use the bundled knowledge engine if the provider is unavailable. The composer supports English and Urdu voice typing in browsers that expose the Web Speech Recognition API. The voice language can be selected next to the microphone button.
+Quick actions for conversation summaries, key points, translation and flashcards use the hosted model where it is available, and use the bundled knowledge engine if the provider is unavailable. The composer supports English and Urdu voice typing in browsers that expose the Web Speech Recognition API. The voice language can be selected next to the microphone button. Zariya does not store voice recordings; audio may be processed by the browser's speech-recognition provider. Workspace backup export and restore are available in Settings, and existing flashcard decks can be edited while retaining review scheduling.
 
 ## Repository contents
 
