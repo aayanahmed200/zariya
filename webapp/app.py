@@ -415,6 +415,53 @@ def save_state():
     _save_store(store)
     return jsonify({"ok": True})
 
+def _tool_model_reply(messages, task_prompt: str):
+    """Run a focused tool task through the hosted model, if it is available."""
+    try:
+        return hosted_model.generate_reply(
+            messages,
+            SYSTEM_PROMPT + "\n\n" + task_prompt,
+            temperature=0.2,
+        )
+    except hosted_model.GatewayError as exc:
+        app.logger.info("Hosted quick tool used knowledge fallback: %s", exc)
+        return None
+
+
+def _parse_flashcard_json(raw: str) -> list[dict]:
+    """Parse and validate model-produced flashcards without trusting raw HTML."""
+    candidate = raw.strip()
+    if candidate.startswith("```"):
+        candidate = candidate.split("\n", 1)[-1]
+        if candidate.endswith("```"):
+            candidate = candidate[:-3].strip()
+    try:
+        data = json.loads(candidate)
+    except (ValueError, TypeError):
+        left, right = candidate.find("{"), candidate.rfind("}")
+        if left < 0 or right <= left:
+            return []
+        try:
+            data = json.loads(candidate[left:right + 1])
+        except (ValueError, TypeError):
+            return []
+    source_cards = data.get("cards") if isinstance(data, dict) else None
+    if not isinstance(source_cards, list):
+        return []
+    cards = []
+    for item in source_cards[:20]:
+        if not isinstance(item, dict):
+            continue
+        front = item.get("front")
+        back = item.get("back")
+        if not isinstance(front, str) or not isinstance(back, str):
+            continue
+        front, back = front.strip(), back.strip()
+        if front and back and len(front) <= 600 and len(back) <= 2400:
+            cards.append({"front": front, "back": back})
+    return cards
+
+
 @app.route("/api/tools/<name>", methods=["POST"])
 def run_tool(name):
     body = request.get_json(silent=True) or {}
@@ -422,18 +469,66 @@ def run_tool(name):
     messages, err, err_status = _normalize_messages(raw_messages) if raw_messages else ([], None, None)
     if err:
         return jsonify({"error": err}), err_status
+    if name not in ("summarize", "keypoints", "translate", "flashcards"):
+        return jsonify({"error": f"Unknown tool '{name}'"}), 404
+    if not messages:
+        return jsonify({"error": "Add a message to the chat first."}), 400
+
     if name == "summarize":
-        return jsonify({"result": kb_engine.summarize_messages(messages)})
+        prompt = (
+            "Summarise this conversation for the user. Keep the important facts, "
+            "decisions and unresolved questions. Use a short title and clear bullet "
+            "points where useful. Do not invent information."
+        )
+        result = _tool_model_reply(messages, prompt)
+        if result is None:
+            result = kb_engine.summarize_messages(messages)
+        return jsonify({"result": result})
+
     if name == "keypoints":
-        return jsonify({"result": kb_engine.key_points(messages)})
+        prompt = (
+            "Extract the main points from this conversation. Return a concise, "
+            "well-organised bullet list in the language used by the user. Keep "
+            "specific names, dates and quantities accurate; do not invent facts."
+        )
+        result = _tool_model_reply(messages, prompt)
+        if result is None:
+            result = kb_engine.key_points(messages)
+        return jsonify({"result": result})
+
     if name == "translate":
         last_user = next((m for m in reversed(messages) if m["role"] == "user"), None)
         if not last_user:
             return jsonify({"result": ""})
-        return jsonify({"result": kb_engine.translate_words(last_user["content"])})
-    if name == "flashcards":
-        return jsonify({"cards": kb_engine.flashcards_from_messages(messages)})
-    return jsonify({"error": f"Unknown tool '{name}'"}), 404
+        translation_prompt = (
+            "Translate the user's text into the other primary language: English to "
+            "natural Urdu, or Urdu to natural English. Preserve the original meaning, "
+            "names, numbers, formatting and technical terms. If the source mixes "
+            "English and Urdu, translate the full message while keeping names and "
+            "terms that should remain unchanged. Return only the translation."
+        )
+        result = _tool_model_reply(
+            [{"role": "user", "content": last_user["content"]}],
+            translation_prompt,
+        )
+        if result is None:
+            result = kb_engine.translate_words(last_user["content"])
+        return jsonify({"result": result})
+
+    flashcard_prompt = (
+        "Create up to 12 useful revision flashcards from this conversation. "
+        "Prioritise central ideas, definitions and facts. Each card needs a clear "
+        "question or term in front and a concise answer in back. Keep both in "
+        "the user's language. Do not invent details. Return ONLY one valid JSON "
+        "object in this exact shape: {\\"cards\\":[{\\"front\\":\\"...\\",\\"back\\":\\"...\\"}]}. "
+        "Do not wrap it in Markdown fences or add commentary."
+    )
+    raw_cards = _tool_model_reply(messages, flashcard_prompt)
+    cards = _parse_flashcard_json(raw_cards) if raw_cards else []
+    if not cards:
+        cards = kb_engine.flashcards_from_messages(messages)
+    return jsonify({"cards": cards})
+
 
 @app.route("/api/kb-stats")
 def kb_stats():
