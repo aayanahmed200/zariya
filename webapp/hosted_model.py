@@ -54,7 +54,7 @@ def connection_status() -> dict:
     }
 
 
-def _headers() -> dict[str, str]:
+def _headers(accept: str = "application/json") -> dict[str, str]:
     token = _token()
     if not token:
         raise GatewayError(
@@ -63,7 +63,7 @@ def _headers() -> dict[str, str]:
     return {
         "Authorization": f"Bearer {token}",
         "Content-Type": "application/json",
-        "Accept": "text/event-stream",
+        "Accept": accept,
         "HTTP-Referer": "https://zariyas.vercel.app/",
         "X-Title": "Zariya",
     }
@@ -173,7 +173,7 @@ def generate_reply(
     try:
         response = requests.post(
             f"{GATEWAY_BASE_URL}/chat/completions",
-            headers=_headers(),
+            headers=_headers("application/json"),
             json=_payload(messages, system_prompt, temperature, stream=False),
             timeout=(10, 60),
         )
@@ -202,7 +202,7 @@ def stream_reply(
     try:
         with requests.post(
             f"{GATEWAY_BASE_URL}/chat/completions",
-            headers=_headers(),
+            headers=_headers("text/event-stream"),
             json=_payload(messages, system_prompt, temperature, stream=True),
             stream=True,
             timeout=(10, 60),
