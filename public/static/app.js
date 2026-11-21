@@ -183,7 +183,7 @@ function renderAccountUI(){
     sbAvatar.innerHTML = '<img src="'+escapeHtml(me.avatar||'')+'" alt="">';
     signedOutRow.style.display = 'none';
     signedInRow.style.display = 'flex';
-    document.getElementById('accountAvatar').src = me.avatar || '';
+    document.getElementById('accountAvatar').src = me.avatar || '/static/logo.png';
     document.getElementById('accountName').textContent = me.name || me.login;
     document.getElementById('accountBio').textContent = me.bio || '';
   } else {
