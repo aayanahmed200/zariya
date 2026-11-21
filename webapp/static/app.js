@@ -583,7 +583,7 @@ function renderBubble(m, idx, isLast){
       (uiPrefs.showTimestamps ? '<div class="msg-meta">'+(m.ts||'')+'</div>' : '')+
       '<div class="msg-actions"><button class="ghost-btn" data-act="copy">Copy</button><button class="ghost-btn" data-act="speak">Read aloud</button><button class="ghost-btn" data-act="up" title="Good answer">Helpful</button><button class="ghost-btn" data-act="down" title="Not helpful">Not helpful</button>'+
       (isLast?'<button class="ghost-btn" data-act="regen">Regenerate</button>':'')+'</div></div>';
-    row.querySelector('[data-act="copy"]').addEventListener('click', ()=>{ navigator.clipboard && navigator.clipboard.writeText(m.content); });
+    row.querySelector('[data-act="copy"]').addEventListener('click', event=>copyMessageContent(event.currentTarget,m.content));
     row.querySelector('[data-act="speak"]').addEventListener('click', ()=>speak(m.content));
     const regen = row.querySelector('[data-act="regen"]');
     if(regen) regen.addEventListener('click', regenerateLast);
@@ -596,13 +596,46 @@ function renderBubble(m, idx, isLast){
 }
 function sendFeedback(idx, rating, btn){
   const session = currentSession(); if(!session) return;
-  const userMsg = session.messages[idx-1];
-  if(!userMsg || userMsg.role!=='user') return;
-  apiPost('/api/feedback', { question: userMsg.content, rating });
+  const userMsg = session.messages.slice(0,idx).reverse().find(message=>message.role==='user');
+  if(!userMsg || btn.dataset.pending==='true') return;
   const row = btn.closest('.msg-actions');
-  if(row){ row.querySelectorAll('[data-act="up"],[data-act="down"]').forEach(b=>b.disabled=true); }
-  btn.classList.add('active');
-  btn.textContent = rating==='up' ? 'Thanks!' : 'Noted';
+  const controls = row ? [...row.querySelectorAll('[data-act="up"],[data-act="down"]')] : [btn];
+  controls.forEach(control=>{control.disabled=true;});
+  btn.dataset.pending='true';
+  btn.textContent='Sending…';
+  apiPost('/api/feedback', { question: userMsg.content, rating }).then(()=>{
+    delete btn.dataset.pending;
+    btn.classList.add('active');
+    btn.textContent = rating==='up' ? 'Thanks!' : 'Noted';
+  }).catch(()=>{
+    delete btn.dataset.pending;
+    controls.forEach(control=>{control.disabled=false;});
+    btn.textContent='Retry';
+    btn.title='Feedback could not be sent. Try again.';
+  });
+}
+async function copyMessageContent(button, content){
+  const original=button.textContent;
+  try{
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      await navigator.clipboard.writeText(content);
+    }else{
+      const area=document.createElement('textarea');
+      area.value=content;
+      area.setAttribute('readonly','');
+      area.style.position='fixed';
+      area.style.opacity='0';
+      document.body.appendChild(area);
+      area.select();
+      const copied=document.execCommand('copy');
+      area.remove();
+      if(!copied) throw new Error('Clipboard unavailable');
+    }
+    button.textContent='Copied';
+  }catch(error){
+    button.textContent='Copy failed';
+  }
+  window.setTimeout(()=>{if(button.isConnected) button.textContent=original;},1800);
 }
 function saveEdit(idx){
     if(isGenerating) return;
