@@ -628,7 +628,7 @@ async function runQuickTool(tool){
       session.messages.push({role:'assistant', content:'**Key points**\n\n'+result, ts:nowISO()});
     } else if(tool==='translate'){
       const {result} = await apiPost('/api/tools/translate', payload);
-      session.messages.push({role:'assistant', content:'**Rough translation**\n\n'+result, ts:nowISO()});
+      session.messages.push({role:'assistant', content:'**Translation**\n\n'+result, ts:nowISO()});
     } else if(tool==='flashcards'){
       const {cards} = await apiPost('/api/tools/flashcards', payload);
       if(cards && cards.length){
