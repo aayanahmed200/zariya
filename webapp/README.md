@@ -6,9 +6,11 @@ A hosted Urdu and English workspace for chat, notes and flashcards. Visitors can
 
 ## Overview
 
-The Flask app provides chat, chat history, notepad, flashcards, deck import/export and browser speech features. Chat is routed server-side through Vercel AI Gateway using the Vercel deployment OIDC token. The default open-weight model is `nvidia/nemotron-3.5-lightning-free`, currently listed at $0 per input/output token. Free provider capacity and rate limits can change; when hosted inference is unavailable, selected requests use the bundled rule-based knowledge engine.
+The Flask app provides chat, bilingual voice typing, chat history, notepad, flashcards, deck import/export and browser text-to-speech. Chat is routed server-side through Vercel AI Gateway using the Vercel deployment OIDC token. The default open-weight model is `nvidia/nemotron-3.5-lightning-free`, currently listed at $0 per input/output token. Free provider capacity and rate limits can change; when hosted inference is unavailable, selected requests use the bundled rule-based knowledge engine.
 
-The current NVIDIA model-provider listing does not advertise zero-data-retention or a no-training guarantee. Chat prompts are transmitted to the Gateway and model provider. Users should not enter passwords, private records or sensitive information.
+The current NVIDIA model-provider listing does not advertise zero-data-retention or a no-training guarantee. Chat prompts are transmitted to the Gateway and model provider. Voice typing uses the browser speech-recognition service; its audio handling depends on the browser's provider. Zariya does not store voice recordings. Users should not enter passwords, private records or sensitive information.
+
+Quick actions for conversation summaries, key points, translation and flashcards use the hosted model where it is available, and use the bundled knowledge engine if the provider is unavailable. The composer supports English and Urdu voice typing in browsers that expose the Web Speech Recognition API. The voice language can be selected next to the microphone button.
 
 ## Repository contents
 
