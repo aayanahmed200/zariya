@@ -861,5 +861,5 @@ body{direction:ltr;text-align:left;background:var(--bg);color:var(--text)}
 /* Clear states for unavailable quick actions and keyboard-friendly filters */
 .qt-btn:disabled{opacity:.42;cursor:not-allowed;transform:none}
 .qt-btn:disabled:hover{background:var(--surface-soft);border-color:var(--border);color:var(--text-muted)}
-.tag-chip{font:inherit}
+.tag-chip{font:inherit;cursor:pointer}
 .tag-chip:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
