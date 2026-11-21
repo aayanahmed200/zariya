@@ -1,25 +1,26 @@
 # Zariya Flask Web App
 
-The Urdu- and English-language browser application, deployable to Vercel with a bundled knowledge fallback.
+**Live application:** [zariya-ebon.vercel.app](https://zariya-ebon.vercel.app/)
+
+The Urdu- and English-language browser workspace, powered by Ollama with a built-in knowledge fallback.
 
 ## Overview
 
-The Flask app provides chat, chat history, notepad, flashcards, import/export tools and browser speech features. It answers supported requests through its built-in knowledge engine without API credentials. Anthropic, Google Custom Search and GitHub OAuth are optional server-side integrations.
+The Flask app provides chat, chat history, notepad, flashcards, deck import/export and browser speech features. Ollama is the only generative model provider. The app connects to a local Ollama server during development or Ollama Cloud when deployed to Vercel. Without an available model connection, selected queries are handled by the built-in rule-based knowledge engine.
 
 ## Repository contents
 
-- `app.py` — Flask routes, sessions and request handling.
-- `local_model.py` — Ollama integration for local development.
-- `kb_engine.py` — rule-based Urdu/English responses and knowledge lookup.
-- `embeddings.py` — optional local semantic search.
+- `app.py` — Flask routes and request handling.
+- `local_model.py` — Ollama local/cloud API connection, model listing and streaming.
+- `kb_engine.py` — rule-based Urdu/English knowledge and selected operations.
+- `embeddings.py` — optional local semantic search for local development.
 - `server/` — bundled knowledge JSON and local-development storage.
 - `templates/` — browser application shell.
 - `static/` — source CSS, JavaScript and logo; mirrored to root `public/static/` for Vercel.
-- `test_*.py` — knowledge, local-model and embedding checks.
 
 ## Technology
 
-Python, Flask, Requests, python-dotenv, vanilla JavaScript and CSS. Ollama is an external service used only during local development.
+Python, Flask, Requests, python-dotenv, Ollama, vanilla JavaScript and CSS.
 
 ## Run locally
 
@@ -31,26 +32,25 @@ cp .env.example .env
 python app.py
 ```
 
-Open [http://localhost:5000](http://localhost:5000). If Ollama is running locally, the app can use its configured model; otherwise it falls back to the bundled knowledge engine.
+Install and start [Ollama](https://ollama.com/download). Zariya uses `http://localhost:11434` by default. Pull a model first (for example, `qwen2.5:1.5b`), then choose it from Settings.
 
-## Vercel deployment
+## Deploy to Vercel
 
-Import the repository into Vercel with the project root set to `.`. The root `index.py` exports the Flask app, root `requirements.txt` contains only the web runtime dependencies, and Vercel serves `public/static/` from its static asset CDN.
+Import the repository into Vercel with the project root set to `.`. The root `index.py` exports the Flask app, root `requirements.txt` contains the web runtime dependencies, and Vercel serves `public/` from its static asset CDN.
 
-Hosted mode disables Ollama because a Vercel Function does not run a persistent local Ollama daemon. Without an AI provider key, the chat uses the bundled rule-based knowledge engine.
+Vercel cannot run an Ollama desktop daemon inside a Function, so hosted mode connects directly to Ollama Cloud. Add `OLLAMA_API_KEY` in Vercel Project Settings → Environment Variables. Create the key in [Ollama settings](https://ollama.com/settings/keys). The default cloud model is `gemma4:31b`; set `OLLAMA_MODEL` to another model name available to your Ollama account. Set `OLLAMA_BASE_URL` only when using a private remote Ollama server instead of Ollama Cloud.
+
+The Cloud API key is used on the server only. Ollama Cloud does not expose the local model inventory endpoint; Settings shows the active cloud model and lets you enter another model name manually.
+
+Never place the Ollama API key in browser JavaScript, HTML or committed files.
 
 ## Configuration
 
-Set optional values in Vercel Project Settings → Environment Variables, or copy `.env.example` to `.env` for local development:
-
-- `FLASK_SECRET_KEY` — private random signing key of at least 32 characters. Required for reliable session cookies and GitHub OAuth.
-- `APP_BASE_URL` — public base URL for OAuth callbacks; Vercel's deployment hostname is used as a fallback.
-- `ANTHROPIC_API_KEY` and `ANTHROPIC_MODEL` — optional generative chat provider.
-- `GOOGLE_API_KEY` and `GOOGLE_CX` — optional Google Custom Search.
-- `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET` — optional GitHub profile sign-in; it is enabled only when both credentials and a stable `FLASK_SECRET_KEY` are configured.
-- `DISABLE_LOCAL_MODEL=1` — disables Ollama; the Vercel entry point sets this automatically.
-
-Never put provider credentials in browser JavaScript. Enabling Claude or Google Search sends relevant prompts or queries to those external providers.
+- `OLLAMA_API_KEY` — required for Ollama Cloud or an authenticated remote Ollama endpoint.
+- `OLLAMA_BASE_URL` — optional API root; local default is `http://localhost:11434`, hosted default is `https://ollama.com`.
+- `OLLAMA_MODEL` — default model; local default is `qwen2.5:1.5b`, hosted default is `gemma4:31b`.
+- `GOOGLE_API_KEY` and `GOOGLE_CX` — optional Google Custom Search credentials for the Search web tool.
+- `FLASK_SECRET_KEY`, `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET` — optional GitHub profile sign-in configuration.
 
 ## Tests
 
@@ -61,17 +61,9 @@ pip install -r requirements.txt -r requirements-dev.txt
 pytest tests/
 ```
 
-Local web-app checks can be run from this directory with pytest installed:
-
-```bash
-python test_kb_engine.py
-pytest test_local_model.py
-pytest test_embeddings.py
-```
-
 ## Scope and limitations
 
-The knowledge engine is a curated, rule-based fallback, not a general-purpose language model. Its coverage is limited to supported operations and bundled entries. In hosted mode, chats, notes and flashcards are kept in the visitor's browser local storage; they are not synced across devices or accounts, and clearing browser storage removes them. Ollama is local-development only. Optional Anthropic and Google integrations send relevant content to those external services, and answers can be inaccurate.
+The included knowledge engine is a curated, rule-based fallback, not a general-purpose language model. Ollama Cloud processes prompts and responses to generate answers. Browser chat history, notes and flashcards are kept in the visitor's local storage; they are not synced across devices or accounts, and clearing browser storage removes them. Model output can be incorrect.
 
 ## License
 

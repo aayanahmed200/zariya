@@ -1,24 +1,26 @@
 # Zariya
 
-An Urdu- and English-language assistant with browser-based chat, notes and flashcards, a bundled knowledge fallback, and optional AI integrations.
+**Live application:** [zariya-ebon.vercel.app](https://zariya-ebon.vercel.app/)
+
+An Urdu- and English-language workspace for chat, notes and flashcards, powered by Ollama models with a built-in knowledge fallback.
 
 ## Overview
 
-The Flask web app in `webapp/` is the deployable browser application. It runs on Vercel as a Python Flask app and works without API credentials through its bundled Urdu/English knowledge engine. Add an Anthropic API key to enable generative chat, or Google Custom Search credentials to enable web search.
+The Flask web app in `webapp/` is the deployable browser application. It uses Ollama as its only generative model provider. On Vercel it connects to Ollama Cloud; during local development it can connect to an Ollama server running on the same computer. If no model endpoint is configured, supported requests use the bundled rule-based knowledge engine.
 
-The Streamlit app remains available for local experimentation. It uses a separate GGUF model workflow and is not part of the Vercel deployment.
+The older Streamlit app remains available for local experimentation and uses a separate GGUF model workflow.
 
 ## Repository contents
 
 - `index.py` — Vercel entry point for the Flask app.
-- `webapp/` — Flask routes, knowledge engine, templates and browser interface.
-- `public/static/` — browser assets served by Vercel's static CDN.
+- `webapp/` — Flask routes, Ollama integration, bilingual knowledge engine, templates and browser interface.
+- `public/` — favicon, web manifest, robots policy, sitemap and static browser assets.
 - `app/` and `core/` — local Streamlit interface and model helpers.
-- `tests/` — automated tests for the Vercel entry point and local core modules.
+- `tests/` — automated checks for the Vercel app and Ollama integration.
 
 ## Technology
 
-Python 3.12, Flask, Requests, python-dotenv, vanilla JavaScript and CSS. Ollama is supported for local development only; Vercel Functions do not host the local Ollama service.
+Python 3.12, Flask, Requests, python-dotenv, Ollama, vanilla JavaScript and CSS. The Vercel deployment uses Ollama Cloud; local development supports the Ollama desktop/server application.
 
 ## Run locally
 
@@ -33,7 +35,7 @@ cp .env.example .env
 python app.py
 ```
 
-Open [http://localhost:5000](http://localhost:5000). Without provider credentials, chat uses the bundled knowledge engine. For local model responses during development, start Ollama separately.
+Install and start [Ollama](https://ollama.com/download), then pull a model such as `qwen2.5:1.5b`. Zariya connects to the local service at `http://localhost:11434` by default.
 
 ### Streamlit app
 
@@ -46,29 +48,30 @@ python run.py
 
 Place a compatible GGUF file at `models/model.gguf` to enable local generation in the Streamlit app.
 
-To run the repository tests:
+Run the repository tests with:
 
 ```bash
 pip install -r requirements.txt -r requirements-dev.txt
 pytest tests/
 ```
 
-### Vercel
+## Deploy to Vercel
 
-Import the repository into Vercel with the project root set to `.`. Vercel detects the Flask application through `index.py`; the root `requirements.txt` installs only the web runtime dependencies.
+Import the repository into Vercel with the project root set to `.`. Vercel detects the Flask application through `index.py`; the root `requirements.txt` installs the lightweight web runtime.
 
-The app works without environment variables. Optional project environment variables are:
+To enable generative chat, add these server-side environment variables in Vercel Project Settings → Environment Variables:
 
-- `FLASK_SECRET_KEY` — a private random value of at least 32 characters; required for persistent sessions and GitHub OAuth.
-- `ANTHROPIC_API_KEY` and optionally `ANTHROPIC_MODEL` — enables generative chat. Prompts are sent to Anthropic.
-- `GOOGLE_API_KEY` and `GOOGLE_CX` — enables Google Custom Search.
-- `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` and `APP_BASE_URL` — enables GitHub sign-in. Configure the OAuth callback as `<APP_BASE_URL>/auth/github/callback`.
+- `OLLAMA_API_KEY` — create a key in [Ollama settings](https://ollama.com/settings/keys). Required for direct Ollama Cloud API access.
+- `OLLAMA_MODEL` — optional model name; defaults to `gemma4:31b`. You can change the model in Zariya Settings.
+- `OLLAMA_BASE_URL` — optional endpoint override; defaults to `https://ollama.com` on Vercel. A private remote Ollama server must be reachable over HTTPS and protected with an API key.
 
-Ollama is automatically disabled in hosted mode. Chats, notes and flashcards are stored in the visitor's browser local storage; they are not synced across devices or accounts. The knowledge engine is rule-based, not a general-purpose language model.
+The key is used only by the server and is never sent to browser JavaScript. Ollama Cloud processes prompts and responses to generate answers. Without an Ollama key, Zariya falls back to its limited bundled knowledge engine.
+
+Chats, notes and flashcards are stored in the visitor's browser local storage; they are not synced across devices or accounts. The Streamlit app and local Ollama development workflow are not part of the Vercel deployment.
 
 ## Scope and limitations
 
-The built-in knowledge engine handles supported operations and curated entries only, so broad open-ended questions need an optional AI provider for generative answers. Answers can be inaccurate. Anthropic and Google integrations send relevant prompts or searches to those services. Browser-local data is not cloud backup or account sync.
+The built-in knowledge engine supports selected calculations, translations and curated knowledge entries. It is not a general-purpose language model. Generated answers can be inaccurate. Optional Google Search sends search terms to Google when enabled. Browser-local data is not cloud backup or account sync.
 
 ## License
 

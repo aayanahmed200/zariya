@@ -1,23 +1,9 @@
-"""
-Zariya -- offline-first, privacy-focused AI platform for Urdu and low-resource languages.
+"""Zariya — a bilingual workspace with Ollama-powered chat and a curated knowledge fallback.
 
-Architecture, and why it's built this way:
-- All API keys (Anthropic, Google, GitHub OAuth) live server-side in environment
-  variables. The browser never sees them, never stores them, and never has to
-  ask the person using the app for anything -- that's configured once by whoever
-  deploys it, not per visitor.
-- The offline knowledge engine (kb_engine.py) has zero dependencies and zero
-  network calls. It's the guaranteed fallback if no keys are configured, and it's
-  what makes this genuinely offline-capable, not just "offline until the API key
-  runs out."
-- GitHub sign-in is real OAuth (authorization-code flow), not a public-profile
-  lookup -- the client secret is exchanged server-side, exactly the way GitHub's
-  own docs require, and is never exposed to the browser.
-- Two generation knobs (a custom system prompt / persona, and a temperature /
-  creativity value) can be sent per-request from the client and are applied to
-  whichever backend (Claude or the local model) ends up answering. Both are
-  optional and fall back to sane defaults, so older requests without them still
-  work unchanged.
+The app connects to Ollama Cloud on Vercel and to a local Ollama daemon during
+development. Ollama credentials are read only from server-side environment
+variables. When no model endpoint is configured, selected requests fall back
+to the bundled rule-based knowledge engine.
 """
 import os
 import secrets
@@ -59,8 +45,6 @@ app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 app.config["SESSION_COOKIE_SECURE"] = HOSTED_MODE or not DEBUG_MODE
 app.config["PERMANENT_SESSION_LIFETIME"] = 60 * 60 * 24 * 7  # 7 days
 
-ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
-ANTHROPIC_MODEL = os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-4-6")
 GOOGLE_API_KEY = os.environ.get("GOOGLE_API_KEY", "")
 GOOGLE_CX = os.environ.get("GOOGLE_CX", "")
 GITHUB_CLIENT_ID = os.environ.get("GITHUB_CLIENT_ID", "")
@@ -116,7 +100,7 @@ def _user_bucket(store):
 # Basic request-size guards, consistent with the systemPrompt cap below: an
 # unbounded messages array or unbounded combined content length is an easy way
 # for a misbehaving client (or a deliberately abusive one) to force huge
-# memory/CPU use or huge outbound payloads to Claude/Ollama on every request.
+# memory/CPU use or excessive outbound payloads to the configured Ollama endpoint.
 MAX_MESSAGES = 200
 MAX_TOTAL_CONTENT_CHARS = 200_000
 
@@ -248,9 +232,8 @@ def me():
     return jsonify({"signedIn": False, "githubConfigured": GITHUB_OAUTH_CONFIGURED})
 
 # ---------------------------------------------------------------------------
-# Chat: Claude API (server-side key) -> local model -> offline knowledge engine.
-# The person using the app is never asked for a key -- whoever deploys the
-# server configures it once in .env.
+# Chat: Ollama (local during development or Ollama Cloud on Vercel) -> curated knowledge fallback.
+# The Ollama API key is configured only on the server and never sent to the browser.
 # ---------------------------------------------------------------------------
 @app.route("/api/chat", methods=["POST"])
 def chat():
@@ -259,135 +242,87 @@ def chat():
     if err:
         return jsonify({"error": err}), err_status
     system_prompt, temperature = _generation_params(body)
+    selected_model = body.get("model")
+    if not isinstance(selected_model, str):
+        selected_model = None
 
-    used_real_model = False
-    reply = None
-
-    if ANTHROPIC_API_KEY:
-        try:
-            claude_body = {
-                "model": ANTHROPIC_MODEL,
-                "max_tokens": 1000,
-                "system": system_prompt,
-                "messages": [{"role": m["role"], "content": m["content"]} for m in messages],
-            }
-            if temperature is not None:
-                claude_body["temperature"] = temperature
-            res = requests.post(
-                "https://api.anthropic.com/v1/messages",
-                headers={
-                    "Content-Type": "application/json",
-                    "x-api-key": ANTHROPIC_API_KEY,
-                    "anthropic-version": "2023-06-01",
-                },
-                json=claude_body,
-                timeout=30,
-            )
-            res.raise_for_status()
-            data = res.json()
-            text_block = next((b for b in data.get("content", []) if b.get("type") == "text"), None)
-            reply = text_block["text"] if text_block else None
-            used_real_model = reply is not None
-        except Exception as e:
-            app.logger.warning("Claude API call failed, falling back to offline: %s", e)
-
-    if reply is None and local_model.is_available():
-        local_reply = local_model.generate_reply(messages, system_prompt, temperature)
-        if local_reply:
-            reply = local_reply
-            used_real_model = True
-
+    try:
+        reply = local_model.generate_reply(messages, system_prompt, temperature, model=selected_model)
+    except local_model.OllamaError as exc:
+        app.logger.info("Ollama request fell back to knowledge mode: %s", exc)
+        reply = None
+    used_model = bool(reply)
     if reply is None:
         try:
             reply = kb_engine.offline_reply(messages)
         except Exception:
             app.logger.exception("offline_reply crashed")
-            reply = ("Something went wrong answering that offline. Try rephrasing your "
-                      "message, or a simpler one like a math expression or a greeting.")
+            reply = ("I couldn't answer that from the built-in knowledge base. "
+                     "Connect Ollama to enable generative responses.")
 
-    if used_real_model:
+    if used_model:
         last_user = next((m for m in reversed(messages) if m["role"] == "user"), None)
         if last_user and last_user.get("content", "").strip():
             kb_engine.remember_answer(last_user["content"], reply)
 
-    return jsonify({"reply": reply, "usedRealModel": used_real_model})
+    return jsonify({
+        "reply": reply,
+        "usedModel": used_model,
+        "provider": "ollama" if used_model else "knowledge",
+    })
 
 def _sse(data):
     return f"data: {json.dumps(data)}\n\n"
 
 @app.route("/api/chat/stream", methods=["POST"])
 def chat_stream():
-    """Same fallback chain as /api/chat (Claude -> local model -> offline
-    knowledge engine), but streams the reply back as Server-Sent Events so
-    the local model can show up token-by-token like a real LLM chat instead
-    of the browser waiting on one big blocking response. Claude and the
-    offline knowledge engine don't support token streaming here, so their
-    replies are sent as a single event -- only the local model path streams
-    incrementally."""
+    """Stream Ollama model output. If Ollama is unavailable or not configured,
+    the bundled knowledge engine answers supported requests and the UI is told
+    which mode was used."""
     body = request.get_json(silent=True) or {}
     messages, err, err_status = _normalize_messages(body.get("messages"))
     if err:
         return jsonify({"error": err}), err_status
     system_prompt, temperature = _generation_params(body)
+    selected_model = body.get("model")
+    if not isinstance(selected_model, str):
+        selected_model = None
 
     def generate():
-        used_real_model = False
+        used_model = False
         full_reply = None
+        collected = []
 
-        if ANTHROPIC_API_KEY:
+        if local_model.is_available():
             try:
-                claude_body = {
-                    "model": ANTHROPIC_MODEL,
-                    "max_tokens": 1000,
-                    "system": system_prompt,
-                    "messages": [{"role": m["role"], "content": m["content"]} for m in messages],
-                }
-                if temperature is not None:
-                    claude_body["temperature"] = temperature
-                res = requests.post(
-                    "https://api.anthropic.com/v1/messages",
-                    headers={
-                        "Content-Type": "application/json",
-                        "x-api-key": ANTHROPIC_API_KEY,
-                        "anthropic-version": "2023-06-01",
-                    },
-                    json=claude_body,
-                    timeout=30,
-                )
-                res.raise_for_status()
-                data = res.json()
-                text_block = next((b for b in data.get("content", []) if b.get("type") == "text"), None)
-                if text_block:
-                    full_reply = text_block["text"]
-                    used_real_model = True
-                    yield _sse({"delta": full_reply})
-            except Exception as e:
-                app.logger.warning("Claude API call failed, falling back to offline: %s", e)
-
-        if full_reply is None and local_model.is_available():
-            collected = []
-            for token in local_model.stream_reply(messages, system_prompt, temperature):
-                collected.append(token)
-                yield _sse({"delta": token})
-            if collected:
-                full_reply = "".join(collected)
-                used_real_model = True
+                for token in local_model.stream_reply(messages, system_prompt, temperature, model=selected_model):
+                    collected.append(token)
+                    yield _sse({"delta": token})
+                if collected:
+                    full_reply = "".join(collected)
+                    used_model = True
+            except local_model.OllamaError as exc:
+                app.logger.info("Ollama request fell back to knowledge mode: %s", exc)
+                if collected:
+                    collected.clear()
+                    yield _sse({"reset": True})
+                yield _sse({"notice": str(exc)})
 
         if full_reply is None:
             try:
                 full_reply = kb_engine.offline_reply(messages)
             except Exception:
                 app.logger.exception("offline_reply crashed")
-                full_reply = ("Something went wrong answering that offline. Try rephrasing your "
-                               "message, or a simpler one like a math expression or a greeting.")
+                full_reply = ("I couldn't answer that from the built-in knowledge base. "
+                              "Connect Ollama to enable generative responses.")
             yield _sse({"delta": full_reply})
 
-        if used_real_model and full_reply:
+        if used_model and full_reply:
             last_user = next((m for m in reversed(messages) if m["role"] == "user"), None)
             if last_user and last_user.get("content", "").strip():
                 kb_engine.remember_answer(last_user["content"], full_reply)
 
-        yield _sse({"done": True, "usedRealModel": used_real_model})
+        yield _sse({"done": True, "usedModel": used_model, "provider": "ollama" if used_model else "knowledge"})
 
     return Response(
         stream_with_context(generate()),
@@ -495,15 +430,19 @@ def kb_stats():
 @app.route("/api/config")
 def config():
     """Expose provider availability, never credentials or secret values."""
+    ollama = local_model.connection_status()
     return jsonify({
         "hostedMode": HOSTED_MODE,
-        "claudeConfigured": bool(ANTHROPIC_API_KEY),
+        "ollamaConfigured": ollama["configured"],
+        "ollamaAvailable": ollama["available"],
+        "ollamaMode": ollama["mode"],
+        "ollamaStatus": ollama["status"],
+        "localModelAvailable": ollama["available"],
+        "localModelStatus": ollama["status"],
+        "localModelProgress": {"completed": 0, "total": 0},
+        "localModelName": ollama["model"],
         "searchConfigured": bool(GOOGLE_API_KEY and GOOGLE_CX),
         "githubConfigured": GITHUB_OAUTH_CONFIGURED,
-        "localModelAvailable": False if HOSTED_MODE else local_model.is_available(),
-        "localModelStatus": "Disabled on Vercel serverless" if HOSTED_MODE else local_model.load_status(),
-        "localModelProgress": {"completed": 0, "total": 0} if HOSTED_MODE else local_model.load_progress(),
-        "localModelName": local_model.current_model(),
     })
 
 @app.route("/api/health")
@@ -517,30 +456,22 @@ def health():
 
 @app.route("/api/local-model/retry", methods=["POST"])
 def local_model_retry():
-    """Manually wakes up the background model-download loop instead of waiting
-    out its backoff delay -- surfaced as a "Retry download" button in Settings
-    for when a pull has failed and the automatic wait would otherwise take up
-    to a minute."""
+    """Pull the configured default model during local development."""
     return jsonify(local_model.retry_now())
 
 @app.route("/api/local-model/models")
 def local_model_models():
-    """Lists every model Ollama already has pulled on this machine, plus which
-    one is currently active, so Settings can offer a model switcher without
-    ever needing to touch .env."""
+    """Return the models available to the configured local or cloud Ollama endpoint."""
     return jsonify({"models": local_model.list_models(), "active": local_model.current_model()})
 
 @app.route("/api/local-model/select", methods=["POST"])
 def local_model_select():
-    """Switches the active local model at runtime. If the requested model
-    isn't pulled yet, this starts a background download exactly like the
-    first-run setup does, and the frontend polls /api/config for progress."""
     body = request.get_json(silent=True) or {}
     name = body.get("model", "")
     if not isinstance(name, str):
-        return jsonify({"ok": False, "error": "model must be a string"}), 400
+        return jsonify({"ok": False, "error": "Model name must be text."}), 400
     result = local_model.set_active_model(name)
-    return jsonify(result)
+    return jsonify(result), (200 if result.get("ok") else 400)
 
 @app.route("/")
 def index():

@@ -22,7 +22,8 @@ let editingIndex = null;
 let isGenerating = false;
 let stopped = false;
 let currentAbort = null;
-let serverConfig = { claudeConfigured:false, searchConfigured:false, githubConfigured:false, localModelAvailable:false, localModelStatus:'' };
+let serverConfig = { hostedMode:false, ollamaConfigured:false, ollamaAvailable:false, ollamaMode:'local', ollamaStatus:'', localModelName:'', searchConfigured:false, githubConfigured:false };
+let activeOllamaModel = LS.get('zariya_active_ollama_model', '');
 let me = { signedIn:false };
 
 function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,8); }
@@ -70,30 +71,40 @@ function renderMarkdown(raw){
 }
 
 /* ============ API HELPERS ============ */
+async function readApiResponse(response){
+  let data;
+  try{ data = await response.json(); }
+  catch(e){ throw new Error('The server returned an unreadable response (HTTP '+response.status+').'); }
+  if(!response.ok) throw new Error(data.error || data.status || ('Request failed (HTTP '+response.status+').'));
+  return data;
+}
 async function apiGet(url){
-  const r = await fetch(url);
-  try{ return await r.json(); }
-  catch(e){ throw new Error('Unexpected response from server (status '+r.status+')'); }
+  return readApiResponse(await fetch(url, { headers:{'Accept':'application/json'} }));
 }
 async function apiPost(url, body, signal){
-  const r = await fetch(url, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body||{}), signal });
-  try{ return await r.json(); }
-  catch(e){ throw new Error('Unexpected response from server (status '+r.status+')'); }
+  return readApiResponse(await fetch(url, { method:'POST', headers:{'Content-Type':'application/json','Accept':'application/json'}, body:JSON.stringify(body||{}), signal }));
 }
 
 async function loadServerState(){
-  const [cfg, meRes] = await Promise.all([apiGet('/api/config'), apiGet('/api/me')]);
-  serverConfig = cfg; me = meRes;
-  const state = cfg.hostedMode ? LS.get('zariya_app_state_v1:' + (me.signedIn && me.login ? me.login : 'guest'), {}) : await apiGet('/api/state');
+  const results = await Promise.allSettled([apiGet('/api/config'), apiGet('/api/me')]);
+  serverConfig = results[0].status === 'fulfilled' ? results[0].value : {
+    hostedMode:true, ollamaConfigured:false, ollamaAvailable:false, ollamaMode:'cloud',
+    ollamaStatus:'The app server could not be reached. Refresh to retry.', localModelName:'', searchConfigured:false, githubConfigured:false
+  };
+  me = results[1].status === 'fulfilled' ? results[1].value : { signedIn:false, githubConfigured:false };
+  const state = serverConfig.hostedMode
+    ? LS.get('zariya_app_state_v1:' + (me.signedIn && me.login ? me.login : 'guest'), {})
+    : await apiGet('/api/state').catch(()=>LS.get('zariya_app_state_v1:guest', {}));
   sessions = Array.isArray(state.sessions) ? state.sessions : [];
   notes = Array.isArray(state.notes) ? state.notes : [];
   decks = Array.isArray(state.decks) ? state.decks : [];
   decks.forEach(d=> (Array.isArray(d.cards) ? d.cards : []).forEach(migrateCardForSpacedRepetition));
   currentSessionId = sessions.length ? sessions[0].id : null;
   const storageDescription = document.getElementById('storageDescription');
-  if(storageDescription) storageDescription.textContent = cfg.hostedMode
-    ? 'Notes are stored in this browser and are not synced across devices.'
-    : 'Notes are stored by this local development server.';
+  if(storageDescription) storageDescription.textContent = serverConfig.hostedMode
+    ? 'Saved in this browser. Not synced across devices.'
+    : 'Saved by this local development server.';
+  if(!activeOllamaModel) activeOllamaModel = serverConfig.localModelName || '';
 }
 let saveTimer;
 function saveServerState(){
@@ -135,16 +146,24 @@ function updateCreativityLabel(pct){
 }
 function updateStatusPill(){
   const dot = document.getElementById('statusDot'); const txt = document.getElementById('statusText');
-  if(serverConfig.claudeConfigured){ dot.classList.remove('off'); txt.textContent = 'Claude connected'; }
-  else if(serverConfig.hostedMode){ dot.classList.remove('off'); txt.textContent = 'Knowledge mode'; }
-  else if(serverConfig.localModelAvailable){ dot.classList.remove('off'); txt.textContent = 'Local model ready'; }
-  else if(serverConfig.localModelStatus && /download|loading/i.test(serverConfig.localModelStatus)){ dot.classList.add('off'); txt.textContent = 'Local model starting…'; }
-  else { dot.classList.remove('off'); txt.textContent = 'Knowledge mode'; }
+  if(serverConfig.ollamaAvailable){
+    dot.classList.remove('off');
+    txt.textContent = serverConfig.ollamaMode==='cloud' ? 'Ollama Cloud' : 'Ollama connected';
+  } else {
+    dot.classList.add('off');
+    txt.textContent = serverConfig.ollamaConfigured ? 'Ollama unavailable' : 'Knowledge fallback';
+  }
+  const hint = document.getElementById('composerHint');
+  if(hint && !isGenerating) hint.textContent = serverConfig.ollamaAvailable
+    ? 'Using '+(activeOllamaModel || serverConfig.localModelName || 'your Ollama model')+'. Responses can still be wrong.'
+    : (serverConfig.hostedMode
+      ? 'Connect Ollama Cloud in Settings to enable generative chat. The built-in knowledge mode is limited.'
+      : 'Start Ollama locally to enable generative chat. The built-in knowledge mode is limited.');
 }
 function updateLocalModelRetryUI(){
   const row = document.getElementById('localModelRetryRow');
   if(!row) return;
-  row.style.display = (serverConfig.hostedMode || serverConfig.localModelAvailable) ? 'none' : 'flex';
+  row.style.display = (serverConfig.hostedMode || serverConfig.ollamaAvailable) ? 'none' : 'flex';
   const prog = serverConfig.localModelProgress;
   const fill = document.getElementById('localModelProgressFill');
   if(fill){
@@ -161,28 +180,45 @@ function renderAccountUI(){
 
   if(me.signedIn){
     sbName.textContent = me.name || me.login;
-    sbAvatar.innerHTML = '<img src="'+me.avatar+'" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" alt="">';
+    sbAvatar.innerHTML = '<img src="'+escapeHtml(me.avatar||'')+'" alt="">';
     signedOutRow.style.display = 'none';
     signedInRow.style.display = 'flex';
-    document.getElementById('accountAvatar').src = me.avatar;
+    document.getElementById('accountAvatar').src = me.avatar || '';
     document.getElementById('accountName').textContent = me.name || me.login;
     document.getElementById('accountBio').textContent = me.bio || '';
   } else {
-    sbName.textContent = 'Sign in with GitHub';
+    sbName.textContent = serverConfig.githubConfigured ? 'Sign in with GitHub' : 'Saved in this browser';
     sbAvatar.textContent = 'Z';
-    signedOutRow.style.display = 'flex';
+    signedOutRow.style.display = serverConfig.githubConfigured ? 'flex' : 'none';
     signedInRow.style.display = 'none';
   }
   configNote.textContent = serverConfig.githubConfigured
-    ? ''
-    : 'GitHub sign-in isn\'t set up on this server yet.';
+    ? 'GitHub identifies this browser profile; it does not provide cloud sync.'
+    : 'Guest mode is ready. Your chats and notes stay in this browser.';
   document.getElementById('githubSignInBtn').disabled = !serverConfig.githubConfigured;
 
-  document.getElementById('claudeStatusText').textContent = serverConfig.claudeConfigured ? 'Connected' : 'Not configured (optional)';
-document.getElementById('localModelStatusText').textContent = serverConfig.hostedMode ? 'Not available in Vercel serverless' : (serverConfig.localModelAvailable ? 'Loaded -- answering your chats' + (serverConfig.localModelName ? ' (' + serverConfig.localModelName + ')' : '') : (serverConfig.localModelStatus || 'Not configured'));
-  document.getElementById('searchStatusText').textContent = serverConfig.searchConfigured ? 'Connected' : 'Not configured (optional)';
-  const localModelControls = document.getElementById('localModelControls');
-  if(localModelControls) localModelControls.style.display = serverConfig.hostedMode ? 'none' : '';
+  const modelStatus=document.getElementById('localModelStatusText');
+  if(modelStatus) modelStatus.textContent = serverConfig.ollamaStatus || 'Checking Ollama…';
+  const searchStatus=document.getElementById('searchStatusText');
+  if(searchStatus) searchStatus.textContent = serverConfig.searchConfigured ? 'Available' : 'Not configured';
+  const setupNote=document.getElementById('ollamaSetupNote');
+  if(setupNote){
+    if(serverConfig.hostedMode && !serverConfig.ollamaConfigured){
+      setupNote.innerHTML = 'Add <code>OLLAMA_API_KEY</code> in <strong>Vercel → Project → Settings → Environment Variables</strong>. Create a key in <a href="https://ollama.com/settings/keys" target="_blank" rel="noopener noreferrer">Ollama settings</a>. Your key remains on the server.';
+    } else if(serverConfig.hostedMode){
+      setupNote.textContent = 'Connected to Ollama Cloud. Select a model below; model requests stay server-side.';
+    } else {
+      setupNote.textContent = 'Local development connects to the Ollama app running on this computer.';
+    }
+  }
+  const pullRow=document.getElementById('localModelPullRow');
+  if(pullRow) pullRow.style.display = 'flex';
+  const modelEntryLabel=document.querySelector('.model-name-entry label');
+  if(modelEntryLabel) modelEntryLabel.textContent = serverConfig.hostedMode ? 'Choose another cloud model' : 'Pull another local model';
+  const searchTool=document.querySelector('[data-tool="websearch"]');
+  if(searchTool) searchTool.hidden = !serverConfig.searchConfigured;
+  const statusMark=document.getElementById('ollamaStatusMark');
+  if(statusMark) statusMark.style.background = serverConfig.ollamaAvailable ? 'var(--success)' : 'var(--muted)';
   updateLocalModelRetryUI();
   updateOnboardingBanner();
 }
@@ -191,11 +227,11 @@ document.getElementById('localModelStatusText').textContent = serverConfig.hoste
       const banner = document.getElementById('onboardingBanner');
       if(!banner) return;
       const dismissed = LS.get(ONBOARDING_DISMISS_KEY, false);
-      const needsHelp = serverConfig.hostedMode ? !serverConfig.claudeConfigured
-        : (!serverConfig.claudeConfigured && !serverConfig.localModelAvailable);
+      const needsHelp = !serverConfig.ollamaConfigured;
       const copy = banner.querySelector('.ob-text');
-      if(copy && serverConfig.hostedMode) copy.textContent =
-        'Hosted mode is using Zariya’s built-in Urdu/English knowledge engine. Add a server-side ANTHROPIC_API_KEY to enable generative AI. Chats, notes and flashcards are saved in this browser, not synced to an account.';
+      if(copy) copy.textContent = serverConfig.hostedMode
+        ? 'Connect Ollama Cloud in Settings to use generative models. Until then, Zariya answers supported requests with its limited built-in knowledge base.'
+        : 'Start Ollama on this computer and select a downloaded model in Settings. Zariya can still handle supported lookups without it.';
       banner.style.display = (needsHelp && !dismissed) ? 'flex' : 'none';
   }
   const onboardingDismissBtn = document.getElementById('onboardingDismissBtn');
@@ -215,13 +251,15 @@ function switchView(name){
   document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
   document.getElementById('view-'+name).classList.add('active');
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.toggle('active', n.dataset.view===name));
+  const title=document.getElementById('topbarSection');
+  if(title) title.textContent = ({chat:'Chat',notepad:'Notepad',flashcards:'Flashcards',settings:'Settings'})[name] || 'Workspace';
   document.getElementById('quickTools').style.display = name==='chat' ? '' : 'none';
   closeSidebarMobile();
   if(name==='notepad') renderNotesList();
   if(name==='flashcards') renderDeckGrid();
-if(name==='settings') loadModelList();
+  if(name==='settings') loadModelList();
 }
-document.querySelectorAll('.nav-item').forEach(n=> n.addEventListener('click', ()=>switchView(n.dataset.view)));
+document.querySelectorAll('[data-view]').forEach(n=> n.addEventListener('click', ()=>switchView(n.dataset.view)));
 
 function openSidebarMobile(){ document.getElementById('sidebar').classList.add('open'); document.getElementById('sbScrim').classList.add('show'); }
 function closeSidebarMobile(){ document.getElementById('sidebar').classList.remove('open'); document.getElementById('sbScrim').classList.remove('show'); }
@@ -260,6 +298,14 @@ function renderSessionList(){
 }
 document.getElementById('sessSearch').addEventListener('input', renderSessionList);
 document.getElementById('newChatBtn').addEventListener('click', newSession);
+document.addEventListener('keydown', e=>{
+  if((e.ctrlKey || e.metaKey) && e.key.toLowerCase()==='k'){
+    e.preventDefault();
+    newSession();
+    input.focus();
+  }
+  if(e.key==='Escape') closeSidebarMobile();
+});
 
 
 /* ============ CHAT RENDER ============ */
@@ -270,11 +316,22 @@ function renderChat(){
   inner.innerHTML = '';
   if(!session || !session.messages.length){
     scroll.classList.add('empty-mode'); inner.classList.add('empty-mode');
-    const hour = new Date().getHours();
-    const greeting = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
     const hero = document.createElement('div');
     hero.className = 'empty-hero';
-    hero.innerHTML = '<h2>'+greeting+'</h2><div class="urdu-line">کچھ بھی پوچھیں</div><p>Ask anything in Urdu or English.</p>';
+    hero.innerHTML = '<div class="hero-kicker">URDU · ENGLISH · MORE</div><h1>What would you like to work on?</h1><div class="urdu-line" lang="ur" dir="rtl">آئیے کچھ نیا سیکھتے ہیں</div><p>Ask a question, explore an idea, or practise something you are learning.</p>';
+    const suggestions = document.createElement('div');
+    suggestions.className = 'home-suggestions';
+    ['Explain a difficult topic in simple words','Translate a sentence into Urdu','Help me revise for an exam','Summarise these notes'].forEach(label=>{
+      const button=document.createElement('button');
+      button.type='button'; button.className='suggest-card'; button.textContent=label;
+      button.addEventListener('click',()=>{
+        input.value=label;
+        input.dispatchEvent(new Event('input',{bubbles:true}));
+        sendMessage();
+      });
+      suggestions.appendChild(button);
+    });
+    hero.appendChild(suggestions);
     inner.appendChild(hero);
     return;
   }
@@ -394,7 +451,7 @@ async function respondTo(session){
     const res = await fetch('/api/chat/stream', {
       method:'POST',
       headers:{'Content-Type':'application/json'},
-body: JSON.stringify({ messages: session.messages.map(m=>({role:m.role, content:m.content})), systemPrompt: genPrefs.persona || undefined, temperature: typeof genPrefs.temperature==='number' ? genPrefs.temperature : undefined }),
+body: JSON.stringify({ messages: session.messages.map(m=>({role:m.role, content:m.content})), systemPrompt: genPrefs.persona || undefined, temperature: typeof genPrefs.temperature==='number' ? genPrefs.temperature : undefined, model: activeOllamaModel || serverConfig.localModelName || undefined }),
       signal: currentAbort.signal
     });
     if(!res.ok || !res.body){
@@ -415,6 +472,14 @@ body: JSON.stringify({ messages: session.messages.map(m=>({role:m.role, content:
           if(!line) continue;
           let payload;
           try{ payload = JSON.parse(line.slice(6)); }catch(e){ continue; }
+          if(payload.reset){
+            reply='';
+            if(bubbleEl) updateStreamingBubble(bubbleEl, reply);
+          }
+          if(payload.notice){
+            const hint=document.getElementById('composerHint');
+            if(hint) hint.textContent=payload.notice;
+          }
           if(payload.delta){
             reply += payload.delta;
             if(!bubbleEl){ removeThinking(); bubbleEl = appendStreamingBubble(); }
@@ -463,60 +528,62 @@ function regenerateLast(){
 /* ============ QUICK TOOLS ============ */
 document.querySelectorAll('.qt-btn').forEach(btn=> btn.addEventListener('click', ()=>runQuickTool(btn.dataset.tool)));
 async function runQuickTool(tool){
-    if(isGenerating) return;
-  const session = currentSession(); if(!session || !session.messages.length) return;
+  if(isGenerating) return;
+  const session = currentSession();
+  if(!session || !session.messages.length) return;
   const payload = { messages: session.messages.map(m=>({role:m.role, content:m.content})) };
-  if(tool==='summarize'){
-    const {result} = await apiPost('/api/tools/summarize', payload);
-    session.messages.push({role:'assistant', content:'**Conversation summary**\n\n'+result, ts:nowISO()});
-  } else if(tool==='keypoints'){
-    const {result} = await apiPost('/api/tools/keypoints', payload);
-    session.messages.push({role:'assistant', content:'**Key points**\n\n'+result, ts:nowISO()});
-  } else if(tool==='translate'){
-    const {result} = await apiPost('/api/tools/translate', payload);
-    session.messages.push({role:'assistant', content:'**Rough translation**\n\n'+result, ts:nowISO()});
-  } else if(tool==='flashcards'){
-    const {cards} = await apiPost('/api/tools/flashcards', payload);
-    if(cards && cards.length){
-      const deck = {id:uid(), name:session.title+' - flashcards', tags:[], cards: cards.map(c=>({id:uid(), front:c.front, back:c.back, known:false})), createdAt:Date.now()};
-      decks.unshift(deck); saveServerState();
-      switchView('flashcards'); renderDeckGrid(); openDeck(deck.id);
+  try{
+    if(tool==='summarize'){
+      const {result} = await apiPost('/api/tools/summarize', payload);
+      session.messages.push({role:'assistant', content:'**Conversation summary**\n\n'+result, ts:nowISO()});
+    } else if(tool==='keypoints'){
+      const {result} = await apiPost('/api/tools/keypoints', payload);
+      session.messages.push({role:'assistant', content:'**Key points**\n\n'+result, ts:nowISO()});
+    } else if(tool==='translate'){
+      const {result} = await apiPost('/api/tools/translate', payload);
+      session.messages.push({role:'assistant', content:'**Rough translation**\n\n'+result, ts:nowISO()});
+    } else if(tool==='flashcards'){
+      const {cards} = await apiPost('/api/tools/flashcards', payload);
+      if(cards && cards.length){
+        const deck = {id:uid(), name:session.title+' - flashcards', tags:[], cards:cards.map(c=>migrateCardForSpacedRepetition({id:uid(),front:c.front,back:c.back,known:false})), createdAt:Date.now()};
+        decks.unshift(deck); saveServerState();
+        switchView('flashcards'); renderDeckGrid(); openDeck(deck.id);
+        return;
+      }
+      session.messages.push({role:'assistant',content:'Not enough content yet to build flashcards.',ts:nowISO()});
+    } else if(tool==='websearch'){
+      const lastUser=[...session.messages].reverse().find(m=>m.role==='user');
+      if(!lastUser) return;
+      showThinking();
+      const res=await apiPost('/api/search',{query:lastUser.content});
+      removeThinking();
+      if(!res.results || !res.results.length){
+        session.messages.push({role:'assistant',content:'No web results came back for that search.',ts:nowISO()});
+      } else {
+        const body=res.results.map((r,i)=>(i+1)+'. '+r.title+'\n'+r.link+'\n'+r.snippet).join('\n\n');
+        session.messages.push({
+          role:'assistant',
+          content:'Web search results for "'+lastUser.content+'":\n\n'+body,
+          html:renderSearchResultsHtml(lastUser.content,res.results),
+          ts:nowISO()
+        });
+      }
+    } else if(tool==='title'){
+      session.title=session.messages.find(m=>m.role==='user')?.content.slice(0,42)||session.title;
+      saveServerState(); renderSessionList();
+      return;
+    } else if(tool==='exportchat'){
+      const lines=session.messages.map(m=>(m.role==='user'?'**You:** ':'**Zariya:** ')+m.content);
+      const filename=(session.title||'chat').replace(/[^\w\- ]/g,'').trim().replace(/\s+/g,'_')+'.md';
+      downloadFile(filename,'# '+session.title+'\n\n'+lines.join('\n\n'));
       return;
     }
-    session.messages.push({role:'assistant', content:'Not enough content yet to build flashcards.', ts:nowISO()});
-  } else if(tool==='websearch'){
-    const lastUser = [...session.messages].reverse().find(m=>m.role==='user');
-    if(!lastUser) return;
-    showThinking();
-    const res = await apiPost('/api/search', { query: lastUser.content });
+    saveServerState(); renderChat();
+  }catch(err){
     removeThinking();
-    if(res.error){
-      session.messages.push({role:'assistant', content: res.error, ts:nowISO()});
-    } else if(!res.results || !res.results.length){
-      session.messages.push({role:'assistant', content:'No web results came back for that search.', ts:nowISO()});
-    } else {
-      // content stays plain markdown/text (used by Copy/Read-aloud and export);
-      // html holds the rendered .search-result card markup renderBubble()
-      // displays instead, once it's available in a persisted session.
-      const body = res.results.map((r,i)=> (i+1)+'. '+r.title+'\n'+r.link+'\n'+r.snippet).join('\n\n');
-      session.messages.push({
-        role:'assistant',
-        content:'Web search results for "'+lastUser.content+'":\n\n'+body,
-        html: renderSearchResultsHtml(lastUser.content, res.results),
-        ts:nowISO(),
-      });
-    }
-  } else if(tool==='title'){
-    session.title = session.messages[0].content.slice(0,42);
-    saveServerState(); renderSessionList();
-    return;
-  } else if(tool==='exportchat'){
-    const lines = session.messages.map(m=> (m.role==='user' ? '**You:** ' : '**Zariya:** ') + m.content);
-    const filename = (session.title||'chat').replace(/[^\w\- ]/g,'').trim().replace(/\s+/g,'_') + '.md';
-    downloadFile(filename, '# '+session.title+'\n\n'+lines.join('\n\n'));
-    return;
+    session.messages.push({role:'assistant',content:'That tool is not available right now: '+(err.message||'request failed'),ts:nowISO()});
+    saveServerState(); renderChat();
   }
-  saveServerState(); renderChat();
 }
 
 /* ============ SPEECH ============ */
@@ -849,18 +916,54 @@ function renderStudy(){
     });
   }
 }
-document.getElementById('newDeckBtn').addEventListener('click', ()=>{
-  const name = prompt('Deck name?'); if(!name) return;
-    const tagsRaw = prompt('Tags (comma separated, optional)') || '';
-    const tags = tagsRaw.split(',').map(t=>t.trim().toLowerCase()).filter(Boolean);
-  const cards = []; let addMore=true;
-  while(addMore && cards.length<20){
-    const front = prompt('Front of card #'+(cards.length+1)+' (Cancel to stop)'); if(front===null) break;
-    const back = prompt('Back of card #'+(cards.length+1)); if(back===null) break;
-    cards.push(migrateCardForSpacedRepetition({id:uid(), front, back, known:false}));
-    addMore = confirm('Add another card?');
+const newDeckDialog = document.getElementById('newDeckDialog');
+const newDeckCards = document.getElementById('newDeckCards');
+function addDeckCardRow(front='', back=''){
+  const count=newDeckCards.querySelectorAll('.deck-form-card').length+1;
+  const row=document.createElement('div');
+  row.className='deck-form-card';
+  row.innerHTML='<div class="deck-form-card-head"><span>Card '+count+'</span><button class="deck-form-remove" type="button" aria-label="Remove card">Remove</button></div>'
+    +'<label>Front<input class="deck-front" maxlength="600" required placeholder="Question or term" value="'+escapeHtml(front)+'"></label>'
+    +'<label>Back<textarea class="deck-back" maxlength="2400" required rows="2" placeholder="Answer or definition">'+escapeHtml(back)+'</textarea></label>';
+  row.querySelector('.deck-form-remove').addEventListener('click',()=>{
+    row.remove();
+    newDeckCards.querySelectorAll('.deck-form-card-head span').forEach((el,i)=>el.textContent='Card '+(i+1));
+  });
+  newDeckCards.appendChild(row);
+}
+document.getElementById('newDeckBtn').addEventListener('click',()=>{
+  document.getElementById('newDeckForm').reset();
+  newDeckCards.innerHTML='';
+  addDeckCardRow();
+  if(newDeckDialog && typeof newDeckDialog.showModal==='function') newDeckDialog.showModal();
+  else addDeckCardRow();
+});
+document.getElementById('addDeckCardBtn').addEventListener('click',()=>{
+  if(newDeckCards.querySelectorAll('.deck-form-card').length>=30){
+    document.getElementById('newDeckFormHint').textContent='A deck can contain up to 30 cards.';
+    return;
   }
-  if(cards.length){ decks.unshift({id:uid(), name, tags, cards, createdAt:Date.now()}); saveServerState(); renderDeckGrid(); }
+  addDeckCardRow();
+});
+document.getElementById('newDeckCancelBtn').addEventListener('click',()=>newDeckDialog.close());
+document.getElementById('newDeckForm').addEventListener('submit',e=>{
+  e.preventDefault();
+  const name=document.getElementById('newDeckName').value.trim();
+  const tags=document.getElementById('newDeckTags').value.split(',').map(t=>t.trim().toLowerCase()).filter(Boolean).slice(0,12);
+  const cards=[...newDeckCards.querySelectorAll('.deck-form-card')].map(row=>({
+    id:uid(),
+    front:row.querySelector('.deck-front').value.trim(),
+    back:row.querySelector('.deck-back').value.trim(),
+    known:false
+  })).filter(card=>card.front&&card.back).map(migrateCardForSpacedRepetition);
+  if(!name||!cards.length){
+    document.getElementById('newDeckFormHint').textContent='Add a deck name and at least one complete card.';
+    return;
+  }
+  decks.unshift({id:uid(),name,tags,cards,createdAt:Date.now()});
+  saveServerState();
+  renderDeckGrid();
+  newDeckDialog.close();
 });
 function renderDeckTagFilterRow(){
     const row = document.getElementById('deckTagFilterRow');
@@ -953,56 +1056,48 @@ document.getElementById('resetPersonaBtn').addEventListener('click', ()=>{ genPr
 async function loadModelList(){
   const sel = document.getElementById('modelSelect');
   if(!sel) return;
-  if(serverConfig.hostedMode){ sel.innerHTML = '<option value="">Local models are disabled on Vercel</option>'; return; }
   try{
     const data = await apiGet('/api/local-model/models');
-    const models = data.models || [];
-    const active = data.active || '';
+    const models = Array.isArray(data.models) ? data.models : [];
+    const active = activeOllamaModel || data.active || serverConfig.localModelName || '';
     if(!models.length){
-      sel.innerHTML = '<option value="">No models pulled yet (Ollama may not be running)</option>';
+      sel.innerHTML = '<option value="">'+(serverConfig.ollamaConfigured ? 'No models listed — enter a model name below' : 'Connect Ollama to load models')+'</option>';
       return;
     }
-    sel.innerHTML = models.map(m=> '<option value="'+escapeHtml(m.name)+'"'+(m.name===active?' selected':'')+'>'+escapeHtml(m.name)+(m.name===active?' (active)':'')+'</option>').join('');
+    sel.innerHTML = models.map(m=> '<option value="'+escapeHtml(m.name)+'"'+(m.name===active?' selected':'')+'>'+escapeHtml(m.name)+'</option>').join('');
+    if(active && !models.some(m=>m.name===active)){
+      const option=document.createElement('option');
+      option.value=active; option.textContent=active+' (selected)'; option.selected=true; sel.insertBefore(option,sel.firstChild);
+    }
   }catch(e){
-    sel.innerHTML = '<option value="">Could not load models</option>';
+    sel.innerHTML = '<option value="">Could not load Ollama models</option>';
+    const note=document.getElementById('modelSwitchNote'); if(note) note.textContent=e.message;
   }
+}
+async function chooseOllamaModel(name, note){
+  if(!name) return;
+  note.textContent = 'Selecting '+name+'…';
+  try{
+    const res = await apiPost('/api/local-model/select', { model:name });
+    activeOllamaModel = res.model || name;
+    LS.set('zariya_active_ollama_model', activeOllamaModel);
+    note.textContent = res.pulling ? 'Downloading '+name+' on the local Ollama server…' : 'Using '+activeOllamaModel+'.';
+    serverConfig.localModelName = activeOllamaModel;
+    updateStatusPill();
+  }catch(err){ note.textContent = err.message || 'Could not select that model.'; }
 }
 const modelSelect = document.getElementById('modelSelect');
 if(modelSelect){
-  modelSelect.addEventListener('change', async (e)=>{
-    const name = e.target.value; if(!name) return;
-    const note = document.getElementById('modelSwitchNote');
-    note.textContent = 'Switching to '+name+'…';
-    try{
-      const res = await apiPost('/api/local-model/select', { model:name });
-      if(res.ok){
-        note.textContent = res.pulling ? ('Downloading '+name+'… this can take a few minutes.') : ('Now using '+name+'.');
-        pollLocalModelStatus();
-        const cfg = await apiGet('/api/config'); serverConfig = cfg; updateStatusPill(); renderAccountUI();
-      } else {
-        note.textContent = res.error || 'Could not switch model.';
-      }
-    }catch(err){ note.textContent = 'Could not reach the server.'; }
-  });
+  modelSelect.addEventListener('change', e=>chooseOllamaModel(e.target.value, document.getElementById('modelSwitchNote')));
 }
 const pullModelBtn = document.getElementById('pullModelBtn');
 if(pullModelBtn){
   pullModelBtn.addEventListener('click', async ()=>{
     const inputEl = document.getElementById('newModelInput');
     const name = inputEl.value.trim(); if(!name) return;
-    const note = document.getElementById('modelSwitchNote');
-    note.textContent = 'Requesting '+name+'…';
-    try{
-      const res = await apiPost('/api/local-model/select', { model:name });
-      if(res.ok){
-        note.textContent = res.pulling ? ('Downloading '+name+'… this can take a few minutes.') : ('Now using '+name+'.');
-        inputEl.value='';
-        pollLocalModelStatus();
-        loadModelList();
-      } else {
-        note.textContent = res.error || 'Could not pull that model.';
-      }
-    }catch(err){ note.textContent = 'Could not reach the server.'; }
+    await chooseOllamaModel(name, document.getElementById('modelSwitchNote'));
+    inputEl.value='';
+    loadModelList();
   });
 }
 
@@ -1033,7 +1128,7 @@ function downloadFile(filename, content){
 /* ============ LIVE STATUS POLLING ============ */
 let statusPollTimer = null;
 function pollLocalModelStatus(){
-  if(serverConfig.hostedMode || serverConfig.localModelAvailable) return;
+  if(serverConfig.hostedMode || serverConfig.ollamaAvailable) return;
   if(statusPollTimer) clearInterval(statusPollTimer);
   let elapsed = 0;
   const intervalMs = 4000, maxMs = 15*60*1000;

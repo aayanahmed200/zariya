@@ -10,10 +10,9 @@ WEBAPP_DIR = ROOT / "webapp"
 if str(WEBAPP_DIR) not in sys.path:
     sys.path.insert(0, str(WEBAPP_DIR))
 
-# Vercel Functions are request-driven and do not run a persistent local
-# Ollama daemon. Keep hosted inference on the bundled knowledge fallback
-# unless the deployer configures a supported remote provider.
+# Hosted inference goes directly to Ollama Cloud. The API key is supplied as a
+# Vercel environment variable; no local Ollama daemon is started in Functions.
 if os.environ.get("VERCEL"):
-    os.environ.setdefault("DISABLE_LOCAL_MODEL", "1")
+    os.environ.setdefault("OLLAMA_BASE_URL", "https://ollama.com")
 
 from webapp.app import app  # noqa: E402

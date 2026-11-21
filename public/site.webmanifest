@@ -1,0 +1,19 @@
+{
+  "name": "Zariya — Urdu & English Assistant",
+  "short_name": "Zariya",
+  "description": "An Urdu and English workspace for chat, notes and learning.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f7f8f6",
+  "theme_color": "#34745a",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ],
+  "lang": "en"
+}
