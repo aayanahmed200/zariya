@@ -478,3 +478,20 @@ def test_flashcard_editor_preserves_existing_review_data():
     assert "...(previous||{})" in source
     assert "existingDeck.cards=cards;" in source
     assert "if(!c.id) c.id = uid();" in source
+
+
+def test_new_note_selects_the_new_empty_editor_instead_of_previous_note():
+    source = (ROOT / "webapp" / "static" / "app.js").read_text(encoding="utf-8")
+    handler = source[source.index("document.getElementById('newNoteBtn')"):source.index("document.getElementById('deleteNoteBtn')")]
+    assert "currentNoteId=null;" in handler
+    assert "openNote(n.id);" in handler
+    assert "activeNoteTagFilter=null;" in handler
+
+
+def test_deleting_or_restoring_notes_selects_a_valid_note():
+    source = (ROOT / "webapp" / "static" / "app.js").read_text(encoding="utf-8")
+    delete_block = source[source.index("document.getElementById('deleteNoteBtn')"):source.index("let noteTitleSaveTimer")]
+    restore_block = source[source.index("function restoreWorkspaceBackup"):source.index("document.getElementById('exportWorkspaceBtn')")]
+    assert "currentNoteId = null;" in delete_block
+    assert "activeNoteTagFilter = null;" in delete_block
+    assert "currentNoteId=null;" in restore_block
