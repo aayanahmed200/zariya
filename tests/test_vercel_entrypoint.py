@@ -446,7 +446,7 @@ def test_browser_sse_parser_is_loaded_and_stream_parser_uses_it():
     parser = (ROOT / "webapp" / "static" / "sse.js").read_text(encoding="utf-8")
     assert '/static/sse.js?' in html
     assert "window.ZariyaSSE.consume" in source
-    assert 'pending.indexOf("\\\\n\\\\n")' in parser
+    assert 'pending.indexOf("\\n\\n")' in parser
     assert "buffer.indexOf('\\\\\\\\n\\\\\\\\n')" not in source
 
 
@@ -482,7 +482,7 @@ def test_flashcard_editor_preserves_existing_review_data():
 
 def test_new_note_selects_the_new_empty_editor_instead_of_previous_note():
     source = (ROOT / "webapp" / "static" / "app.js").read_text(encoding="utf-8")
-    handler = source[source.index("document.getElementById('newNoteBtn')"):source.index("document.getElementById('deleteNoteBtn')")]
+    handler = source[source.index("document.getElementById('newNoteBtn')"):source.index("document.getElementById('deleteNoteBtn').addEventListener")]
     assert "currentNoteId=null;" in handler
     assert "openNote(n.id);" in handler
     assert "activeNoteTagFilter=null;" in handler
