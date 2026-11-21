@@ -84,7 +84,7 @@ async function apiPost(url, body, signal){
 async function loadServerState(){
   const [cfg, meRes] = await Promise.all([apiGet('/api/config'), apiGet('/api/me')]);
   serverConfig = cfg; me = meRes;
-  const state = cfg.hostedMode ? LS.get('zariya_app_state_v1', {}) : await apiGet('/api/state');
+  const state = cfg.hostedMode ? LS.get('zariya_app_state_v1:' + (me.signedIn && me.login ? me.login : 'guest'), {}) : await apiGet('/api/state');
   sessions = Array.isArray(state.sessions) ? state.sessions : [];
   notes = Array.isArray(state.notes) ? state.notes : [];
   decks = Array.isArray(state.decks) ? state.decks : [];
@@ -99,7 +99,7 @@ let saveTimer;
 function saveServerState(){
   clearTimeout(saveTimer);
   if(serverConfig.hostedMode){
-    LS.set('zariya_app_state_v1', { sessions, notes, decks });
+    LS.set('zariya_app_state_v1:' + (me.signedIn && me.login ? me.login : 'guest'), { sessions, notes, decks });
     return;
   }
   saveTimer = setTimeout(()=>{ apiPost('/api/state', { sessions, notes, decks }).catch(()=>{}); }, 300);

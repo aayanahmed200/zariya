@@ -37,7 +37,10 @@ load_dotenv()
 
 app = Flask(__name__)
 FLASK_SECRET_KEY = os.environ.get("FLASK_SECRET_KEY", "")
-SESSION_SECRET_CONFIGURED = len(FLASK_SECRET_KEY) >= 32 and "change-this" not in FLASK_SECRET_KEY.lower()
+SESSION_SECRET_VALUE = FLASK_SECRET_KEY.lower()
+SESSION_SECRET_CONFIGURED = len(FLASK_SECRET_KEY) >= 32 and not any(
+    marker in SESSION_SECRET_VALUE for marker in ("change-this", "replace-with", "your-secret", "example")
+)
 app.secret_key = FLASK_SECRET_KEY or secrets.token_hex(32)
 
 # Debug mode is opt-in only (never on by default) since Flask's debugger
