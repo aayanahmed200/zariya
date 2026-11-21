@@ -1,9 +1,9 @@
-"""Zariya — a bilingual workspace with Ollama-powered chat and a curated knowledge fallback.
+"""Zariya — a bilingual workspace with hosted open-model chat and a curated fallback.
 
-The app connects to Ollama Cloud on Vercel and to a local Ollama daemon during
-development. Ollama credentials are read only from server-side environment
-variables. When no model endpoint is configured, selected requests fall back
-to the bundled rule-based knowledge engine.
+Hosted chat uses a free open-weight model through Vercel AI Gateway. Vercel
+OIDC authenticates the server-to-server request; no browser API key or local
+model installation is required. If hosted inference is unavailable, selected
+requests fall back to the bundled rule-based knowledge engine.
 """
 import os
 import secrets
@@ -17,7 +17,7 @@ from dotenv import load_dotenv
 from flask import Flask, jsonify, redirect, request, session, url_for, render_template, Response, stream_with_context, send_from_directory
 
 import kb_engine
-import local_model
+import hosted_model
 
 load_dotenv()
 
@@ -59,9 +59,17 @@ PUBLIC_DIR = Path(__file__).resolve().parents[1] / "public"
 STORE_PATH = DATA_DIR / "store.json"
 
 SYSTEM_PROMPT = (
-    "You are Zariya, a warm, concise bilingual Urdu/English assistant built as a "
-    "privacy-first, offline-first platform for Urdu and other low-resource languages. "
-    "Reply in whichever language the user writes in, mixing naturally if they mix."
+    "You are Zariya, a clear, capable bilingual assistant for Urdu and English. "
+    "Reply in the language the user uses. If the user writes in English, reply in "
+    "natural, correctly written English. If the user writes in Urdu, reply in Urdu "
+    "script. If they mix languages, mirror that mix naturally. Keep every English "
+    "paragraph, heading, list and table left-to-right. Keep Urdu-only blocks right-to-left. "
+    "Format answers for easy reading: use a short direct opening, descriptive Markdown "
+    "headings when the answer is long, blank lines between sections, concise bullet or "
+    "numbered lists for steps, and tables only when they genuinely clarify comparisons. "
+    "Avoid huge unbroken paragraphs, excessive headings, decorative symbols, fake citations, "
+    "and repetitive introductions. Use fenced code blocks for code. Be accurate, explain "
+    "uncertainty, and never claim a lookup or action you did not perform."
 )
 
 # ---------------------------------------------------------------------------
@@ -139,7 +147,7 @@ def _generation_params(body):
     system_prompt = SYSTEM_PROMPT
     custom = body.get("systemPrompt")
     if isinstance(custom, str) and custom.strip():
-        system_prompt = custom.strip()[:2000]  # generous cap, just to stop abuse
+        system_prompt += "\n\nAdditional response preferences from the user:\n" + custom.strip()[:1200]
 
     temperature = None
     raw_temp = body.get("temperature")
@@ -233,8 +241,8 @@ def me():
     return jsonify({"signedIn": False, "githubConfigured": GITHUB_OAUTH_CONFIGURED})
 
 # ---------------------------------------------------------------------------
-# Chat: Ollama (local during development or Ollama Cloud on Vercel) -> curated knowledge fallback.
-# The Ollama API key is configured only on the server and never sent to the browser.
+# Chat: Vercel AI Gateway hosted open model -> curated knowledge fallback.
+# Gateway authentication is server-side Vercel OIDC; no visitor key is required.
 # ---------------------------------------------------------------------------
 @app.route("/api/chat", methods=["POST"])
 def chat():
@@ -243,14 +251,11 @@ def chat():
     if err:
         return jsonify({"error": err}), err_status
     system_prompt, temperature = _generation_params(body)
-    selected_model = body.get("model")
-    if not isinstance(selected_model, str):
-        selected_model = None
 
     try:
-        reply = local_model.generate_reply(messages, system_prompt, temperature, model=selected_model)
-    except local_model.OllamaError as exc:
-        app.logger.info("Ollama request fell back to knowledge mode: %s", exc)
+        reply = hosted_model.generate_reply(messages, system_prompt, temperature)
+    except hosted_model.GatewayError as exc:
+        app.logger.info("Hosted AI request fell back to knowledge mode: %s", exc)
         reply = None
     used_model = bool(reply)
     if reply is None:
@@ -258,8 +263,10 @@ def chat():
             reply = kb_engine.offline_reply(messages)
         except Exception:
             app.logger.exception("offline_reply crashed")
-            reply = ("I couldn't answer that from the built-in knowledge base. "
-                     "Connect Ollama to enable generative responses.")
+            reply = (
+                "I couldn't answer that from the built-in knowledge base. "
+                "Hosted AI is temporarily unavailable; please try again later."
+            )
 
     if used_model:
         last_user = next((m for m in reversed(messages) if m["role"] == "user"), None)
@@ -269,41 +276,38 @@ def chat():
     return jsonify({
         "reply": reply,
         "usedModel": used_model,
-        "provider": "ollama" if used_model else "knowledge",
+        "provider": "ai_gateway" if used_model else "knowledge",
     })
 
+
 def _sse(data):
-    return f"data: {json.dumps(data)}\n\n"
+    return f"data: {json.dumps(data, ensure_ascii=False)}\\n\\n"
+
 
 @app.route("/api/chat/stream", methods=["POST"])
 def chat_stream():
-    """Stream Ollama model output. If Ollama is unavailable or not configured,
-    the bundled knowledge engine answers supported requests and the UI is told
-    which mode was used."""
+    """Stream hosted open-model output or fall back to the built-in knowledge engine."""
     body = request.get_json(silent=True) or {}
     messages, err, err_status = _normalize_messages(body.get("messages"))
     if err:
         return jsonify({"error": err}), err_status
     system_prompt, temperature = _generation_params(body)
-    selected_model = body.get("model")
-    if not isinstance(selected_model, str):
-        selected_model = None
 
     def generate():
         used_model = False
         full_reply = None
         collected = []
 
-        if local_model.is_available():
+        if hosted_model.connection_status()["available"]:
             try:
-                for token in local_model.stream_reply(messages, system_prompt, temperature, model=selected_model):
+                for token in hosted_model.stream_reply(messages, system_prompt, temperature):
                     collected.append(token)
                     yield _sse({"delta": token})
                 if collected:
                     full_reply = "".join(collected)
                     used_model = True
-            except local_model.OllamaError as exc:
-                app.logger.info("Ollama request fell back to knowledge mode: %s", exc)
+            except hosted_model.GatewayError as exc:
+                app.logger.info("Hosted AI stream fell back to knowledge mode: %s", exc)
                 if collected:
                     collected.clear()
                     yield _sse({"reset": True})
@@ -314,8 +318,10 @@ def chat_stream():
                 full_reply = kb_engine.offline_reply(messages)
             except Exception:
                 app.logger.exception("offline_reply crashed")
-                full_reply = ("I couldn't answer that from the built-in knowledge base. "
-                              "Connect Ollama to enable generative responses.")
+                full_reply = (
+                    "I couldn't answer that from the built-in knowledge base. "
+                    "Hosted AI is temporarily unavailable; please try again later."
+                )
             yield _sse({"delta": full_reply})
 
         if used_model and full_reply:
@@ -323,13 +329,18 @@ def chat_stream():
             if last_user and last_user.get("content", "").strip():
                 kb_engine.remember_answer(last_user["content"], full_reply)
 
-        yield _sse({"done": True, "usedModel": used_model, "provider": "ollama" if used_model else "knowledge"})
+        yield _sse({
+            "done": True,
+            "usedModel": used_model,
+            "provider": "ai_gateway" if used_model else "knowledge",
+        })
 
     return Response(
         stream_with_context(generate()),
         mimetype="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
+
 
 @app.route("/api/feedback", methods=["POST"])
 def feedback():
@@ -430,49 +441,31 @@ def kb_stats():
 
 @app.route("/api/config")
 def config():
-    """Expose provider availability, never credentials or secret values."""
-    ollama = local_model.connection_status()
+    """Expose hosted-model readiness without returning authentication details."""
+    ai = hosted_model.connection_status()
     return jsonify({
         "hostedMode": HOSTED_MODE,
-        "ollamaConfigured": ollama["configured"],
-        "ollamaAvailable": ollama["available"],
-        "ollamaMode": ollama["mode"],
-        "ollamaStatus": ollama["status"],
-        "localModelAvailable": ollama["available"],
-        "localModelStatus": ollama["status"],
-        "localModelProgress": {"completed": 0, "total": 0},
-        "localModelName": ollama["model"],
+        "aiConfigured": ai["configured"],
+        "aiAvailable": ai["available"],
+        "aiProvider": ai["provider"],
+        "aiStatus": ai["status"],
+        "aiModel": ai["model"],
         "searchConfigured": bool(GOOGLE_API_KEY and GOOGLE_CX),
         "githubConfigured": GITHUB_OAUTH_CONFIGURED,
     })
 
+
 @app.route("/api/health")
 def health():
+    ai = hosted_model.connection_status()
     return jsonify({
         "ok": True,
         "service": "zariya",
         "mode": "hosted" if HOSTED_MODE else "local",
+        "aiConfigured": ai["configured"],
+        "aiProvider": ai["provider"],
         "knowledgeEntries": len(kb_engine.KB),
     })
-
-@app.route("/api/local-model/retry", methods=["POST"])
-def local_model_retry():
-    """Pull the configured default model during local development."""
-    return jsonify(local_model.retry_now())
-
-@app.route("/api/local-model/models")
-def local_model_models():
-    """Return the models available to the configured local or cloud Ollama endpoint."""
-    return jsonify({"models": local_model.list_models(), "active": local_model.current_model()})
-
-@app.route("/api/local-model/select", methods=["POST"])
-def local_model_select():
-    body = request.get_json(silent=True) or {}
-    name = body.get("model", "")
-    if not isinstance(name, str):
-        return jsonify({"ok": False, "error": "Model name must be text."}), 400
-    result = local_model.set_active_model(name)
-    return jsonify(result), (200 if result.get("ok") else 400)
 
 
 # SEO assets are served by Vercel's public directory in production. These
