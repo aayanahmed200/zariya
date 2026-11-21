@@ -46,7 +46,14 @@ python app.py
 
 Install and start [Ollama](https://ollama.com) to use local model generation. If it is unavailable, the app can fall back to its built-in knowledge engine. Configure optional integrations in `webapp/.env.example` only when you intend to use them.
 
-Run the root tests with `pytest tests/`. The web app has its own checks in `webapp/`; see [webapp/README.md](webapp/README.md).
+For the Streamlit app's tests, install the development dependency and run them from the repository root:
+
+```bash
+pip install -r requirements-dev.txt
+pytest tests/
+```
+
+The Flask app has separate setup and tests documented in [webapp/README.md](webapp/README.md).
 
 ## Scope and limitations
 
@@ -54,4 +61,4 @@ The knowledge engine is a curated, rule-based fallback, not a general-purpose la
 
 ## License
 
-MIT. See [LICENSE](LICENSE).
+This project is licensed under the MIT License. See [LICENSE](LICENSE) for the full text.
