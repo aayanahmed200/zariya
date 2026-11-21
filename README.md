@@ -10,7 +10,7 @@ The Flask web app in `webapp/` is the deployable browser application. Chat reque
 
 The model is hosted by a third-party provider. Its current provider listing does not advertise zero-data-retention or a no-training guarantee. Avoid entering passwords, private records or other sensitive information in chat.
 
-The composer also includes browser voice typing with an English/Urdu language choice when the browser supports Web Speech recognition. It requires microphone permission; voice audio may be processed by the browser's speech-recognition provider. Zariya does not store voice recordings.
+The composer also includes browser voice typing with an English/Urdu language choice when the browser supports Web Speech recognition. It requires microphone permission; voice audio may be processed by the browser's speech-recognition provider. Zariya does not store voice recordings. The workspace also supports JSON backup export and restore, and existing flashcard decks can be edited without resetting their spaced-repetition history.
 
 Quick actions for summaries, key points, translation and flashcard creation use the hosted model with the built-in knowledge engine as a fallback.
 
