@@ -32,6 +32,13 @@ def test_static_seo_assets_exist():
     assert (ROOT / "public" / "sitemap.xml").is_file()
 
 
+
+def test_profile_avatar_has_nonempty_fallback_and_public_copy_matches():
+    app_source = (ROOT / "webapp" / "static" / "app.js").read_text(encoding="utf-8")
+    public_source = (ROOT / "public" / "static" / "app.js").read_text(encoding="utf-8")
+    assert "escapeHtml(me.avatar||'/static/logo.png')" in app_source
+    assert app_source == public_source
+
 def test_health_endpoint_reports_hosted_mode():
     response = index.app.test_client().get("/api/health")
     assert response.status_code == 200
