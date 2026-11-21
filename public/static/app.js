@@ -276,7 +276,7 @@ function restoreWorkspaceBackup(raw){
   notes=restored.notes;
   decks=restored.decks;
   currentSessionId=sessions.length ? sessions[0].id : null;
-  currentNoteId=notes.length ? notes[0].id : null;
+  currentNoteId=null;
   currentDeckId=null;
   editingDeckId=null;
   activeNoteTagFilter=null;
@@ -1133,7 +1133,11 @@ function openNote(id){
 }
 document.getElementById('newNoteBtn').addEventListener('click', ()=>{
   const n = {id:uid(), title:'Untitled note', body:'', tags:[], updatedAt:Date.now()};
-  notes.unshift(n); currentNoteId=n.id; saveServerState(); renderNotesList();
+  notes.unshift(n);
+  currentNoteId=null;
+  activeNoteTagFilter=null;
+  saveServerState();
+  openNote(n.id);
   document.getElementById('note-title-input').focus();
 });
 document.getElementById('deleteNoteBtn').addEventListener('click', ()=>{
@@ -1141,8 +1145,10 @@ document.getElementById('deleteNoteBtn').addEventListener('click', ()=>{
   const n = notes.find(n=>n.id===currentNoteId);
   if(!confirm('Delete "'+((n&&n.title)||'this note')+'"? This cannot be undone.')) return;
   notes = notes.filter(n=>n.id!==currentNoteId);
-  currentNoteId = notes.length? notes[0].id : null;
-  saveServerState(); renderNotesList();
+  currentNoteId = null;
+  activeNoteTagFilter = null;
+  saveServerState();
+  renderNotesList();
 });
 let noteTitleSaveTimer, noteBodySaveTimer;
 document.getElementById('note-title-input').addEventListener('input', ()=>{
