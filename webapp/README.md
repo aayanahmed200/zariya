@@ -2,25 +2,27 @@
 
 **Live application:** [zariyas.vercel.app](https://zariyas.vercel.app/)
 
-The Urdu- and English-language browser workspace, powered by Ollama with a built-in knowledge fallback.
+A hosted Urdu and English workspace for chat, notes and flashcards. Visitors can open the site and chat without installing Ollama, downloading a model or entering a personal API key.
 
 ## Overview
 
-The Flask app provides chat, chat history, notepad, flashcards, deck import/export and browser speech features. Ollama is the only generative model provider. In production, visitors can connect their own local Ollama server directly from the browser without a paid cloud API key. Optional Ollama Cloud inference is supported through a server-side key. Without a model connection, selected queries are handled by the built-in rule-based knowledge engine.
+The Flask app provides chat, chat history, notepad, flashcards, deck import/export and browser speech features. Chat is routed server-side through Vercel AI Gateway using the Vercel deployment OIDC token. The default open-weight model is `nvidia/nemotron-3.5-lightning-free`, currently listed at $0 per input/output token. Free provider capacity and rate limits can change; when hosted inference is unavailable, selected requests use the bundled rule-based knowledge engine.
+
+The current NVIDIA model-provider listing does not advertise zero-data-retention or a no-training guarantee. Chat prompts are transmitted to the Gateway and model provider. Users should not enter passwords, private records or sensitive information.
 
 ## Repository contents
 
 - `app.py` — Flask routes and request handling.
-- `local_model.py` — Ollama local/cloud API connection, model listing and streaming.
+- `hosted_model.py` — Vercel AI Gateway authentication, chat completions and streaming.
 - `kb_engine.py` — rule-based Urdu/English knowledge and selected operations.
-- `embeddings.py` — optional local semantic search for local development.
+- `embeddings.py` — optional local semantic search for development.
 - `server/` — bundled knowledge JSON and local-development storage.
 - `templates/` — browser application shell.
 - `static/` — source CSS, JavaScript and logo; mirrored to root `public/static/` for Vercel.
 
 ## Technology
 
-Python, Flask, Requests, python-dotenv, Ollama, vanilla JavaScript and CSS.
+Python, Flask, Requests, python-dotenv, Vercel AI Gateway, vanilla JavaScript and CSS.
 
 ## Run locally
 
@@ -32,25 +34,20 @@ cp .env.example .env
 python app.py
 ```
 
-Install and start [Ollama](https://ollama.com/download). Zariya uses `http://localhost:11434` by default. Pull a model first (for example, `qwen2.5:1.5b`), then choose it from Settings.
+The local Flask app works without a model token using its built-in knowledge fallback. For local hosted-model testing only, set `AI_GATEWAY_API_KEY` in your uncommitted `.env` file. The deployed website does not require this variable: Vercel provides `VERCEL_OIDC_TOKEN` automatically when OIDC token generation is enabled for the project.
 
 ## Deploy to Vercel
 
 Import the repository into Vercel with the project root set to `.`. The root `index.py` exports the Flask app, root `requirements.txt` contains the web runtime dependencies, and Vercel serves `public/` from its static asset CDN.
 
-Vercel cannot run a desktop Ollama daemon inside a Function. The free path is to connect the visitor's Ollama app directly from the browser: install Ollama, download a model (for example `ollama pull qwen2.5:1.5b`), then allow `https://zariyas.vercel.app` in `OLLAMA_ORIGINS`. On Windows use `setx OLLAMA_ORIGINS "https://zariyas.vercel.app"`, quit and reopen Ollama, and press Test & connect in Settings. Local prompts stay on the visitor's computer.
+Vercel OIDC token generation is enabled for the project. The backend uses `VERCEL_OIDC_TOKEN` to authenticate to `https://ai-gateway.vercel.sh/v1/chat/completions`. Visitors do not need to install an app, download a model or supply an API key.
 
-Optional hosted inference uses an `OLLAMA_API_KEY` configured in Vercel Project Settings → Environment Variables. Direct Ollama Cloud API access is metered and can require usage credits; it is not needed for the local connection.
-
-The Cloud API key is used on the server only. Ollama Cloud does not expose the local model inventory endpoint; Settings shows the active cloud model and lets you enter another model name manually.
-
-Never place the Ollama API key in browser JavaScript, HTML or committed files.
+The default Gateway model is `nvidia/nemotron-3.5-lightning-free`. Its live catalogue listing currently shows $0 input and output token pricing. Free model availability and provider rate limits are not guaranteed. Override it with `AI_GATEWAY_MODEL` only if another model is supported and intentionally configured.
 
 ## Configuration
 
-- `OLLAMA_API_KEY` — required for Ollama Cloud or an authenticated remote Ollama endpoint.
-- `OLLAMA_BASE_URL` — optional API root; local default is `http://localhost:11434`, hosted default is `https://ollama.com`.
-- `OLLAMA_MODEL` — default model; local default is `qwen2.5:1.5b`, hosted default is `gemma4:31b`.
+- `AI_GATEWAY_MODEL` — optional server-side model override; defaults to `nvidia/nemotron-3.5-lightning-free`.
+- `AI_GATEWAY_API_KEY` — optional for local development only; do not commit it. Vercel deployments use OIDC instead.
 - `GOOGLE_API_KEY` and `GOOGLE_CX` — optional Google Custom Search credentials for the Search web tool.
 - `FLASK_SECRET_KEY`, `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET` — optional GitHub profile sign-in configuration.
 
@@ -63,9 +60,9 @@ pip install -r requirements.txt -r requirements-dev.txt
 pytest tests/
 ```
 
-## Scope and limitations
+## Data and limitations
 
-The included knowledge engine is a curated, rule-based fallback, not a general-purpose language model. Ollama Cloud processes prompts and responses to generate answers. Browser chat history, notes and flashcards are kept in the visitor's local storage; they are not synced across devices or accounts, and clearing browser storage removes them. Model output can be incorrect.
+Hosted AI prompts are sent to Vercel AI Gateway and NVIDIA's selected model provider. The provider does not currently advertise zero-data-retention or a no-training guarantee; do not send sensitive information. Browser chat history, notes and flashcards are kept in the visitor's local storage; they are not synced across devices or accounts, and clearing browser storage removes them. Model output can be incorrect. The built-in knowledge engine is a limited rule-based fallback rather than a general-purpose AI model.
 
 ## License
 
