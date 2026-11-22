@@ -693,13 +693,13 @@ def test_microphone_uses_recorded_wav_and_custom_accessible_language_dropdown():
     assert "Transcript ready. Review it, then press send." in source
 
 
-def test_urdu_uses_readable_markazi_text_and_transcription_cost_is_disclosed():
+def test_urdu_uses_readable_noto_sans_arabic_and_transcription_cost_is_disclosed():
     html = (ROOT / "webapp" / "templates" / "index.html").read_text(encoding="utf-8")
     css = (ROOT / "webapp" / "static" / "style.css").read_text(encoding="utf-8")
-    assert "Markazi+Text" in html
+    assert "Noto+Sans+Arabic" in html
     assert "English and Urdu voice transcription" in html
     assert "about $0.10 per audio hour" in html
-    assert "Markazi Text" in css
+    assert "Noto Sans Arabic" in css
     assert "line-height:1.85" in css
     assert "Noto Nastaliq Urdu" not in css
 
@@ -760,3 +760,27 @@ def test_uploaded_favicon_is_transparent_rgba_at_128px():
     assert int.from_bytes(icon[16:20], "big") == 128
     assert int.from_bytes(icon[20:24], "big") == 128
     assert icon[25] == 6  # Truecolour PNG with an alpha channel.
+
+
+def test_mixed_urdu_english_markdown_wraps_only_arabic_script_runs():
+    source = (ROOT / "webapp" / "static" / "app.js").read_text(encoding="utf-8")
+    assert "function wrapUrduRuns(value)" in source
+    assert 'class="urdu-run" lang="ur" dir="rtl"' in source
+    assert "text = wrapUrduRuns(text);" in source
+    assert "wrapUrduRuns(escapeHtml(result.snippet || ''))" in source
+    assert "wrapUrduRuns(escapeHtml(label))" in source
+
+
+def test_chat_and_notepad_apply_urdu_typography_while_typing():
+    html = (ROOT / "webapp" / "templates" / "index.html").read_text(encoding="utf-8")
+    source = (ROOT / "webapp" / "static" / "app.js").read_text(encoding="utf-8")
+    css = (ROOT / "webapp" / "static" / "style.css").read_text(encoding="utf-8")
+    assert 'id="note-title-input" placeholder="Untitled note" aria-label="Note title" dir="auto"' in html
+    assert 'id="note-body-input" placeholder="Start writing here…" dir="auto"' in html
+    assert "function syncUrduInput(element)" in source
+    assert "syncUrduInput(input);" in source
+    assert "syncUrduInput(document.getElementById('note-title-input'));" in source
+    assert "syncUrduInput(document.getElementById('note-body-input'));" in source
+    assert "syncUrduInput(document.getElementById('note-tags-input'));" in source
+    assert ".urdu-run{" in css
+    assert "unicode-bidi:isolate" in css
