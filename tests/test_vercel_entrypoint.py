@@ -700,8 +700,8 @@ def test_transparent_favicon_is_used_by_page_and_manifest():
     import json
     html = (ROOT / "webapp" / "templates" / "index.html").read_text(encoding="utf-8")
     manifest = json.loads((ROOT / "public" / "site.webmanifest").read_text(encoding="utf-8"))
-    assert 'href="/favicon.png?v=20261122-3"' in html
-    assert manifest["icons"][0]["src"] == "/favicon.png?v=20261122-3"
+    assert 'href="/favicon.png?v=20261122-4"' in html
+    assert manifest["icons"][0]["src"] == "/favicon.png?v=20261122-4"
     assert manifest["icons"][0]["type"] == "image/png"
 
 
@@ -738,3 +738,9 @@ def test_github_callback_rejects_missing_or_wrong_state():
     response = client.get("/auth/github/callback?code=test&state=wrong")
     assert response.status_code == 302
     assert "authError=" in response.location
+
+
+def test_voice_state_is_initialized_before_composer_handlers():
+    source = (ROOT / "webapp" / "static" / "app.js").read_text(encoding="utf-8")
+    assert source.index("let voiceState = 'idle';") < source.index("function syncSendState()")
+    assert source.index("let shouldListen = false;") < source.index("function syncSendState()")
