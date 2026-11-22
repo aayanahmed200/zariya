@@ -10,9 +10,6 @@ WEBAPP_DIR = ROOT / "webapp"
 if str(WEBAPP_DIR) not in sys.path:
     sys.path.insert(0, str(WEBAPP_DIR))
 
-# Hosted inference goes directly to Ollama Cloud. The API key is supplied as a
-# Vercel environment variable; no local Ollama daemon is started in Functions.
-if os.environ.get("VERCEL"):
-    os.environ.setdefault("OLLAMA_BASE_URL", "https://ollama.com")
-
+# Hosted inference uses Vercel AI Gateway. Vercel injects a short-lived
+# OIDC credential into each Function request; browser code never sees it.
 from webapp.app import app  # noqa: E402
