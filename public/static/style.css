@@ -871,3 +871,23 @@ body{direction:ltr;text-align:left;background:var(--bg);color:var(--text)}
 }
 .voice-typing-note strong{display:block;color:var(--text);font-size:11px;font-weight:700}
 .voice-typing-note p{margin:4px 0 0;color:var(--muted);font-size:10px;line-height:1.55;max-width:650px}
+
+
+/* Clearer first-use states and more readable settings copy */
+.sess-empty{padding:9px 10px;color:var(--muted);font-size:11px;line-height:1.5}
+.sess-empty button{display:block;margin-top:5px;padding:0;background:transparent;border:0;color:var(--accent-strong);font-size:10px;font-weight:700;cursor:pointer}
+.sess-empty button:hover{text-decoration:underline}
+.note-editor.is-empty .note-toolbar{display:none}
+.note-editor-empty{flex:1;min-height:220px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:28px;text-align:center}
+.note-editor-empty[hidden],.note-editor-fields[hidden]{display:none!important}
+.note-empty-mark{width:43px;height:43px;display:flex;align-items:center;justify-content:center;margin-bottom:3px;background:var(--accent-soft);border-radius:13px;color:var(--accent-strong);font-size:23px}
+.note-editor-empty h3{margin:0;color:var(--text);font-family:var(--serif);font-size:20px;font-weight:600}
+.note-editor-empty p{max-width:330px;margin:0 0 8px;color:var(--muted);font-size:12px;line-height:1.7}
+.note-editor-fields{flex:1;min-height:0;display:flex;flex-direction:column}
+.deck-empty{grid-column:1/-1;min-height:260px;gap:11px;background:var(--surface);border:1px dashed var(--border-strong);border-radius:15px}
+.deck-empty svg{width:30px;height:30px;color:var(--accent);opacity:.75}
+.deck-empty strong{color:var(--text);font-family:var(--serif);font-size:18px;font-weight:600}
+.deck-empty span{max-width:360px;color:var(--muted);font-size:12px;line-height:1.7}
+.deck-empty .btn{margin-top:4px}
+.hosted-ai-privacy p,.hosted-ai-limits{font-size:11px;line-height:1.75}
+.voice-typing-note p{font-size:11px;line-height:1.7}
