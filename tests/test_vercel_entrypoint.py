@@ -30,6 +30,8 @@ def test_homepage_renders_hosted_workspace_and_seo():
 
 def test_static_seo_assets_exist():
     assert (ROOT / "public" / "favicon.svg").is_file()
+    assert (ROOT / "public" / "favicon.png").is_file()
+    assert (ROOT / "public" / "favicon.png").read_bytes().startswith(bytes([137,80,78,71,13,10,26,10]))
     assert (ROOT / "public" / "site.webmanifest").is_file()
     assert (ROOT / "public" / "robots.txt").is_file()
     assert (ROOT / "public" / "sitemap.xml").is_file()
@@ -688,3 +690,12 @@ def test_urdu_uses_readable_markazi_text_and_transcription_cost_is_disclosed():
     assert "Markazi Text" in css
     assert "line-height:1.85" in css
     assert "Noto Nastaliq Urdu" not in css
+
+
+def test_transparent_favicon_is_used_by_page_and_manifest():
+    import json
+    html = (ROOT / "webapp" / "templates" / "index.html").read_text(encoding="utf-8")
+    manifest = json.loads((ROOT / "public" / "site.webmanifest").read_text(encoding="utf-8"))
+    assert 'href="/favicon.png?v=20261122-3"' in html
+    assert manifest["icons"][0]["src"] == "/favicon.png?v=20261122-3"
+    assert manifest["icons"][0]["type"] == "image/png"
