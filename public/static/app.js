@@ -338,9 +338,10 @@ function saveServerState(){
   if(serverConfig.hostedMode){
     const saved = LS.set('zariya_app_state_v1:' + (me.signedIn && me.login ? me.login : 'guest'), { sessions, notes, decks });
     updateStorageStatus(saved);
-    return;
+    return saved;
   }
   saveTimer = setTimeout(()=>{ apiPost('/api/state', { sessions, notes, decks }).catch(()=>{}); }, 300);
+  return true;
 }
 
 
