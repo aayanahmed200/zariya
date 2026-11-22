@@ -664,3 +664,27 @@ def test_gateway_transcription_uses_oidc_and_microsoft_provider_options(monkeypa
     assert captured["headers"]["Authorization"] == "Bearer oidc-token"
     assert captured["headers"]["ai-model-id"] == "microsoft/mai-transcribe-2"
     assert captured["payload"]["providerOptions"]["azure"]["locales"] == ["ur"]
+
+
+def test_microphone_uses_recorded_wav_and_custom_accessible_language_dropdown():
+    html = (ROOT / "webapp" / "templates" / "index.html").read_text(encoding="utf-8")
+    source = (ROOT / "webapp" / "static" / "app.js").read_text(encoding="utf-8")
+    assert 'aria-haspopup="listbox"' in html
+    assert 'data-language="auto"' in html
+    assert 'data-language="en"' in html
+    assert 'data-language="ur"' in html
+    assert "navigator.mediaDevices.getUserMedia" in source
+    assert "function encodeWav(samples,sampleRate)" in source
+    assert "fetch('/api/transcribe'" in source
+    assert "SpeechRecognition" not in source
+
+
+def test_urdu_uses_readable_markazi_text_and_transcription_cost_is_disclosed():
+    html = (ROOT / "webapp" / "templates" / "index.html").read_text(encoding="utf-8")
+    css = (ROOT / "webapp" / "static" / "style.css").read_text(encoding="utf-8")
+    assert "Markazi+Text" in html
+    assert "English and Urdu voice transcription" in html
+    assert "about $0.10 per audio hour" in html
+    assert "Markazi Text" in css
+    assert "line-height:1.85" in css
+    assert "Noto Nastaliq Urdu" not in css
