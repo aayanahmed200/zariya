@@ -412,7 +412,9 @@ function setResponseStyle(style,persist=true){
   if(persist) LS.set('zariya_gen_prefs',genPrefs);
 }
 function applyGenPrefs(){
-  document.getElementById('personaInput').value = genPrefs.persona || '';
+  const personaInput=document.getElementById('personaInput');
+  personaInput.value = genPrefs.persona || '';
+  syncUrduInput(personaInput);
   const pct = Math.round((typeof genPrefs.temperature==='number'? genPrefs.temperature : 0.5) * 100);
   document.getElementById('creativitySlider').value = pct;
   updateCreativityLabel(pct);
@@ -1798,13 +1800,19 @@ function addDeckCardRow(front='', back='', existingCard=null){
   row.className='deck-form-card';
   if(existingCard && existingCard.id) row.dataset.cardId=existingCard.id;
   row.innerHTML='<div class="deck-form-card-head"><span>Card '+count+'</span><button class="deck-form-remove" type="button" aria-label="Remove card">Remove</button></div>'
-    +'<label>Front<input class="deck-front" maxlength="600" required placeholder="Question or term" value="'+escapeHtml(front)+'"></label>'
-    +'<label>Back<textarea class="deck-back" maxlength="2400" required rows="2" placeholder="Answer or definition">'+escapeHtml(back)+'</textarea></label>';
+    +'<label>Front<input class="deck-front" maxlength="600" required placeholder="Question or term" dir="auto" value="'+escapeHtml(front)+'"></label>'
+    +'<label>Back<textarea class="deck-back" maxlength="2400" required rows="2" placeholder="Answer or definition" dir="auto">'+escapeHtml(back)+'</textarea></label>';
   row.querySelector('.deck-form-remove').addEventListener('click',()=>{
     row.remove();
     newDeckCards.querySelectorAll('.deck-form-card-head span').forEach((el,i)=>el.textContent='Card '+(i+1));
   });
+  const frontInput=row.querySelector('.deck-front');
+  const backInput=row.querySelector('.deck-back');
+  frontInput.addEventListener('input',()=>syncUrduInput(frontInput));
+  backInput.addEventListener('input',()=>syncUrduInput(backInput));
   newDeckCards.appendChild(row);
+  syncUrduInput(frontInput);
+  syncUrduInput(backInput);
 }
 function resetDeckDialog(mode){
   editingDeckId = mode === 'edit' ? editingDeckId : null;
@@ -2000,12 +2008,17 @@ responsePresetTrigger.addEventListener('keydown',event=>{
 document.addEventListener('pointerdown',event=>{
   if(!responsePresetDropdown.contains(event.target)) setResponsePresetMenuOpen(false);
 });
-document.getElementById('personaInput').addEventListener('input', (e)=>{ genPrefs.persona=e.target.value; LS.set('zariya_gen_prefs',genPrefs); });
+document.getElementById('personaInput').addEventListener('input', (e)=>{
+  syncUrduInput(e.target);
+  genPrefs.persona=e.target.value;
+  LS.set('zariya_gen_prefs',genPrefs);
+});
 document.getElementById('creativitySlider').addEventListener('input', (e)=>{ const pct=parseInt(e.target.value,10); genPrefs.temperature=pct/100; LS.set('zariya_gen_prefs',genPrefs); updateCreativityLabel(pct); });
 document.getElementById('resetPersonaBtn').addEventListener('click', ()=>{
   genPrefs.persona='';
   LS.set('zariya_gen_prefs',genPrefs);
   document.getElementById('personaInput').value='';
+  syncUrduInput(document.getElementById('personaInput'));
 });
 
 function downloadFile(filename, content, type='text/plain;charset=utf-8'){
