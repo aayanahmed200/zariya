@@ -688,7 +688,8 @@ def test_microphone_uses_recorded_wav_and_custom_accessible_language_dropdown():
     assert "fetch('/api/transcribe'" in source
     assert "SpeechRecognition" not in source
     capture = source[source.index("async function startVoiceRecognition()"):source.index("async function stopVoiceRecognition()")]
-    assert capture.index("await recordingContext.resume();") < capture.index("navigator.mediaDevices.getUserMedia")
+    assert capture.index("pendingStreamPromise=navigator.mediaDevices.getUserMedia") < capture.index("const resumePromise=recordingContext.resume()")
+    assert "await Promise.all([pendingStreamPromise,resumePromise])" in capture
     assert "Transcript ready. Review it, then press send." in source
 
 
