@@ -708,8 +708,8 @@ def test_transparent_favicon_is_used_by_page_and_manifest():
     import json
     html = (ROOT / "webapp" / "templates" / "index.html").read_text(encoding="utf-8")
     manifest = json.loads((ROOT / "public" / "site.webmanifest").read_text(encoding="utf-8"))
-    assert 'href="/favicon.png?v=20261122-4"' in html
-    assert manifest["icons"][0]["src"] == "/favicon.png?v=20261122-4"
+    assert 'href="/favicon.png?v=20261122-5"' in html
+    assert manifest["icons"][0]["src"] == "/favicon.png?v=20261122-5"
     assert manifest["icons"][0]["type"] == "image/png"
 
 
@@ -752,3 +752,11 @@ def test_voice_state_is_initialized_before_composer_handlers():
     source = (ROOT / "webapp" / "static" / "app.js").read_text(encoding="utf-8")
     assert source.index("let voiceState = 'idle';") < source.index("function syncSendState()")
     assert source.index("let shouldListen = false;") < source.index("function syncSendState()")
+
+
+def test_uploaded_favicon_is_transparent_rgba_at_128px():
+    icon = (ROOT / "public" / "favicon.png").read_bytes()
+    assert icon[:8] == bytes([137, 80, 78, 71, 13, 10, 26, 10])
+    assert int.from_bytes(icon[16:20], "big") == 128
+    assert int.from_bytes(icon[20:24], "big") == 128
+    assert icon[25] == 6  # Truecolour PNG with an alpha channel.
