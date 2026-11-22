@@ -541,3 +541,42 @@ def test_chat_generation_state_is_isolated_per_request_and_saves_partial_once():
     assert "generation.controller.abort();" in source
     assert "let currentAbort = null;" not in source
     assert "let stopped = false;" not in source
+
+
+def test_chat_navigation_returns_to_chat_from_other_workspace_views():
+    source = (ROOT / "webapp" / "static" / "app.js").read_text(encoding="utf-8")
+    new_session = source[source.index("function newSession()"):source.index("function currentSession()")]
+    session_list = source[source.index("function renderSessionList()"):source.index("document.getElementById('sessSearch').addEventListener")]
+    assert "switchView('chat');" in new_session
+    assert "switchView('chat');" in session_list
+
+
+def test_empty_conversation_search_has_a_clear_search_action():
+    source = (ROOT / "webapp" / "static" / "app.js").read_text(encoding="utf-8")
+    assert "No matching chats" in source
+    assert "Clear search" in source
+    assert "renderSessionList();" in source
+
+
+def test_notes_empty_state_prevents_unsaved_typing_and_offers_creation():
+    html = (ROOT / "webapp" / "templates" / "index.html").read_text(encoding="utf-8")
+    source = (ROOT / "webapp" / "static" / "app.js").read_text(encoding="utf-8")
+    assert 'id="noteEmptyState"' in html
+    assert 'id="noteEditorFields" hidden' in html
+    assert 'id="createFirstNoteBtn"' in html
+    assert "function syncNoteEditorState()" in source
+    assert "document.getElementById('newNoteBtn').click();" in source
+
+
+def test_flashcard_empty_state_supports_manual_deck_creation():
+    source = (ROOT / "webapp" / "static" / "app.js").read_text(encoding="utf-8")
+    assert "Your first deck starts here" in source
+    assert "Create first deck" in source
+    assert "document.getElementById('newDeckBtn').click();" in source
+
+
+def test_hosted_ai_copy_has_no_leftover_ollama_instructions():
+    html = (ROOT / "webapp" / "templates" / "index.html").read_text(encoding="utf-8")
+    assert "Checking hosted AI" in html
+    assert "works with Ollama" not in html
+    assert "Checking Ollama" not in html
