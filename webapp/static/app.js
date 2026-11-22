@@ -21,6 +21,9 @@ let studyQueue = []; let studyIndex = 0; let studyFlipped = false;
 let editingIndex = null;
 let isGenerating = false;
 let quickToolBusy = false;
+let stateBackendAvailable = true;
+let localStateKey = "zariya_state_v1:anonymous";
+let localStateMessage = "";
 let stopped = false;
 let currentAbort = null;
 let serverConfig = { claudeConfigured:false, searchConfigured:false, githubConfigured:false, localModelAvailable:false, localModelStatus:'' };
@@ -87,31 +90,64 @@ async function apiPost(url, body, signal){
 }
 
 async function loadServerState(){
-  const [cfg, meRes, state] = await Promise.all([apiGet('/api/config'), apiGet('/api/me'), apiGet('/api/state')]);
-  serverConfig = cfg; me = meRes;
-  sessions = state.sessions || [];
-  notes = state.notes || [];
-  decks = state.decks || [];
-  decks.forEach(d=> d.cards.forEach(migrateCardForSpacedRepetition));
+  const [cfg, meRes] = await Promise.all([apiGet('/api/config'), apiGet('/api/me')]);
+  serverConfig = cfg;
+  me = meRes;
+  const identity = me.signedIn && me.login ? String(me.login).toLowerCase() : "anonymous";
+  localStateKey = "zariya_state_v1:" + identity;
+
+  let state;
+  try{
+    state = await apiGet('/api/state');
+    stateBackendAvailable = true;
+    localStateMessage = "";
+    LS.set(localStateKey, state);
+  }catch(err){
+    stateBackendAvailable = false;
+    localStateMessage = "Saved on this device. Cloud sync is not configured for this deployment.";
+    state = LS.get(localStateKey, {sessions:[],notes:[],decks:[]});
+  }
+  sessions = Array.isArray(state.sessions) ? state.sessions : [];
+  notes = Array.isArray(state.notes) ? state.notes : [];
+  decks = Array.isArray(state.decks) ? state.decks : [];
+  decks.forEach(d=>{
+    if(!Array.isArray(d.cards)) d.cards = [];
+    d.cards.forEach(migrateCardForSpacedRepetition);
+  });
   currentSessionId = sessions.length ? sessions[0].id : null;
 }
 let saveTimer;
 let saveFeedbackTimer = null;
 function saveServerState(){
   clearTimeout(saveTimer);
+  const snapshot = {sessions,notes,decks};
+  LS.set(localStateKey, snapshot);
   saveTimer = setTimeout(async ()=>{
     const hint = document.getElementById('composerHint');
+    if(!stateBackendAvailable){
+      if(hint){
+        hint.textContent = localStateMessage || "Saved on this device. Cloud sync is unavailable.";
+        hint.classList.remove('save-error');
+        hint.classList.add('local-save');
+        delete hint.dataset.saveError;
+      }
+      return;
+    }
     try{
-      await apiPost('/api/state', { sessions, notes, decks });
+      await apiPost('/api/state', snapshot);
       if(hint && hint.dataset.saveError==='true'){
         hint.textContent = defaultHint;
-        hint.classList.remove('save-error');
+        hint.classList.remove('save-error','local-save');
         delete hint.dataset.saveError;
       }
     }catch(err){
+      stateBackendAvailable = false;
+      localStateMessage = "Saved on this device. Cloud sync is unavailable.";
+      LS.set(localStateKey, snapshot);
       if(hint){
-        hint.textContent = 'Changes could not be saved. Check your connection.';
-        hint.classList.add('save-error');
+        hint.textContent = localStateMessage;
+        hint.classList.remove('save-error');
+        hint.classList.add('local-save');
         hint.dataset.saveError = 'true';
       }
     }
@@ -148,9 +184,10 @@ function updateCreativityLabel(pct){
 }
 function updateStatusPill(){
   const dot = document.getElementById('statusDot'); const txt = document.getElementById('statusText');
-  if(serverConfig.claudeConfigured){ dot.classList.remove('off'); txt.textContent = 'Claude connected'; }
+  if(serverConfig.claudeConfigured){ dot.classList.remove('off'); txt.textContent = 'AI connected'; }
   else if(serverConfig.localModelAvailable){ dot.classList.remove('off'); txt.textContent = 'Local model ready'; }
-  else if(serverConfig.localModelStatus && /download|loading/i.test(serverConfig.localModelStatus)){ dot.classList.add('off'); txt.textContent = 'Local model starting…'; }
+  else if(serverConfig.localModelStatus && /download|loading|starting/i.test(serverConfig.localModelStatus)){ dot.classList.add('off'); txt.textContent = 'Local model starting…'; }
+  else if(serverConfig.deploymentPlatform==='vercel'){ dot.classList.add('off'); txt.textContent = 'Core tools only'; }
   else { dot.classList.add('off'); txt.textContent = 'Offline mode'; }
 }
 function updateLocalModelRetryUI(){
@@ -190,9 +227,20 @@ function renderAccountUI(){
     : 'GitHub sign-in isn\'t set up on this server yet.';
   document.getElementById('githubSignInBtn').disabled = !serverConfig.githubConfigured;
 
-  document.getElementById('claudeStatusText').textContent = serverConfig.claudeConfigured ? 'Connected' : 'Not configured (optional)';
-document.getElementById('localModelStatusText').textContent = serverConfig.localModelAvailable ? 'Loaded -- answering your chats' + (serverConfig.localModelName ? ' (' + serverConfig.localModelName + ')' : '') : (serverConfig.localModelStatus || 'Not configured');
-  document.getElementById('searchStatusText').textContent = serverConfig.searchConfigured ? 'Connected' : 'Not configured (optional)';
+  document.getElementById('claudeStatusText').textContent = serverConfig.claudeConfigured ? 'Connected' : 'Not configured';
+  document.getElementById('localModelStatusText').textContent = serverConfig.localModelAvailable
+    ? 'Ready · ' + (serverConfig.localModelName || 'local model')
+    : (serverConfig.localModelStatus || 'Not configured');
+  document.getElementById('searchStatusText').textContent = serverConfig.searchConfigured ? 'Connected' : 'Not configured';
+  const hosted = serverConfig.deploymentPlatform==='vercel';
+  const aiDescription = document.getElementById('aiDeploymentInfo');
+  const modelControls = document.getElementById('localModelControls');
+  const hostedNote = document.getElementById('hostedModelNote');
+  if(aiDescription) aiDescription.textContent = hosted
+    ? 'This public deployment has no hosted AI model connected. Core chat tools work; open-ended AI responses need a server-side model provider. Visitors do not need to install Ollama.'
+    : 'A local Ollama model runs on the machine hosting this server. Optional hosted providers can be configured by the operator.';
+  if(modelControls) modelControls.style.display = hosted ? 'none' : '';
+  if(hostedNote) hostedNote.style.display = hosted ? 'block' : 'none';
   updateLocalModelRetryUI();
   updateOnboardingBanner();
 }
@@ -201,7 +249,7 @@ document.getElementById('localModelStatusText').textContent = serverConfig.local
       const banner = document.getElementById('onboardingBanner');
       if(!banner) return;
       const dismissed = LS.get(ONBOARDING_DISMISS_KEY, false);
-      const needsHelp = !serverConfig.claudeConfigured && !serverConfig.localModelAvailable;
+      const needsHelp = serverConfig.deploymentPlatform!=='vercel' && !serverConfig.claudeConfigured && !serverConfig.localModelAvailable;
       banner.style.display = (needsHelp && !dismissed) ? 'flex' : 'none';
   }
   const onboardingDismissBtn = document.getElementById('onboardingDismissBtn');
@@ -1049,6 +1097,10 @@ document.getElementById('resetPersonaBtn').addEventListener('click', ()=>{ genPr
 async function loadModelList(){
   const sel = document.getElementById('modelSelect');
   if(!sel) return;
+  if(serverConfig.deploymentPlatform==='vercel'){
+    sel.innerHTML = '<option value="">Local model controls are disabled on this deployment</option>';
+    return;
+  }
   try{
     const data = await apiGet('/api/local-model/models');
     const models = data.models || [];
@@ -1128,7 +1180,8 @@ function downloadFile(filename, content){
 /* ============ LIVE STATUS POLLING ============ */
 let statusPollTimer = null;
 function pollLocalModelStatus(){
-  if(serverConfig.localModelAvailable) return;
+  const status = String(serverConfig.localModelStatus || '');
+  if(serverConfig.localModelAvailable || !/starting|download|pulling|retrying|loading/i.test(status)) return;
   if(statusPollTimer) clearInterval(statusPollTimer);
   let elapsed = 0;
   const intervalMs = 4000, maxMs = 15*60*1000;

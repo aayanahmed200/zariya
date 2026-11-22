@@ -652,3 +652,6 @@ button:disabled{cursor:not-allowed;}
 .composer-box.is-busy{opacity:.82;}
 #chat-input:disabled{cursor:wait;}
 .composer-hint.save-error{color:var(--danger);font-weight:600;}
+
+.composer-hint.local-save{color:var(--text-dim);}
+#hostedModelNote{max-width:70ch;line-height:1.55;}

@@ -37,8 +37,9 @@ import requests
 OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://localhost:11434")
 DEFAULT_MODEL = os.environ.get("LOCAL_MODEL_NAME", "qwen2.5:1.5b")
 _DISABLED = os.environ.get("DISABLE_LOCAL_MODEL", "").lower() in ("1", "true", "yes")
+_ON_VERCEL = bool(os.environ.get("VERCEL") or os.environ.get("VERCEL_ENV"))
 
-_status = "starting"
+_status = "No hosted AI model is configured for this Vercel deployment." if _ON_VERCEL else "starting"
 _ready = False
 _pulling = False
 _progress = {"completed": 0, "total": 0}
@@ -68,6 +69,8 @@ def retry_now() -> dict:
     """Wakes the background loop up immediately instead of waiting out the
     current backoff delay. Safe to call any time -- a no-op if a pull is
     already in flight or the model is already loaded."""
+    if _ON_VERCEL:
+        return {"ok": False, "status": _status, "error": _status}
     if _ready:
         return {"ok": True, "status": _status}
     if _pulling:
@@ -77,6 +80,8 @@ def retry_now() -> dict:
 
 
 def _ollama_running() -> bool:
+    if _ON_VERCEL:
+        return False
     try:
         r = requests.get(f"{OLLAMA_URL}/api/tags", timeout=3)
         return r.status_code == 200
@@ -106,6 +111,8 @@ def list_models() -> list[dict]:
     """Every model Ollama already has pulled on this machine, so Settings can
     offer a dropdown of models that are instantly usable, with no download
     wait, alongside the option to pull a new one by name."""
+    if _ON_VERCEL:
+        return []
     try:
         r = requests.get(f"{OLLAMA_URL}/api/tags", timeout=5)
         r.raise_for_status()
@@ -204,7 +211,8 @@ def _init_in_background():
         delay = min(delay * 2, 60)
 
 
-threading.Thread(target=_init_in_background, daemon=True).start()
+if not _ON_VERCEL and not _DISABLED:
+    threading.Thread(target=_init_in_background, daemon=True).start()
 
 
 def _pull_and_activate(model: str):
@@ -227,6 +235,8 @@ def set_active_model(name: str) -> dict:
     like first-run setup does."""
     global DEFAULT_MODEL, _ready, _status
     name = (name or "").strip()
+    if _ON_VERCEL:
+        return {"ok": False, "error": "Ollama model switching is available on self-hosted installs, not on this Vercel deployment."}
     if not name:
         return {"ok": False, "error": "No model name provided"}
     if _pulling:

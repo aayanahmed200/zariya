@@ -68,6 +68,7 @@ GITHUB_CLIENT_ID = os.environ.get("GITHUB_CLIENT_ID", "")
 GITHUB_CLIENT_SECRET = os.environ.get("GITHUB_CLIENT_SECRET", "")
 APP_BASE_URL = os.environ.get("APP_BASE_URL", "http://localhost:5000")
 
+IS_VERCEL = bool(os.environ.get("VERCEL") or os.environ.get("VERCEL_ENV"))
 DATA_DIR = Path(__file__).parent / "server"
 STORE_PATH = DATA_DIR / "store.json"
 
@@ -439,6 +440,8 @@ def web_search():
 # ---------------------------------------------------------------------------
 @app.route("/api/state", methods=["GET"])
 def get_state():
+    if IS_VERCEL:
+        return jsonify({"error": "Cloud storage is not configured for this deployment. This browser will keep your chats, notes and decks on this device."}), 503
     store = _load_store()
     key = _current_user_key()
     is_new_user = key not in store["users"]
@@ -452,6 +455,8 @@ def get_state():
 
 @app.route("/api/state", methods=["POST"])
 def save_state():
+    if IS_VERCEL:
+        return jsonify({"error": "Cloud storage is not configured for this deployment. Your browser will save these changes on this device."}), 503
     body = request.get_json(silent=True) or {}
     store = _load_store()
     key = _current_user_key()
@@ -494,6 +499,8 @@ def config():
         "claudeConfigured": bool(ANTHROPIC_API_KEY),
         "searchConfigured": bool(GOOGLE_API_KEY and GOOGLE_CX),
         "githubConfigured": bool(GITHUB_CLIENT_ID),
+        "deploymentPlatform": "vercel" if IS_VERCEL else "self-hosted",
+        "stateStorageMode": "browser" if IS_VERCEL else "server",
         "localModelAvailable": local_model.is_available(),
         "localModelStatus": local_model.load_status(),
         "localModelProgress": local_model.load_progress(),
