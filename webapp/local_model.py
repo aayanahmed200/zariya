@@ -39,7 +39,7 @@ DEFAULT_MODEL = os.environ.get("LOCAL_MODEL_NAME", "qwen2.5:1.5b")
 _DISABLED = os.environ.get("DISABLE_LOCAL_MODEL", "").lower() in ("1", "true", "yes")
 _ON_VERCEL = bool(os.environ.get("VERCEL") or os.environ.get("VERCEL_ENV"))
 
-_status = "No hosted AI model is configured for this Vercel deployment." if _ON_VERCEL else "starting"
+_status = "No hosted AI model is configured for this Vercel deployment." if _ON_VERCEL else ("not configured (DISABLE_LOCAL_MODEL is set)" if _DISABLED else "starting")
 _ready = False
 _pulling = False
 _progress = {"completed": 0, "total": 0}

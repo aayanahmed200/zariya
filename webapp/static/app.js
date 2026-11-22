@@ -196,7 +196,8 @@ function updateStatusPill(){
 function updateLocalModelRetryUI(){
   const row = document.getElementById('localModelRetryRow');
   if(!row) return;
-  row.style.display = serverConfig.localModelAvailable ? 'none' : 'flex';
+  const cannotRetry = serverConfig.deploymentPlatform==='vercel' || /not configured|disabled/i.test(serverConfig.localModelStatus || '');
+  row.style.display = serverConfig.localModelAvailable || cannotRetry ? 'none' : 'flex';
   const prog = serverConfig.localModelProgress;
   const fill = document.getElementById('localModelProgressFill');
   if(fill){
