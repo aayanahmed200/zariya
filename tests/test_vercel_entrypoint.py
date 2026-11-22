@@ -604,3 +604,63 @@ def test_note_editor_displays_automatic_save_feedback():
     assert "return saved;" in source
     assert "previousNoteId!==currentNoteId" in source
     assert "if(changed) setNoteSaveStatus('Saved on this device');" in source
+
+
+def _sample_wav_bytes(seconds=1):
+    import io
+    import wave
+    buffer = io.BytesIO()
+    with wave.open(buffer, "wb") as wav_file:
+        wav_file.setnchannels(1)
+        wav_file.setsampwidth(2)
+        wav_file.setframerate(16000)
+        wav_file.writeframes(b"\\x00\\x00" * int(16000 * seconds))
+    return buffer.getvalue()
+
+
+def test_transcription_route_validates_audio_and_uses_server_gateway(monkeypatch):
+    import base64
+    calls = []
+    def fake_transcribe(audio_bytes, media_type="audio/wav", language=None, oidc_token=None):
+        calls.append((audio_bytes, media_type, language, oidc_token))
+        return {"text": "السلام علیکم hello", "language": "ur", "durationInSeconds": 1.0}
+    monkeypatch.setattr(hosted_model, "transcribe_audio", fake_transcribe)
+    client = index.app.test_client()
+    assert client.post("/api/transcribe", json={}).status_code == 400
+    audio = _sample_wav_bytes()
+    response = client.post("/api/transcribe", headers={"x-vercel-oidc-token": "test-oidc"}, json={
+        "audio": base64.b64encode(audio).decode("ascii"),
+        "mediaType": "audio/wav",
+        "language": "ur",
+    })
+    assert response.status_code == 200
+    assert response.get_json()["text"] == "السلام علیکم hello"
+    assert calls[0] == (audio, "audio/wav", "ur", "test-oidc")
+
+
+def test_transcription_route_rejects_invalid_format_and_language():
+    import base64
+    client = index.app.test_client()
+    audio = _sample_wav_bytes()
+    encoded = base64.b64encode(audio).decode("ascii")
+    assert client.post("/api/transcribe", json={"audio": encoded, "language": "fr"}).status_code == 400
+    assert client.post("/api/transcribe", json={"audio": base64.b64encode(b"not wav").decode("ascii")}).status_code == 400
+
+
+def test_gateway_transcription_uses_oidc_and_microsoft_provider_options(monkeypatch):
+    captured = {}
+    class FakeResponse:
+        ok = True
+        status_code = 200
+        def json(self):
+            return {"text": "Hello world", "language": "en", "durationInSeconds": 1.5}
+    def fake_post(url, headers, json, timeout):
+        captured.update(url=url, headers=headers, payload=json, timeout=timeout)
+        return FakeResponse()
+    monkeypatch.setattr(hosted_model.requests, "post", fake_post)
+    result = hosted_model.transcribe_audio(b"wav-bytes", language="ur", oidc_token="oidc-token")
+    assert result["text"] == "Hello world"
+    assert captured["url"].endswith("/v4/ai/transcription-model")
+    assert captured["headers"]["Authorization"] == "Bearer oidc-token"
+    assert captured["headers"]["ai-model-id"] == "microsoft/mai-transcribe-2"
+    assert captured["payload"]["providerOptions"]["azure"]["locales"] == ["ur"]
