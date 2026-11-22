@@ -942,3 +942,32 @@ button:disabled,.btn:disabled,.qt-btn:disabled,.deck-action-btn:disabled{cursor:
   .voice-dropdown-menu{width:180px;left:auto;right:0}
   #chat-input[dir="rtl"]{font-size:16px}
 }
+
+
+
+/* GitHub account connection */
+.account-connect-copy{min-width:0;flex:1}
+.github-sign-in{min-height:38px;gap:9px;padding:0 14px;background:#24292f;border-color:#24292f;color:#fff;border-radius:10px}
+.github-sign-in svg{width:17px;height:17px;flex:0 0 17px}
+.github-sign-in:hover{background:#111820;border-color:#111820;color:#fff;box-shadow:0 4px 12px rgba(24,32,41,.15)}
+.github-setup-panel{margin-top:12px;padding:17px;background:var(--surface-soft);border:1px solid var(--border);border-radius:13px}
+.github-setup-panel[hidden],.account-auth-status[hidden]{display:none!important}
+.github-setup-heading{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.github-setup-heading strong{color:var(--text);font-size:13px}
+.github-setup-heading span{padding:4px 7px;border-radius:6px;background:var(--accent-soft);color:var(--accent-strong);font-size:9px;font-weight:700}
+.github-setup-panel p{margin:8px 0;color:var(--text-soft);font-size:11px;line-height:1.65}
+.github-url-field{position:relative;display:grid;gap:5px;margin-top:9px;padding:10px 11px;background:var(--surface);border:1px solid var(--border);border-radius:9px}
+.github-url-field span{color:var(--muted);font-size:9px;font-weight:700;letter-spacing:.35px;text-transform:uppercase}
+.github-url-field code{padding-right:55px;overflow-wrap:anywhere;color:var(--text);font:10px/1.55 var(--mono)}
+.github-copy-url{position:absolute;right:8px;bottom:8px;padding:5px 8px;background:var(--accent-soft);border:1px solid var(--border);border-radius:6px;color:var(--accent-strong);font-size:9px;font-weight:700;cursor:pointer}
+.github-copy-url:hover{background:var(--accent);border-color:var(--accent);color:white}
+.github-setup-link{display:inline-flex;margin:11px 0 2px;color:var(--accent-strong);font-size:11px;font-weight:700;text-decoration:none}
+.github-setup-link:hover{text-decoration:underline}
+.github-setup-panel p.github-setup-footnote{margin-top:12px;padding-top:10px;border-top:1px solid var(--border);color:var(--muted);font-size:10px}
+.github-setup-footnote code{font:10px var(--mono);color:var(--text-soft)}
+.account-auth-status{margin-top:10px;padding:9px 11px;background:var(--accent-tint);border-left:3px solid var(--accent);border-radius:0 8px 8px 0;color:var(--text-soft);font-size:11px;line-height:1.55}
+@media(max-width:700px){
+  #accountSignedOutRow{align-items:flex-start;flex-direction:column}
+  .github-sign-in{width:100%;justify-content:center}
+  .github-setup-panel{padding:13px}
+}
