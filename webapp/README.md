@@ -24,7 +24,7 @@ Quick actions for conversation summaries, key points, translation and flashcards
 
 ## Technology
 
-Python, Flask, Requests, python-dotenv, Vercel AI Gateway, vanilla JavaScript and CSS.
+Python, Flask, Requests, python-dotenv, Supabase Python SDK, Vercel AI Gateway, vanilla JavaScript and CSS.
 
 ## Run locally
 
@@ -49,7 +49,10 @@ The default Gateway model is `nvidia/nemotron-3.5-lightning-free`. Its live cata
 ## Configuration
 
 - `SUPABASE_URL` — your Supabase project URL.
-- `SUPABASE_SECRET_KEY` — server-only Supabase secret key (`sb_secret_...`). Legacy `SUPABASE_SERVICE_ROLE_KEY` is also supported. Never prefix these with `NEXT_PUBLIC_`.
+- `SUPABASE_PUBLISHABLE_KEY` — the public key (`sb_publishable_...`) for browser-facing, RLS-protected clients. It is not used to authorize Zariya's private server-side workspace table.
+- `SUPABASE_SECRET_KEY` — server-only Supabase secret key (`sb_secret_...`) required by the Flask workspace API. Legacy `SUPABASE_SERVICE_ROLE_KEY` is also supported. Never prefix this secret with `NEXT_PUBLIC_`.
+
+The official Python client is pinned in `requirements.txt` as `supabase==2.34.0`. Install it with `pip install -r requirements.txt` (or `pip install supabase`).
 - `AI_GATEWAY_MODEL` — optional server-side model override; defaults to `nvidia/nemotron-3.5-lightning-free`.
 - `AI_GATEWAY_API_KEY` — optional for local development only; do not commit it. Vercel deployments use OIDC instead.
 - `GOOGLE_API_KEY` and `GOOGLE_CX` — optional Google Custom Search credentials for the Search web tool.
@@ -66,7 +69,7 @@ pytest tests/
 
 ## Supabase cloud storage
 
-Create a Supabase project, then run `supabase/migrations/202611220001_create_zariya_workspaces.sql` in its SQL Editor. Add `SUPABASE_URL` and the project secret key as Vercel server-side environment variables for Production, Preview and Development. Redeploy after adding them. Zariya stores each workspace as JSONB under a hashed, pseudonymous owner ID derived from the signed Flask session (or the GitHub login when signed in). Row-level security is enabled and no browser roles receive table access; only the server uses the secret/service-role key. Without these variables, the site keeps using browser-local storage. A connected Supabase project is required for actual cross-device cloud sync.
+Create a Supabase project, then run `supabase/migrations/202611220001_create_zariya_workspaces.sql` in its SQL Editor. Add `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY` to Vercel. For Zariya's server-managed workspaces, also add `SUPABASE_SECRET_KEY` (the `sb_secret_...` key) as a sensitive server-side variable for Production, Preview and Development. Redeploy after adding them. Zariya stores each workspace as JSONB under a hashed, pseudonymous owner ID derived from the signed Flask session (or the GitHub login when signed in). Row-level security is enabled and no browser roles receive table access; only the server uses the secret/service-role key. Without these variables, the site keeps using browser-local storage. A server-only secret key and the database migration are both required for actual cross-device cloud sync; a publishable key alone is deliberately insufficient for this session-based server-side data model.
 
 ## Data and limitations
 
