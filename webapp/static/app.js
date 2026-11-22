@@ -20,6 +20,7 @@ let currentDeckId = null;
 let studyQueue = []; let studyIndex = 0; let studyFlipped = false;
 let editingIndex = null;
 let isGenerating = false;
+let quickToolBusy = false;
 let stopped = false;
 let currentAbort = null;
 let serverConfig = { claudeConfigured:false, searchConfigured:false, githubConfigured:false, localModelAvailable:false, localModelStatus:'' };
@@ -70,15 +71,19 @@ function renderMarkdown(raw){
 }
 
 /* ============ API HELPERS ============ */
+async function readApiResponse(response){
+  let data;
+  try{ data = await response.json(); }
+  catch(e){ throw new Error('The server returned an unexpected response (status '+response.status+').'); }
+  if(!response.ok) throw new Error(data.error || data.message || 'Request failed (status '+response.status+').');
+  return data;
+}
 async function apiGet(url){
-  const r = await fetch(url);
-  try{ return await r.json(); }
-  catch(e){ throw new Error('Unexpected response from server (status '+r.status+')'); }
+  return readApiResponse(await fetch(url));
 }
 async function apiPost(url, body, signal){
-  const r = await fetch(url, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body||{}), signal });
-  try{ return await r.json(); }
-  catch(e){ throw new Error('Unexpected response from server (status '+r.status+')'); }
+  const response = await fetch(url, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body||{}), signal });
+  return readApiResponse(response);
 }
 
 async function loadServerState(){
@@ -201,7 +206,8 @@ function switchView(name){
   document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
   document.getElementById('view-'+name).classList.add('active');
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.toggle('active', n.dataset.view===name));
-  document.getElementById('quickTools').style.display = name==='chat' ? '' : 'none';
+  const activeSession = currentSession();
+  document.getElementById('quickTools').style.display = name==='chat' && activeSession && activeSession.messages.length ? 'flex' : 'none';
   closeSidebarMobile();
   if(name==='notepad') renderNotesList();
   if(name==='flashcards') renderDeckGrid();
@@ -253,15 +259,45 @@ function renderChat(){
   const inner = document.getElementById('chat-inner');
   const scroll = document.getElementById('chat-scroll');
   const session = currentSession();
+  inner.setAttribute('aria-busy','false');
+  document.getElementById('quickTools').style.display = session && session.messages.length ? 'flex' : 'none';
   inner.innerHTML = '';
   if(!session || !session.messages.length){
     scroll.classList.add('empty-mode'); inner.classList.add('empty-mode');
-    const hour = new Date().getHours();
-    const greeting = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
     const hero = document.createElement('div');
     hero.className = 'empty-hero';
-    hero.innerHTML = '<h2>'+greeting+'</h2><div class="urdu-line">کچھ بھی پوچھیں</div><p>Ask anything in Urdu or English.</p>';
+    hero.innerHTML =
+      '<div class="hero-copy">'+
+        '<h1>Understand more, in Urdu or English.</h1>'+
+        '<p>Ask a question, explore an idea, or turn a useful reply into notes and flashcards.</p>'+
+        '<div class="hero-urdu" lang="ur" dir="rtl">کچھ بھی پوچھیں</div>'+
+      '</div>'+
+      '<div class="hero-prompts" aria-label="Start with an example">'+
+        '<button class="suggest-card" type="button" data-prompt="Explain photosynthesis in simple Urdu, step by step.">'+
+          '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2Z"/><path d="M8 7h8M8 11h6"/></svg>'+
+          '<span class="suggest-copy"><strong>Explain a concept</strong><small>Break it down in simple Urdu or English.</small></span>'+
+          '<svg class="suggest-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>'+
+        '</button>'+
+        '<button class="suggest-card" type="button" data-prompt="Translate a fresh start into Urdu and explain the meaning.">'+
+          '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 8 6 6M4 14l6-6 2-3M2 5h12M7 2h1M14 19l3-7 3 7M15.2 16h3.6"/></svg>'+
+          '<span class="suggest-copy"><strong>Translate a phrase</strong><small>Find the right words and meaning.</small></span>'+
+          '<svg class="suggest-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>'+
+        '</button>'+
+        '<button class="suggest-card" type="button" data-prompt="Help me understand how a quadratic equation works, step by step.">'+
+          '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9.5 18h5M10 22h4M8.2 14.5a7 7 0 1 1 7.6 0c-.8.6-1.3 1.4-1.5 2.5h-4.6c-.2-1.1-.7-1.9-1.5-2.5Z"/></svg>'+
+          '<span class="suggest-copy"><strong>Understand a problem</strong><small>Work through it one step at a time.</small></span>'+
+          '<svg class="suggest-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>'+
+        '</button>'+
+      '</div>';
     inner.appendChild(hero);
+    hero.querySelectorAll('[data-prompt]').forEach(button=>{
+      button.addEventListener('click', ()=>{
+        const composerInput = document.getElementById('chat-input');
+        composerInput.value = button.dataset.prompt;
+        composerInput.dispatchEvent(new Event('input', {bubbles:true}));
+        composerInput.focus();
+      });
+    });
     return;
   }
   scroll.classList.remove('empty-mode'); inner.classList.remove('empty-mode');
@@ -295,7 +331,7 @@ function renderBubble(m, idx, isLast){
       (uiPrefs.showTimestamps ? '<div class="msg-meta">'+(m.ts||'')+'</div>' : '')+
       '<div class="msg-actions"><button class="ghost-btn" data-act="copy">Copy</button><button class="ghost-btn" data-act="speak">Read aloud</button><button class="ghost-btn" data-act="up" title="Good answer">Helpful</button><button class="ghost-btn" data-act="down" title="Not helpful">Not helpful</button>'+
       (isLast?'<button class="ghost-btn" data-act="regen">Regenerate</button>':'')+'</div></div>';
-    row.querySelector('[data-act="copy"]').addEventListener('click', ()=>{ navigator.clipboard && navigator.clipboard.writeText(m.content); });
+    row.querySelector('[data-act="copy"]').addEventListener('click', async (e)=>{ const btn=e.currentTarget; try{ await navigator.clipboard.writeText(m.content); btn.textContent='Copied'; btn.classList.add('is-success'); setTimeout(()=>{btn.textContent='Copy';btn.classList.remove('is-success');},1400); }catch(err){ btn.textContent='Copy unavailable'; setTimeout(()=>btn.textContent='Copy',1800); } });
     row.querySelector('[data-act="speak"]').addEventListener('click', ()=>speak(m.content));
     const regen = row.querySelector('[data-act="regen"]');
     if(regen) regen.addEventListener('click', regenerateLast);
@@ -312,15 +348,24 @@ function renderBubble(m, idx, isLast){
   }
   inner.appendChild(row);
 }
-function sendFeedback(idx, rating, btn){
+async function sendFeedback(idx, rating, btn){
   const session = currentSession(); if(!session) return;
   const userMsg = session.messages[idx-1];
   if(!userMsg || userMsg.role!=='user') return;
-  apiPost('/api/feedback', { question: userMsg.content, rating });
   const row = btn.closest('.msg-actions');
-  if(row){ row.querySelectorAll('[data-act="up"],[data-act="down"]').forEach(b=>b.disabled=true); }
-  btn.classList.add('active');
-  btn.textContent = rating==='up' ? 'Thanks!' : 'Noted';
+  const controls = row ? [...row.querySelectorAll('[data-act="up"],[data-act="down"]')] : [btn];
+  controls.forEach(control=>control.disabled=true);
+  const original = btn.textContent;
+  btn.textContent='Sending…';
+  try{
+    await apiPost('/api/feedback', { question:userMsg.content, rating });
+    btn.classList.add('is-success');
+    btn.textContent = rating==='up' ? 'Thanks!' : 'Noted';
+  }catch(err){
+    controls.forEach(control=>control.disabled=false);
+    btn.textContent='Try again';
+    setTimeout(()=>{ if(btn.isConnected) btn.textContent=original; },1800);
+  }
 }
 function saveEdit(idx){
     if(isGenerating) return;
@@ -358,14 +403,26 @@ function sendMessage(){
 }
 function setGenerating(on){
   isGenerating = on;
-  if(on){ sendBtn.dataset.mode='stop'; sendBtn.innerHTML=STOP_ICON; sendBtn.disabled=false; }
-  else { sendBtn.dataset.mode='send'; sendBtn.innerHTML=SEND_ICON; syncSendState(); }
+  sendBtn.classList.toggle('stop-mode',on);
+  if(on){
+    sendBtn.dataset.mode='stop';
+    sendBtn.innerHTML=STOP_ICON;
+    sendBtn.disabled=false;
+    sendBtn.setAttribute('aria-label','Stop generating');
+    sendBtn.title='Stop generating';
+  } else {
+    sendBtn.dataset.mode='send';
+    sendBtn.innerHTML=SEND_ICON;
+    sendBtn.setAttribute('aria-label','Send message');
+    sendBtn.title='Send message';
+    syncSendState();
+  }
 }
 function showThinking(){
   const inner = document.getElementById('chat-inner');
   const row = document.createElement('div');
   row.className='msg-row assistant'; row.id='thinkingRow';
-  row.innerHTML = '<div class="thinking-row"><img class="thinking-logo" src="/static/logo.png" alt=""><span class="thinking-label">Thinking…</span></div>';
+  row.innerHTML = '<div class="thinking-row" role="status" aria-label="Zariya is generating a response"><span class="thinking-dots" aria-hidden="true"><i></i><i></i><i></i></span><span class="thinking-label">Thinking</span></div>';
   inner.appendChild(row);
   document.getElementById('chat-scroll').scrollTop = 999999;
 }
@@ -449,60 +506,91 @@ function regenerateLast(){
 /* ============ QUICK TOOLS ============ */
 document.querySelectorAll('.qt-btn').forEach(btn=> btn.addEventListener('click', ()=>runQuickTool(btn.dataset.tool)));
 async function runQuickTool(tool){
-    if(isGenerating) return;
-  const session = currentSession(); if(!session || !session.messages.length) return;
-  const payload = { messages: session.messages.map(m=>({role:m.role, content:m.content})) };
-  if(tool==='summarize'){
-    const {result} = await apiPost('/api/tools/summarize', payload);
-    session.messages.push({role:'assistant', content:'**Conversation summary**\n\n'+result, ts:nowISO()});
-  } else if(tool==='keypoints'){
-    const {result} = await apiPost('/api/tools/keypoints', payload);
-    session.messages.push({role:'assistant', content:'**Key points**\n\n'+result, ts:nowISO()});
-  } else if(tool==='translate'){
-    const {result} = await apiPost('/api/tools/translate', payload);
-    session.messages.push({role:'assistant', content:'**Rough translation**\n\n'+result, ts:nowISO()});
-  } else if(tool==='flashcards'){
-    const {cards} = await apiPost('/api/tools/flashcards', payload);
-    if(cards && cards.length){
-      const deck = {id:uid(), name:session.title+' - flashcards', tags:[], cards: cards.map(c=>({id:uid(), front:c.front, back:c.back, known:false})), createdAt:Date.now()};
-      decks.unshift(deck); saveServerState();
-      switchView('flashcards'); renderDeckGrid(); openDeck(deck.id);
-      return;
-    }
-    session.messages.push({role:'assistant', content:'Not enough content yet to build flashcards.', ts:nowISO()});
-  } else if(tool==='websearch'){
-    const lastUser = [...session.messages].reverse().find(m=>m.role==='user');
-    if(!lastUser) return;
-    showThinking();
-    const res = await apiPost('/api/search', { query: lastUser.content });
-    removeThinking();
-    if(res.error){
-      session.messages.push({role:'assistant', content: res.error, ts:nowISO()});
-    } else if(!res.results || !res.results.length){
-      session.messages.push({role:'assistant', content:'No web results came back for that search.', ts:nowISO()});
-    } else {
-      // content stays plain markdown/text (used by Copy/Read-aloud and export);
-      // html holds the rendered .search-result card markup renderBubble()
-      // displays instead, once it's available in a persisted session.
-      const body = res.results.map((r,i)=> (i+1)+'. '+r.title+'\n'+r.link+'\n'+r.snippet).join('\n\n');
-      session.messages.push({
-        role:'assistant',
-        content:'Web search results for "'+lastUser.content+'":\n\n'+body,
-        html: renderSearchResultsHtml(lastUser.content, res.results),
-        ts:nowISO(),
-      });
-    }
-  } else if(tool==='title'){
+  if(isGenerating || quickToolBusy) return;
+  const session = currentSession();
+  if(!session || !session.messages.length) return;
+  if(tool==='title'){
     session.title = session.messages[0].content.slice(0,42);
     saveServerState(); renderSessionList();
     return;
-  } else if(tool==='exportchat'){
+  }
+  if(tool==='exportchat'){
     const lines = session.messages.map(m=> (m.role==='user' ? '**You:** ' : '**Zariya:** ') + m.content);
     const filename = (session.title||'chat').replace(/[^\w\- ]/g,'').trim().replace(/\s+/g,'_') + '.md';
     downloadFile(filename, '# '+session.title+'\n\n'+lines.join('\n\n'));
     return;
   }
-  saveServerState(); renderChat();
+
+  const payload = { messages:session.messages.map(m=>({role:m.role,content:m.content})) };
+  const buttons = [...document.querySelectorAll('.qt-btn')];
+  const activeButton = buttons.find(button=>button.dataset.tool===tool);
+  quickToolBusy = true;
+  buttons.forEach(button=>{
+    button.disabled = true;
+    button.setAttribute('aria-busy',button===activeButton?'true':'false');
+  });
+  if(activeButton){
+    activeButton.dataset.idleLabel = activeButton.textContent;
+    activeButton.textContent = 'Working…';
+    activeButton.classList.add('is-loading');
+  }
+  showThinking();
+  let movedToFlashcards = false;
+  try{
+    if(tool==='summarize'){
+      const {result} = await apiPost('/api/tools/summarize',payload);
+      session.messages.push({role:'assistant',content:'**Conversation summary**\n\n'+result,ts:nowISO()});
+    } else if(tool==='keypoints'){
+      const {result} = await apiPost('/api/tools/keypoints',payload);
+      session.messages.push({role:'assistant',content:'**Key points**\n\n'+result,ts:nowISO()});
+    } else if(tool==='translate'){
+      const {result} = await apiPost('/api/tools/translate',payload);
+      session.messages.push({role:'assistant',content:'**Rough translation**\n\n'+result,ts:nowISO()});
+    } else if(tool==='flashcards'){
+      const {cards} = await apiPost('/api/tools/flashcards',payload);
+      if(cards && cards.length){
+        const deck = {id:uid(),name:session.title+' - flashcards',tags:[],cards:cards.map(c=>({id:uid(),front:c.front,back:c.back,known:false})),createdAt:Date.now()};
+        decks.unshift(deck); saveServerState();
+        switchView('flashcards'); renderDeckGrid(); openDeck(deck.id);
+        movedToFlashcards = true;
+      } else {
+        session.messages.push({role:'assistant',content:'There is not enough content yet to build flashcards.',ts:nowISO()});
+      }
+    } else if(tool==='websearch'){
+      const lastUser = [...session.messages].reverse().find(m=>m.role==='user');
+      if(!lastUser) return;
+      const res = await apiPost('/api/search',{query:lastUser.content});
+      if(res.error){
+        session.messages.push({role:'assistant',content:res.error,ts:nowISO()});
+      } else if(!res.results || !res.results.length){
+        session.messages.push({role:'assistant',content:'No web results came back for that search.',ts:nowISO()});
+      } else {
+        const body = res.results.map((r,i)=>(i+1)+'. '+r.title+'\n'+r.link+'\n'+r.snippet).join('\n\n');
+        session.messages.push({
+          role:'assistant',
+          content:'Web search results for "'+lastUser.content+'":\n\n'+body,
+          html:renderSearchResultsHtml(lastUser.content,res.results),
+          ts:nowISO(),
+        });
+      }
+    }
+  }catch(err){
+    session.messages.push({role:'assistant',content:'That action could not be completed. '+(err.message||'Please try again.'),ts:nowISO()});
+  }finally{
+    removeThinking();
+    quickToolBusy = false;
+    buttons.forEach(button=>{
+      button.disabled = false;
+      button.setAttribute('aria-busy','false');
+      button.classList.remove('is-loading');
+      if(button.dataset.idleLabel){
+        button.textContent = button.dataset.idleLabel;
+        delete button.dataset.idleLabel;
+      }
+    });
+  }
+  saveServerState();
+  if(!movedToFlashcards && currentSessionId===session.id) renderChat();
 }
 
 /* ============ SPEECH ============ */
@@ -1035,14 +1123,22 @@ function pollLocalModelStatus(){
 
 /* ============ INIT ============ */
 (async function init(){
-  await loadServerState();
-  applyUiPrefs();
-  applyGenPrefs();
-  loadModelList();
-  updateStatusPill();
-  renderAccountUI();
-  renderSessionList();
-  renderChat();
-  pollLocalModelStatus();
+  try{
+    await loadServerState();
+    applyUiPrefs();
+    applyGenPrefs();
+    loadModelList();
+    updateStatusPill();
+    renderAccountUI();
+    renderSessionList();
+    renderChat();
+    pollLocalModelStatus();
+  }catch(err){
+    const inner = document.getElementById('chat-inner');
+    inner.setAttribute('aria-busy','false');
+    inner.innerHTML = '<div class="init-error"><h1>Could not load your workspace.</h1><p>Check your connection and try again.</p><button class="btn primary" id="retryWorkspaceBtn" type="button">Try again</button></div>';
+    document.getElementById('retryWorkspaceBtn').addEventListener('click',()=>window.location.reload());
+    document.getElementById('composerHint').textContent = 'Zariya could not connect to the server.';
+  }
 })();
 })();

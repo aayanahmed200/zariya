@@ -84,8 +84,14 @@ Settings
 
 <!-- CHAT VIEW -->
 <section class="view active" id="view-chat">
-<div id="chat-scroll">
-<div id="chat-inner"></div>
+<div id="chat-scroll" class="empty-mode">
+<div id="chat-inner" class="empty-mode" aria-live="polite" aria-busy="true">
+  <div class="chat-loading" role="status" aria-label="Loading your workspace">
+    <span class="loading-line loading-line-wide"></span>
+    <span class="loading-line loading-line-medium"></span>
+    <div class="loading-skeleton-row"><span></span><span></span><span></span></div>
+  </div>
+</div>
 </div>
 <div class="quick-tools" id="quickTools" style="display:none;">
 <button class="qt-btn" data-tool="summarize">Summarize</button>
@@ -107,7 +113,7 @@ Settings
 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
 </button>
 </div>
-<div class="composer-hint" id="composerHint">Zariya can make mistakes. Offline core runs entirely on this server.</div>
+<div class="composer-hint" id="composerHint">Enter to send · Shift + Enter for a line break. Replies can be imperfect.</div>
 </div>
 </div>
 </section>
