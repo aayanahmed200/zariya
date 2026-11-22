@@ -50,8 +50,8 @@ let activeGeneration = null;
 let generationSequence = 0;
 let serverConfig = {
   hostedMode:false, aiConfigured:false, aiAvailable:false,
-  aiProvider:'Vercel AI Gateway', aiStatus:'Checking hosted AI…',
-  aiModel:'nvidia/nemotron-3.5-lightning-free',
+  aiProvider:'Kilo AI Gateway', aiStatus:'Checking hosted AI…',
+  aiModel:'kilo-auto/free',
   searchConfigured:false, githubConfigured:false,
   supabaseConfigured:false, storageMode:'browser'
 };
@@ -374,9 +374,9 @@ function mergeWorkspaceState(remote, cached){
 async function loadServerState(){
   const results = await Promise.allSettled([apiGet('/api/config'), apiGet('/api/me')]);
   serverConfig = results[0].status === 'fulfilled' ? results[0].value : {
-    hostedMode:true, aiConfigured:false, aiAvailable:false, aiProvider:'Vercel AI Gateway',
+    hostedMode:true, aiConfigured:false, aiAvailable:false, aiProvider:'Kilo AI Gateway',
     aiStatus:'The app server could not be reached. Refresh to retry.',
-    aiModel:'nvidia/nemotron-3.5-lightning-free', searchConfigured:false, githubConfigured:false,
+    aiModel:'kilo-auto/free', searchConfigured:false, githubConfigured:false,
     supabaseConfigured:false, storageMode:'browser'
   };
   me = results[1].status === 'fulfilled' ? results[1].value : { signedIn:false, githubConfigured:false };
@@ -561,16 +561,16 @@ function updateStatusPill(){
   const text=document.getElementById('statusText');
   if(serverConfig.aiAvailable){
     dot.classList.remove('off');
-    text.textContent='AI ready';
+    text.textContent='Free AI';
   }else{
     dot.classList.add('off');
-    text.textContent='Knowledge mode';
+    text.textContent='AI unavailable';
   }
   const hint=document.getElementById('composerHint');
   if(hint && !isGenerating){
     hint.textContent=serverConfig.aiAvailable
-      ? 'Hosted open model · no installation or personal API key needed. Replies can still be wrong.'
-      : 'Hosted AI is temporarily unavailable. Basic built-in knowledge remains available.';
+      ? 'Free hosted AI · no install, account, or personal API key. Shared usage limits apply.'
+      : 'Free AI is temporarily unavailable. Your saved chats are still here; try again shortly.';
   }
 }
 function renderAccountUI(){
@@ -613,8 +613,8 @@ function renderAccountUI(){
   if(modelName) modelName.textContent=serverConfig.aiModel || 'Hosted open model';
   const providerNote=document.getElementById('aiProviderNote');
   if(providerNote) providerNote.textContent=serverConfig.aiAvailable
-    ? 'Connected through Vercel AI Gateway. Nothing to install and no personal API key is needed.'
-    : 'The hosted model is not reachable right now. Zariya will use its limited built-in knowledge mode until the service is available.';
+    ? 'Connected to Kilo’s anonymous free-model pool. No account or personal API key is needed; shared limits apply.'
+    : 'The free model pool is not responding right now. Zariya will show a clear service error rather than invent an AI answer.';
   const statusMark=document.getElementById('aiStatusMark');
   if(statusMark) statusMark.style.background=serverConfig.aiAvailable ? 'var(--success)' : 'var(--muted)';
 
@@ -981,7 +981,9 @@ async function respondTo(session){
   showThinking();
   let reply='';
   let bubbleEl=null;
+  let streamError='';
   const handleStreamPayload = payload=>{
+    if(payload.error){ streamError=String(payload.error); return; }
     if(generation.stopped) return;
     if(payload.reset){
       reply='';
@@ -1020,7 +1022,7 @@ async function respondTo(session){
     if(!res.ok || !res.body){
       let data={};
       try{ data=await res.json(); }catch(error){}
-      throw new Error(data.error || 'The hosted chat service returned an error.');
+      throw new Error(data.error || 'The free AI service returned an error.');
     }
     const reader=res.body.getReader();
     const decoder=new TextDecoder();
@@ -1033,6 +1035,7 @@ async function respondTo(session){
     }
     buffer+=decoder.decode();
     window.ZariyaSSE.consume(buffer,handleStreamPayload,true);
+    if(streamError) throw new Error(streamError);
   }catch(error){
     if(error.name==='AbortError' || generation.stopped){
       if(generation.stopped && generation.reply.trim() && !generation.partialSaved){
@@ -1051,7 +1054,9 @@ async function respondTo(session){
     if(reply.trim()){
       reply += '\n\n---\n\n*The connection stopped before the full answer arrived. This is the partial response received so far.*';
     }else{
-      reply='Could not reach hosted AI right now: '+(error.message || 'Please try again.');
+      reply='Free AI is temporarily unavailable: '+(error.message || 'Please try again shortly.');
+      const hint=document.getElementById('composerHint');
+      if(hint) hint.textContent='Free AI is busy or unavailable. Your message is saved; try again shortly.';
     }
   }
   if(generation.stopped) return;

@@ -439,28 +439,17 @@ def chat():
             oidc_token=_gateway_oidc_token(),
         )
     except hosted_model.GatewayError as exc:
-        app.logger.info("Hosted AI request fell back to knowledge mode: %s", exc)
-        reply = None
-    used_model = bool(reply)
-    if reply is None:
-        try:
-            reply = kb_engine.offline_reply(messages)
-        except Exception:
-            app.logger.exception("offline_reply crashed")
-            reply = (
-                "I couldn't answer that from the built-in knowledge base. "
-                "Hosted AI is temporarily unavailable; please try again later."
-            )
+        app.logger.warning("Hosted AI request failed: %s", exc)
+        return jsonify({"error": str(exc), "provider": "unavailable"}), 503
 
-    if used_model:
-        last_user = next((m for m in reversed(messages) if m["role"] == "user"), None)
-        if last_user and last_user.get("content", "").strip():
-            kb_engine.remember_answer(last_user["content"], reply)
+    last_user = next((m for m in reversed(messages) if m["role"] == "user"), None)
+    if last_user and last_user.get("content", "").strip():
+        kb_engine.remember_answer(last_user["content"], reply)
 
     return jsonify({
         "reply": reply,
-        "usedModel": used_model,
-        "provider": "ai_gateway" if used_model else "knowledge",
+        "usedModel": True,
+        "provider": "hosted",
     })
 
 
@@ -470,7 +459,7 @@ def _sse(data):
 
 @app.route("/api/chat/stream", methods=["POST"])
 def chat_stream():
-    """Stream hosted open-model output or fall back to the built-in knowledge engine."""
+    """Stream hosted model output or send a clear provider error to the client."""
     body = request.get_json(silent=True) or {}
     messages, err, err_status = _normalize_messages(body.get("messages"))
     if err:
@@ -478,52 +467,36 @@ def chat_stream():
     system_prompt, temperature = _generation_params(body)
 
     def generate():
-        used_model = False
-        full_reply = None
         collected = []
+        try:
+            for part in hosted_model.stream_reply(
+                messages,
+                system_prompt,
+                temperature,
+                oidc_token=_gateway_oidc_token(),
+            ):
+                collected.append(part)
+                yield _sse({"delta": part})
+        except hosted_model.GatewayError as exc:
+            app.logger.warning("Hosted AI stream failed: %s", exc)
+            if collected:
+                yield _sse({"reset": True})
+            yield _sse({"error": str(exc), "provider": "unavailable"})
+            return
 
-        oidc_token = _gateway_oidc_token()
-        if hosted_model.connection_status(oidc_token=oidc_token)["available"]:
-            try:
-                for token in hosted_model.stream_reply(
-                    messages,
-                    system_prompt,
-                    temperature,
-                    oidc_token=oidc_token,
-                ):
-                    collected.append(token)
-                    yield _sse({"delta": token})
-                if collected:
-                    full_reply = "".join(collected)
-                    used_model = True
-            except hosted_model.GatewayError as exc:
-                app.logger.info("Hosted AI stream fell back to knowledge mode: %s", exc)
-                if collected:
-                    collected.clear()
-                    yield _sse({"reset": True})
-                yield _sse({"notice": str(exc)})
+        full_reply = "".join(collected).strip()
+        if not full_reply:
+            yield _sse({
+                "error": "The free model returned an empty response. Please try again.",
+                "provider": "unavailable",
+            })
+            return
 
-        if full_reply is None:
-            try:
-                full_reply = kb_engine.offline_reply(messages)
-            except Exception:
-                app.logger.exception("offline_reply crashed")
-                full_reply = (
-                    "I couldn't answer that from the built-in knowledge base. "
-                    "Hosted AI is temporarily unavailable; please try again later."
-                )
-            yield _sse({"delta": full_reply})
+        last_user = next((m for m in reversed(messages) if m["role"] == "user"), None)
+        if last_user and last_user.get("content", "").strip():
+            kb_engine.remember_answer(last_user["content"], full_reply)
 
-        if used_model and full_reply:
-            last_user = next((m for m in reversed(messages) if m["role"] == "user"), None)
-            if last_user and last_user.get("content", "").strip():
-                kb_engine.remember_answer(last_user["content"], full_reply)
-
-        yield _sse({
-            "done": True,
-            "usedModel": used_model,
-            "provider": "ai_gateway" if used_model else "knowledge",
-        })
+        yield _sse({"done": True, "usedModel": True, "provider": "hosted"})
 
     return Response(
         stream_with_context(generate()),
