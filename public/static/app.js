@@ -34,13 +34,23 @@ let serverConfig = {
 };
 function isPureUrdu(text){
   const value = String(text || '');
-  return /[\u0600-\u06FF]/.test(value) && !/[A-Za-z]/.test(value);
+  return /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/.test(value) && !/[A-Za-z]/.test(value);
 }
 let me = { signedIn:false };
 
 function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,8); }
 function nowISO(){ return new Date().toLocaleString([], {month:'short', day:'numeric', hour:'2-digit', minute:'2-digit'}); }
-function isUrdu(text){ return /[\u0600-\u06FF]/.test(text||''); }
+function isUrdu(text){ return /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/.test(String(text||'')); }
+function syncUrduInput(element){
+  if(!element) return;
+  const hasUrdu=isUrdu(element.value);
+  element.classList.toggle('input-urdu',hasUrdu);
+  element.dir=isPureUrdu(element.value)?'rtl':'auto';
+}
+function wrapUrduRuns(value){
+  const arabicRun=/[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]+(?:[\s\u200C\u200D،؛؟۔٪٫٬]+[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]+)*/g;
+  return String(value??'').replace(arabicRun,run=>'<span class="urdu-run" lang="ur" dir="rtl">'+run+'</span>');
+}
 function escapeHtml(value){
   return String(value ?? '').replace(/[&<>"']/g, c=>({
     '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
@@ -56,13 +66,14 @@ function formatInline(value){
   };
   text = text.replace(/\x60([^\x60\n]+)\x60/g, (match, code)=>hold('<code>'+escapeHtml(code)+'</code>'));
   text = text.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, (match, label, url)=>{
-    return hold('<a href="'+escapeHtml(url)+'" target="_blank" rel="noopener noreferrer">'+escapeHtml(label)+'</a>');
+    return hold('<a href="'+escapeHtml(url)+'" target="_blank" rel="noopener noreferrer">'+wrapUrduRuns(escapeHtml(label))+'</a>');
   });
   text = escapeHtml(text);
   text = text.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>');
   text = text.replace(/~~(.+?)~~/g,'<del>$1</del>');
   text = text.replace(/(^|[^\w*])\*([^*\n]+)\*(?!\*)/g,'$1<em>$2</em>');
   text = text.replace(/(^|[^\w_])_([^_\n]+)_(?!\w)/g,'$1<em>$2</em>');
+  text = wrapUrduRuns(text);
   text = text.replace(/\n/g,'<br>');
   text = text.replace(/\u0000(\d+)\u0000/g, (match, index)=>protectedHtml[Number(index)] || '');
   return text;
@@ -70,14 +81,14 @@ function formatInline(value){
 function renderSearchResultsHtml(query, results){
   const heading = formatInline('**Web search results for "'+query+'"**');
   const cards = results.map(result=>{
-    const title = escapeHtml(result.title || result.link || 'Untitled result');
+    const title = wrapUrduRuns(escapeHtml(result.title || result.link || 'Untitled result'));
     const rawUrl = String(result.link || '');
     let safeUrl = '';
     try{
       const parsed = new URL(rawUrl);
       if(parsed.protocol==='http:' || parsed.protocol==='https:') safeUrl = escapeHtml(rawUrl);
     }catch(error){}
-    const snippet = escapeHtml(result.snippet || '');
+    const snippet = wrapUrduRuns(escapeHtml(result.snippet || ''));
     return '<div class="search-result">'
       +(safeUrl?'<a class="sr-title" href="'+safeUrl+'" target="_blank" rel="noopener noreferrer">'+title+'</a>':'<span class="sr-title">'+title+'</span>')
       +'<div class="sr-url">'+safeUrl+'</div>'
@@ -748,7 +759,13 @@ const sendBtn = document.getElementById('sendBtn');
 const SEND_ICON = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M12 19V5M5 12l7-7 7 7"/></svg>';
 const STOP_ICON = '<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><rect x="5" y="5" width="14" height="14" rx="2"/></svg>';
 function syncSendState(){ if(isGenerating) return; sendBtn.disabled = input.value.trim().length===0 || shouldListen; }
-input.addEventListener('input', ()=>{ input.style.height='auto'; input.style.height=Math.min(input.scrollHeight,160)+'px'; syncSendState(); });
+input.addEventListener('input', ()=>{
+  syncUrduInput(input);
+  input.style.height='auto';
+  input.style.height=Math.min(input.scrollHeight,160)+'px';
+  syncSendState();
+});
+syncUrduInput(input);
 input.addEventListener('keydown', (e)=>{ if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); if(!sendBtn.disabled) sendMessage(); } });
 sendBtn.addEventListener('click', ()=>{ if(sendBtn.dataset.mode==='stop'){ stopGenerating(); } else if(!sendBtn.disabled){ sendMessage(); } });
 syncSendState();
@@ -1300,7 +1317,7 @@ async function stopVoiceRecognition(){
     if(!transcript) throw new Error('No speech was detected. Try speaking a little closer to the microphone.');
     const existing=input.value.trim();
     input.value=existing?existing+'\n'+transcript:transcript;
-    input.classList.toggle('input-urdu',isUrdu(transcript)&&!/[A-Za-z]/.test(transcript));
+    syncUrduInput(input);
     input.style.height='auto';
     input.style.height=Math.min(input.scrollHeight,160)+'px';
     syncSendState();
@@ -1357,6 +1374,9 @@ function syncNoteEditorState(){
     document.getElementById('note-body-input').value='';
     document.getElementById('note-tags-input').value='';
   }
+  syncUrduInput(document.getElementById('note-title-input'));
+  syncUrduInput(document.getElementById('note-body-input'));
+  syncUrduInput(document.getElementById('note-tags-input'));
 }
 function renderNotesList(){
   const wrap = document.getElementById('notesList'); wrap.innerHTML='';
@@ -1368,7 +1388,7 @@ function renderNotesList(){
   visibleNotes.forEach(n=>{
     const div = document.createElement('div');
     div.className = 'note-card'+(n.id===currentNoteId?' active':'');
-    div.innerHTML = '<div class="note-card-title">'+escapeHtml(n.title||'Untitled')+'</div><div class="note-card-preview">'+escapeHtml((n.body||'').slice(0,60))+'</div>'+((n.tags&&n.tags.length)?'<div class="note-card-tags">'+n.tags.map(t=>'<span>'+escapeHtml(t)+'</span>').join('')+'</div>':'');
+    div.innerHTML = '<div class="note-card-title" dir="auto">'+wrapUrduRuns(escapeHtml(n.title||'Untitled'))+'</div><div class="note-card-preview" dir="auto">'+wrapUrduRuns(escapeHtml((n.body||'').slice(0,60)))+'</div>'+((n.tags&&n.tags.length)?'<div class="note-card-tags">'+n.tags.map(t=>'<span>'+wrapUrduRuns(escapeHtml(t))+'</span>').join('')+'</div>':'');
     div.addEventListener('click', ()=>openNote(n.id));
     wrap.appendChild(div);
   });
@@ -1405,7 +1425,10 @@ function openNote(id){
   if(changed) setNoteSaveStatus('Saved on this device');
   document.getElementById('note-title-input').value = n? n.title : '';
   document.getElementById('note-body-input').value = n? n.body : '';
-  document.getElementById('note-tags-input').value = n && n.tags ? n.tags.join(', ') : '';  
+  document.getElementById('note-tags-input').value = n && n.tags ? n.tags.join(', ') : '';
+  syncUrduInput(document.getElementById('note-title-input'));
+  syncUrduInput(document.getElementById('note-body-input'));
+  syncUrduInput(document.getElementById('note-tags-input'));
   renderNotesList();
 }
 document.getElementById('newNoteBtn').addEventListener('click', ()=>{
@@ -1432,6 +1455,7 @@ document.getElementById('deleteNoteBtn').addEventListener('click', ()=>{
 });
 let noteTitleSaveTimer, noteBodySaveTimer;
 document.getElementById('note-title-input').addEventListener('input', ()=>{
+  syncUrduInput(document.getElementById('note-title-input'));
   setNoteSaveStatus('Unsaved changes');
   clearTimeout(noteTitleSaveTimer);
   noteTitleSaveTimer = setTimeout(()=>{
@@ -1445,6 +1469,7 @@ document.getElementById('note-title-input').addEventListener('input', ()=>{
   },400);
 });
 document.getElementById('note-body-input').addEventListener('input', ()=>{
+  syncUrduInput(document.getElementById('note-body-input'));
   updateNoteActionState();
   setNoteSaveStatus('Unsaved changes');
   clearTimeout(noteBodySaveTimer);
@@ -1465,6 +1490,7 @@ document.getElementById('exportNoteBtn').addEventListener('click', ()=>{
 });
   let noteTagsSaveTimer;
   document.getElementById('note-tags-input').addEventListener('input', ()=>{
+      syncUrduInput(document.getElementById('note-tags-input'));
       setNoteSaveStatus('Unsaved changes');
       clearTimeout(noteTagsSaveTimer);
       noteTagsSaveTimer = setTimeout(()=>{
