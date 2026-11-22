@@ -803,3 +803,16 @@ def test_quiz_options_lock_after_answer_and_show_accessible_feedback():
     assert "Your answer, correct" in source
     assert "Your answer, incorrect" in source
     assert "quiz-feedback.correct" in (ROOT / "webapp" / "static" / "style.css").read_text(encoding="utf-8")
+
+
+def test_response_style_dropdown_is_accessible_and_preserves_custom_instructions():
+    html = (ROOT / "webapp" / "templates" / "index.html").read_text(encoding="utf-8")
+    source = (ROOT / "webapp" / "static" / "app.js").read_text(encoding="utf-8")
+    assert 'aria-haspopup="listbox"' in html
+    for preset in ("balanced", "concise", "steps", "detailed"):
+        assert f'data-response-style="{preset}"' in html
+    assert "responseStylePresets" in source
+    assert "systemPrompt:[responseStylePresets[genPrefs.responseStyle||'balanced']?.instruction,genPrefs.persona].filter(Boolean).join" in source
+    assert "genPrefs.persona='';" in source
+    assert "genPrefs={persona:'', temperature:0.5}" not in source
+    assert "responsePresetOptions[(index+direction+responsePresetOptions.length)%responsePresetOptions.length].focus();" in source
