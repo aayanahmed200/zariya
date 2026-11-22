@@ -687,6 +687,9 @@ def test_microphone_uses_recorded_wav_and_custom_accessible_language_dropdown():
     assert "function encodeWav(samples,sampleRate)" in source
     assert "fetch('/api/transcribe'" in source
     assert "SpeechRecognition" not in source
+    capture = source[source.index("async function startVoiceRecognition()"):source.index("async function stopVoiceRecognition()")]
+    assert capture.index("await recordingContext.resume();") < capture.index("navigator.mediaDevices.getUserMedia")
+    assert "Transcript ready. Review it, then press send." in source
 
 
 def test_urdu_uses_readable_markazi_text_and_transcription_cost_is_disclosed():
