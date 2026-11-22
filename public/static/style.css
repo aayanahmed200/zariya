@@ -1020,3 +1020,17 @@ button:disabled,.btn:disabled,.qt-btn:disabled,.deck-action-btn:disabled{cursor:
   line-height:1.85;
 }
 .note-card-title .urdu-run,.note-card-preview .urdu-run{font-size:1.06em}
+
+
+
+/* Clear quiz answer states and feedback */
+.quiz-option:active:not(:disabled){background:var(--accent-soft);border-color:var(--accent);color:var(--accent-strong)}
+.quiz-option:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.quiz-option:disabled{opacity:1;cursor:default;transform:none}
+.quiz-option.correct{background:color-mix(in srgb,var(--success) 10%,var(--surface));border-color:var(--success);color:var(--success);box-shadow:inset 3px 0 0 var(--success)}
+.quiz-option.wrong{background:color-mix(in srgb,var(--danger) 8%,var(--surface));border-color:var(--danger);color:var(--danger);box-shadow:inset 3px 0 0 var(--danger)}
+.quiz-feedback{display:none;margin:0 0 14px;padding:10px 12px;border:1px solid var(--border);border-radius:9px;background:var(--surface-soft);color:var(--text-soft);font-size:12px;line-height:1.7}
+.quiz-feedback.correct,.quiz-feedback.wrong{display:block}
+.quiz-feedback.correct{border-color:var(--success);background:color-mix(in srgb,var(--success) 8%,var(--surface));color:var(--success)}
+.quiz-feedback.wrong{border-color:var(--danger);background:color-mix(in srgb,var(--danger) 7%,var(--surface));color:var(--danger)}
+.quiz-feedback .urdu-run{font-size:1.1em}
