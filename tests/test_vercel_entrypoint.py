@@ -716,9 +716,9 @@ def test_github_sign_in_is_visible_with_setup_instructions_when_not_configured()
 
 def test_github_login_uses_canonical_callback_and_signed_oauth_state(monkeypatch):
     from webapp import app as webapp_module
-    webapp_module.GITHUB_OAUTH_CONFIGURED = True
-    webapp_module.GITHUB_CLIENT_ID = "test-client-id"
-    webapp_module.APP_BASE_URL = "https://zariyas.vercel.app"
+    monkeypatch.setattr(webapp_module, "GITHUB_OAUTH_CONFIGURED", True)
+    monkeypatch.setattr(webapp_module, "GITHUB_CLIENT_ID", "test-client-id")
+    monkeypatch.setattr(webapp_module, "APP_BASE_URL", "https://zariyas.vercel.app")
     client = index.app.test_client()
     response = client.get("/auth/github/login")
     assert response.status_code == 302
@@ -727,9 +727,6 @@ def test_github_login_uses_canonical_callback_and_signed_oauth_state(monkeypatch
     assert query["client_id"] == ["test-client-id"]
     assert query["redirect_uri"] == ["https://zariyas.vercel.app/auth/github/callback"]
     assert len(query["state"][0]) >= 32
-    # Restore values so other tests see the usual unconfigured test environment.
-    webapp_module.GITHUB_OAUTH_CONFIGURED = False
-    webapp_module.GITHUB_CLIENT_ID = ""
 
 
 def test_github_callback_rejects_missing_or_wrong_state():
