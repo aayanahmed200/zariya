@@ -31,7 +31,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Lora:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=Noto+Nastaliq+Urdu:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/static/style.css?v=20261121-6">
+<link rel="stylesheet" href="/static/style.css?v=20261122-1">
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
@@ -124,7 +124,7 @@
         <span class="topbar-section" id="topbarSection">Chat</span>
       </div>
       <div class="topbar-right">
-        <span class="status-pill"><span class="status-dot off" id="statusDot"></span><span id="statusText">Checking Ollama</span></span>
+        <span class="status-pill" role="status" aria-live="polite" title="Hosted model status"><span class="status-dot off" id="statusDot"></span><span id="statusText">Checking hosted AI…</span></span>
         <button class="topbar-settings" type="button" data-view="settings" aria-label="Open settings" title="Settings">
           <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1-1.8 1.8-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5v.2h-2.6v-.2a1.7 1.7 0 0 0-1-1.5 1.7 1.7 0 0 0-1.9.3l-.1.1-1.8-1.8.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H4v-2.6h.2a1.7 1.7 0 0 0 1.5-1 1.7 1.7 0 0 0-.3-1.9l-.1-.1 1.8-1.8.1.1a1.7 1.7 0 0 0 1.9.3 1.7 1.7 0 0 0 1-1.5V4h2.6v.2a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1 1.8 1.8-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.5 1h.2v2.6h-.2a1.7 1.7 0 0 0-1.5 1Z"/></svg>
         </button>
@@ -201,17 +201,25 @@
           <div class="tag-filter-row" id="noteTagFilterRow"></div>
           <div class="notes-list" id="notesList"></div>
         </div>
-        <div class="note-editor">
+        <div class="note-editor is-empty">
           <div class="note-toolbar">
             <span class="note-editor-label">EDITOR</span>
             <div class="note-toolbar-actions">
-              <button class="btn" id="noteToFlashBtn" type="button">Turn into flashcards</button>
-              <button class="btn danger" id="deleteNoteBtn" type="button">Delete</button>
+              <button class="btn" id="noteToFlashBtn" type="button" disabled>Turn into flashcards</button>
+              <button class="btn danger" id="deleteNoteBtn" type="button" disabled>Delete</button>
             </div>
           </div>
-          <input id="note-title-input" placeholder="Untitled note" aria-label="Note title">
-          <input id="note-tags-input" class="tag-input" placeholder="Add tags, separated by commas" aria-label="Note tags">
-          <textarea id="note-body-input" placeholder="Start writing here…"></textarea>
+          <div class="note-editor-empty" id="noteEmptyState">
+            <span class="note-empty-mark" aria-hidden="true">✎</span>
+            <h3>Your notes start here</h3>
+            <p>Create a note to collect ideas, class notes and things you want to remember.</p>
+            <button class="btn primary" id="createFirstNoteBtn" type="button">Create your first note</button>
+          </div>
+          <div class="note-editor-fields" id="noteEditorFields" hidden>
+            <input id="note-title-input" placeholder="Untitled note" aria-label="Note title">
+            <input id="note-tags-input" class="tag-input" placeholder="Add tags, separated by commas" aria-label="Note tags">
+            <textarea id="note-body-input" placeholder="Start writing here…"></textarea>
+          </div>
         </div>
       </div>
     </section>
@@ -242,7 +250,7 @@
         <div>
           <div class="page-eyebrow">MAKE IT YOURS</div>
           <h2>Settings</h2>
-          <p>Choose how Zariya connects and how it feels to use.</p>
+          <p>Adjust your workspace, replies and voice tools.</p>
         </div>
       </div>
       <div id="settings-body">
@@ -380,7 +388,7 @@
               <div><h3>About Zariya</h3><p class="desc">An Urdu and English workspace for questions, notes and learning.</p></div>
             </div>
             <div class="setting-content about-copy">
-              Zariya works with Ollama when a model endpoint is connected. Without a connection, a small built-in knowledge base can still handle supported lookups, translations and calculations. It is not a general-purpose language model.
+              Zariya connects to a hosted open model through Vercel AI Gateway, so you can start chatting without installing software or adding a personal API key. When the hosted service is unavailable, the app falls back to a smaller built-in knowledge mode. Your chats, notes and flashcards are stored in this browser.
             </div>
           </div>
         </div>
@@ -404,7 +412,7 @@
   </form>
 </dialog>
 </div>
-<script src="/static/sse.js?v=20261121-6"></script>
-<script src="/static/app.js?v=20261121-6"></script>
+<script src="/static/sse.js?v=20261122-1"></script>
+<script src="/static/app.js?v=20261122-1"></script>
 </body>
 </html>
