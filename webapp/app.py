@@ -166,25 +166,38 @@ def _generation_params(body):
 @app.route("/auth/github/login")
 def github_login():
     if not GITHUB_OAUTH_CONFIGURED:
-        return jsonify({"error": "GitHub OAuth isn't configured on this server yet. "
-                                  "Set GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET in .env."}), 400
-    state = secrets.token_urlsafe(16)
+        return redirect("/?" + urlencode({
+            "authError": "GitHub sign-in is not connected yet. Open Settings → Account & storage for the one-time setup."
+        }))
+    state = secrets.token_urlsafe(32)
+    session.permanent = True
     session["oauth_state"] = state
     redirect_uri = f"{APP_BASE_URL}/auth/github/callback"
-    authorize_url = (
-        "https://github.com/login/oauth/authorize"
-        f"?client_id={GITHUB_CLIENT_ID}&redirect_uri={redirect_uri}"
-        f"&scope=read:user&state={state}"
-    )
+    authorize_url = "https://github.com/login/oauth/authorize?" + urlencode({
+        "client_id": GITHUB_CLIENT_ID,
+        "redirect_uri": redirect_uri,
+        "scope": "read:user",
+        "state": state,
+    })
     return redirect(authorize_url)
 
 @app.route("/auth/github/callback")
 def github_callback():
-    if request.args.get("state") != session.get("oauth_state"):
-        return jsonify({"error": "State mismatch -- possible CSRF, or your session expired. Try signing in again."}), 400
+    expected_state = session.pop("oauth_state", None)
+    returned_state = request.args.get("state", "")
+    if not expected_state or not secrets.compare_digest(returned_state, expected_state):
+        return redirect("/?" + urlencode({
+            "authError": "GitHub sign-in expired or could not be verified. Please start again from Settings."
+        }))
+    if request.args.get("error"):
+        return redirect("/?" + urlencode({
+            "authError": "GitHub sign-in was cancelled. You can try again from Settings."
+        }))
     code = request.args.get("code")
     if not code:
-        return jsonify({"error": "GitHub didn't return an authorization code."}), 400
+        return redirect("/?" + urlencode({
+            "authError": "GitHub did not return an authorization code. Please try again."
+        }))
 
     try:
         token_res = requests.post(
@@ -220,8 +233,14 @@ def github_callback():
         app.logger.warning("GitHub profile fetch failed: %s", e)
         return redirect("/?" + urlencode({"authError": "GitHub sign-in failed while fetching your profile. Please try again."}))
 
-    session["github_login"] = profile.get("login")
-    session["github_name"] = profile.get("name") or profile.get("login")
+    login = profile.get("login")
+    if not isinstance(login, str) or not login.strip():
+        return redirect("/?" + urlencode({
+            "authError": "GitHub did not return a usable account profile. Please try again."
+        }))
+    session.permanent = True
+    session["github_login"] = login
+    session["github_name"] = profile.get("name") or login
     session["github_avatar"] = profile.get("avatar_url")
     session["github_bio"] = profile.get("bio") or ""
     return redirect("/")
