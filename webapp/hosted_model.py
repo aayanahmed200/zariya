@@ -7,6 +7,7 @@ limits still apply. No browser credential is ever exposed.
 """
 from __future__ import annotations
 
+import base64
 import json
 import os
 from collections.abc import Iterator
@@ -241,6 +242,65 @@ def stream_reply(
                 content = delta.get("content") if isinstance(delta, dict) else None
                 if isinstance(content, str) and content:
                     yield content
+    except GatewayError:
+        raise
+    except (requests.RequestException, ValueError, TypeError) as exc:
+        raise GatewayError(_request_error(exc)) from exc
+
+
+def transcribe_audio(
+    audio_bytes: bytes,
+    media_type: str = "audio/wav",
+    language: str | None = None,
+    oidc_token: str | None = None,
+) -> dict:
+    """Transcribe a short browser-recorded WAV through Vercel AI Gateway."""
+    token = _token(oidc_token)
+    if not token:
+        raise GatewayError(
+            "Hosted transcription is not connected on this deployment. Please try again later."
+        )
+    if not isinstance(audio_bytes, bytes) or not audio_bytes:
+        raise GatewayError("No microphone audio was received. Please record again.")
+    if len(audio_bytes) > 2_500_000:
+        raise GatewayError("That recording is too large. Keep voice notes under 60 seconds.")
+    if media_type != "audio/wav":
+        raise GatewayError("The recording format was not supported. Please record again.")
+
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+        "ai-gateway-protocol-version": "0.0.1",
+        "ai-transcription-model-specification-version": "4",
+        "ai-model-id": "microsoft/mai-transcribe-2",
+        "HTTP-Referer": "https://zariyas.vercel.app/",
+        "X-Title": "Zariya",
+    }
+    payload = {
+        "audio": base64.b64encode(audio_bytes).decode("ascii"),
+        "mediaType": media_type,
+    }
+    if language in ("en", "ur"):
+        payload["providerOptions"] = {"azure": {"locales": [language], "transcribeStyle": "clean"}}
+
+    try:
+        response = requests.post(
+            "https://ai-gateway.vercel.sh/v4/ai/transcription-model",
+            headers=headers,
+            json=payload,
+            timeout=(10, 75),
+        )
+        _raise_for_status(response)
+        data = response.json()
+        transcript = data.get("text") if isinstance(data, dict) else None
+        if not isinstance(transcript, str) or not transcript.strip():
+            raise GatewayError("No clear speech was detected. Try speaking a little closer to the microphone.")
+        return {
+            "text": transcript.strip(),
+            "language": data.get("language"),
+            "durationInSeconds": data.get("durationInSeconds"),
+        }
     except GatewayError:
         raise
     except (requests.RequestException, ValueError, TypeError) as exc:
