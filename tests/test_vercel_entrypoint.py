@@ -580,3 +580,24 @@ def test_hosted_ai_copy_has_no_leftover_ollama_instructions():
     assert "Checking hosted AI" in html
     assert "works with Ollama" not in html
     assert "Checking Ollama" not in html
+
+
+def test_workspace_toggles_and_mobile_navigation_expose_accessible_state():
+    html = (ROOT / "webapp" / "templates" / "index.html").read_text(encoding="utf-8")
+    source = (ROOT / "webapp" / "static" / "app.js").read_text(encoding="utf-8")
+    assert 'aria-expanded="false" aria-controls="sidebar"' in html
+    assert 'aria-pressed="true">Light' in html
+    assert "timestampsToggle.setAttribute('aria-pressed'" in source
+    assert "ttsToggle.setAttribute('aria-pressed'" in source
+    assert "setAttribute('aria-expanded','true')" in source
+    assert "setAttribute('aria-expanded','false')" in source
+
+
+def test_note_editor_displays_automatic_save_feedback():
+    html = (ROOT / "webapp" / "templates" / "index.html").read_text(encoding="utf-8")
+    source = (ROOT / "webapp" / "static" / "app.js").read_text(encoding="utf-8")
+    assert 'id="noteSaveStatus"' in html
+    assert "function setNoteSaveStatus(message,warning=false)" in source
+    assert "Unsaved changes" in source
+    assert "Saved just now" in source
+    assert "Could not save" in source
