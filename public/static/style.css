@@ -828,7 +828,7 @@ body{direction:ltr;text-align:left;background:var(--bg);color:var(--text)}
   border-radius:9px;
   background:var(--surface-soft);
   color:var(--text-soft);
-  font:600 10px var(--sans);
+  font:600 10px var(--font);
   text-align:center;
   cursor:pointer;
 }
