@@ -1195,12 +1195,13 @@ async function startVoiceRecognition(){
   syncSendState();
   showVoiceHint('Requesting microphone access…');
   try{
+    // Resume the audio context while this click still carries user activation.
+    recordingContext=new AudioContextClass();
+    await recordingContext.resume();
     const stream=await navigator.mediaDevices.getUserMedia({
       audio:{channelCount:1,echoCancellation:true,noiseSuppression:true,autoGainControl:true}
     });
     recordingStream=stream;
-    recordingContext=new AudioContextClass();
-    await recordingContext.resume();
     recordingSampleRate=recordingContext.sampleRate;
     recordingChunks=[];recordingFrames=0;
     recordingSource=recordingContext.createMediaStreamSource(stream);
@@ -1227,6 +1228,10 @@ async function startVoiceRecognition(){
     recordingTimer=setTimeout(()=>stopVoiceRecognition(),MAX_VOICE_SECONDS*1000);
   }catch(error){
     cleanupVoiceCapture();
+    if(recordingContext){
+      try{await recordingContext.close();}catch(closeError){}
+      recordingContext=null;
+    }
     const messages={
       NotAllowedError:'Microphone permission was blocked. Allow microphone access for this site, then try again.',
       SecurityError:'Microphone access requires HTTPS. Open Zariya using its secure website address.',
