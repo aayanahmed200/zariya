@@ -31,7 +31,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Lora:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=Noto+Nastaliq+Urdu:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/static/style.css?v=20261122-1">
+<link rel="stylesheet" href="/static/style.css?v=20261122-2">
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
@@ -116,7 +116,7 @@
   <main id="main">
     <header class="topbar">
       <div class="topbar-left">
-        <button class="hamburger" id="hamburgerBtn" type="button" aria-label="Open navigation">
+        <button class="hamburger" id="hamburgerBtn" type="button" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
         </button>
         <div class="mobile-brand"><img src="/static/logo.png" alt=""><span>zariya</span></div>
@@ -203,7 +203,7 @@
         </div>
         <div class="note-editor is-empty">
           <div class="note-toolbar">
-            <span class="note-editor-label">EDITOR</span>
+            <div class="note-toolbar-left"><span class="note-editor-label">EDITOR</span><span class="note-save-status" id="noteSaveStatus" role="status" aria-live="polite">Saved on this device</span></div>
             <div class="note-toolbar-actions">
               <button class="btn" id="noteToFlashBtn" type="button" disabled>Turn into flashcards</button>
               <button class="btn danger" id="deleteNoteBtn" type="button" disabled>Delete</button>
@@ -294,8 +294,8 @@
               <div class="setting-row">
                 <div><label>Theme</label><div class="sub">Light or dark interface</div></div>
                 <div class="theme-row">
-                  <button class="theme-opt active" type="button" data-theme-opt="light">Light</button>
-                  <button class="theme-opt" type="button" data-theme-opt="dark">Dark</button>
+                  <button class="theme-opt active" type="button" data-theme-opt="light" aria-pressed="true">Light</button>
+                  <button class="theme-opt" type="button" data-theme-opt="dark" aria-pressed="false">Dark</button>
                 </div>
               </div>
               <div class="setting-row">
@@ -412,7 +412,7 @@
   </form>
 </dialog>
 </div>
-<script src="/static/sse.js?v=20261122-1"></script>
-<script src="/static/app.js?v=20261122-1"></script>
+<script src="/static/sse.js?v=20261122-2"></script>
+<script src="/static/app.js?v=20261122-2"></script>
 </body>
 </html>
