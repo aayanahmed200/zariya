@@ -208,7 +208,15 @@ async function apiPost(url, body, signal){
   return readApiResponse(await fetch(url, { method:'POST', headers:{'Content-Type':'application/json','Accept':'application/json'}, body:JSON.stringify(body||{}), signal }));
 }
 
+function updateStorageIndicators(){
+  const synced=!!(serverConfig.supabaseConfigured && stateBackendAvailable && !localStateMessage);
+  const profileName=document.getElementById('sbProfileName');
+  const caption=document.getElementById('storageCaption');
+  if(profileName) profileName.textContent=synced ? 'Cloud workspace' : 'Saved in this browser';
+  if(caption) caption.textContent=synced ? 'Synced to cloud' : 'Stored on this device';
+}
 async function updateStorageStatus(saved=true, message=''){
+  updateStorageIndicators();
   const status=document.getElementById('storageStatus');
   if(!status) return;
   status.classList.toggle('warning',!saved);
