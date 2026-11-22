@@ -1,9 +1,9 @@
-"""Hosted, keyless-by-default inference through Vercel AI Gateway.
+"""Keyless hosted inference through Kilo's anonymous free-model pool.
 
-Vercel deployments use their short-lived VERCEL_OIDC_TOKEN. Local development
-can optionally use AI_GATEWAY_API_KEY. The default model is a $0/token open-
-weight model in the live AI Gateway catalogue; provider capacity and service
-limits still apply. No browser credential is ever exposed.
+Kilo supports unauthenticated requests to free models with shared IP-based
+rate limits. Vercel AI Gateway remains an optional server-side fallback when
+a Vercel OIDC token or server-owned gateway key is available. No visitor
+credential is ever required or exposed.
 """
 from __future__ import annotations
 
@@ -15,10 +15,12 @@ from collections.abc import Iterator
 import requests
 
 GATEWAY_BASE_URL = "https://ai-gateway.vercel.sh/v1"
+KILO_BASE_URL = "https://ai-gateway.kilo.ai/api/v1"
 DEFAULT_MODEL = os.environ.get(
     "AI_GATEWAY_MODEL", "nvidia/nemotron-3.5-lightning-free"
 ).strip()
-MAX_OUTPUT_TOKENS = 1400
+KILO_MODEL = os.environ.get("KILO_AI_MODEL", "kilo-auto/free").strip() or "kilo-auto/free"
+MAX_OUTPUT_TOKENS = 1800
 
 
 class GatewayError(RuntimeError):
@@ -26,9 +28,7 @@ class GatewayError(RuntimeError):
 
 
 def _token(oidc_token: str | None = None) -> str:
-    # At build time Vercel exposes VERCEL_OIDC_TOKEN as an environment
-    # variable. At function runtime it injects the short-lived token into the
-    # incoming request's x-vercel-oidc-token header instead.
+    # Vercel injects its short-lived OIDC token into each function request.
     return (
         (oidc_token or "").strip()
         or os.environ.get("VERCEL_OIDC_TOKEN", "").strip()
@@ -37,23 +37,28 @@ def _token(oidc_token: str | None = None) -> str:
 
 
 def configured(oidc_token: str | None = None) -> bool:
-    return bool(_token(oidc_token))
+    # Kilo's free-model pool explicitly supports anonymous requests.
+    # No account, app secret, or visitor API key is required.
+    return True
 
 
 def connection_status(oidc_token: str | None = None) -> dict:
-    token_present = configured(oidc_token)
-    if token_present:
-        status = "Hosted AI ready · NVIDIA Nemotron 3.5 Lightning Free"
-    elif os.environ.get("VERCEL"):
-        status = "Hosted AI authentication is not available on this deployment."
-    else:
-        status = "Local development has no AI Gateway token; built-in knowledge mode is available."
     return {
-        "configured": token_present,
-        "available": token_present,
-        "status": status,
-        "model": DEFAULT_MODEL,
-        "provider": "Vercel AI Gateway",
+        "configured": True,
+        "available": True,
+        "status": "Free AI enabled · shared anonymous model pool",
+        "model": KILO_MODEL,
+        "provider": "Kilo AI Gateway",
+    }
+
+
+def _kilo_headers(accept: str = "application/json") -> dict[str, str]:
+    # No Authorization header: anonymous free-model requests are supported.
+    return {
+        "Content-Type": "application/json",
+        "Accept": accept,
+        "HTTP-Referer": "https://zariyas.vercel.app/",
+        "X-Title": "Zariya",
     }
 
 
@@ -131,9 +136,10 @@ def _payload(
     system_prompt: str,
     temperature: float | None,
     stream: bool,
+    model: str = DEFAULT_MODEL,
 ) -> dict:
     payload = {
-        "model": DEFAULT_MODEL,
+        "model": model,
         "messages": _build_messages(messages, system_prompt),
         "stream": stream,
         "max_tokens": MAX_OUTPUT_TOKENS,
@@ -169,30 +175,114 @@ def _extract_content(data: dict) -> str | None:
     return None
 
 
+def _kilo_http_error(response: requests.Response) -> str:
+    if response.status_code in (401, 403):
+        return "The free model gateway temporarily refused anonymous access. Please try again later."
+    if response.status_code == 402:
+        return "The selected free model is temporarily unavailable. Please try again later."
+    if response.status_code == 404:
+        return "The free model pool has changed. Please try again later."
+    if response.status_code == 429:
+        return "The shared free-model request limit has been reached. Wait a little, then try again."
+    if response.status_code >= 500:
+        return "The free model service is temporarily unavailable. Please try again."
+    return f"The free model request failed (HTTP {response.status_code}). Please try again."
+
+
+def _kilo_payload(
+    messages: list[dict],
+    system_prompt: str,
+    temperature: float | None,
+    stream: bool,
+) -> dict:
+    return _payload(messages, system_prompt, temperature, stream, model=KILO_MODEL)
+
+
+def _iter_sse_reply(url: str, headers: dict[str, str], payload: dict) -> Iterator[str]:
+    with requests.post(
+        url,
+        headers=headers,
+        json=payload,
+        stream=True,
+        timeout=(12, 75),
+    ) as response:
+        if not response.ok:
+            if url.startswith(KILO_BASE_URL):
+                raise GatewayError(_kilo_http_error(response))
+            _raise_for_status(response)
+        for line in response.iter_lines(decode_unicode=True):
+            if not line:
+                continue
+            if isinstance(line, bytes):
+                line = line.decode("utf-8", errors="replace")
+            line = line.strip()
+            if not line.startswith("data:"):
+                continue
+            data = line[5:].strip()
+            if data == "[DONE]":
+                return
+            try:
+                chunk = json.loads(data)
+            except (ValueError, TypeError):
+                continue
+            if isinstance(chunk, dict) and chunk.get("error"):
+                raise GatewayError("The hosted model could not complete this response. Please try again.")
+            choices = chunk.get("choices", []) if isinstance(chunk, dict) else []
+            if not choices:
+                continue
+            delta = choices[0].get("delta", {})
+            # Never expose separate internal reasoning fields from some models.
+            content = delta.get("content") if isinstance(delta, dict) else None
+            if isinstance(content, str) and content:
+                yield content
+
+
 def generate_reply(
     messages: list[dict],
     system_prompt: str,
     temperature: float | None = None,
     oidc_token: str | None = None,
-) -> str | None:
-    if not configured(oidc_token):
-        return None
+) -> str:
+    """Generate through anonymous Kilo free models, then optional Vercel fallback."""
+    first_error: GatewayError | None = None
     try:
         response = requests.post(
-            f"{GATEWAY_BASE_URL}/chat/completions",
-            headers=_headers("application/json", oidc_token),
-            json=_payload(messages, system_prompt, temperature, stream=False),
-            timeout=(10, 60),
+            f"{KILO_BASE_URL}/chat/completions",
+            headers=_kilo_headers(),
+            json=_kilo_payload(messages, system_prompt, temperature, stream=False),
+            timeout=(12, 75),
         )
-        _raise_for_status(response)
+        if not response.ok:
+            raise GatewayError(_kilo_http_error(response))
         answer = _extract_content(response.json())
-        if not answer:
-            raise GatewayError("The hosted model returned an empty response. Please try again.")
-        return answer
-    except GatewayError:
-        raise
+        if answer:
+            return answer
+        raise GatewayError("The free model returned an empty response. Please try again.")
+    except GatewayError as exc:
+        first_error = exc
     except (requests.RequestException, ValueError, TypeError) as exc:
-        raise GatewayError(_request_error(exc)) from exc
+        first_error = GatewayError(_request_error(exc))
+
+    # A server-owned Vercel credential is a secondary route only.
+    token = _token(oidc_token)
+    if token:
+        try:
+            response = requests.post(
+                f"{GATEWAY_BASE_URL}/chat/completions",
+                headers=_headers("application/json", oidc_token),
+                json=_payload(messages, system_prompt, temperature, stream=False),
+                timeout=(10, 60),
+            )
+            _raise_for_status(response)
+            answer = _extract_content(response.json())
+            if answer:
+                return answer
+        except GatewayError:
+            pass
+        except (requests.RequestException, ValueError, TypeError):
+            pass
+
+    raise first_error or GatewayError("The free model service is temporarily unavailable.")
 
 
 def stream_reply(
@@ -201,51 +291,47 @@ def stream_reply(
     temperature: float | None = None,
     oidc_token: str | None = None,
 ) -> Iterator[str]:
-    """Yield content deltas from the OpenAI-compatible Chat Completions SSE API."""
-    if not configured(oidc_token):
-        raise GatewayError(
-            "Hosted AI is not connected on this deployment. The built-in knowledge mode is available."
-        )
-
+    """Stream anonymous Kilo free-model output, with an optional Vercel fallback."""
+    emitted = False
+    first_error: GatewayError | None = None
     try:
-        with requests.post(
-            f"{GATEWAY_BASE_URL}/chat/completions",
-            headers=_headers("text/event-stream", oidc_token),
-            json=_payload(messages, system_prompt, temperature, stream=True),
-            stream=True,
-            timeout=(10, 60),
-        ) as response:
-            _raise_for_status(response)
-            for line in response.iter_lines(decode_unicode=True):
-                if not line:
-                    continue
-                if isinstance(line, bytes):
-                    line = line.decode("utf-8", errors="replace")
-                line = line.strip()
-                if not line.startswith("data:"):
-                    continue
-                data = line[5:].strip()
-                if data == "[DONE]":
-                    return
-                try:
-                    chunk = json.loads(data)
-                except (ValueError, TypeError):
-                    continue
-                if isinstance(chunk, dict) and chunk.get("error"):
-                    raise GatewayError(
-                        "The hosted model could not complete this response. Please try again."
-                    )
-                choices = chunk.get("choices", []) if isinstance(chunk, dict) else []
-                if not choices:
-                    continue
-                delta = choices[0].get("delta", {})
-                content = delta.get("content") if isinstance(delta, dict) else None
-                if isinstance(content, str) and content:
-                    yield content
-    except GatewayError:
-        raise
+        for part in _iter_sse_reply(
+            f"{KILO_BASE_URL}/chat/completions",
+            _kilo_headers("text/event-stream"),
+            _kilo_payload(messages, system_prompt, temperature, stream=True),
+        ):
+            emitted = True
+            yield part
+        if emitted:
+            return
+        first_error = GatewayError("The free model returned an empty response. Please try again.")
+    except GatewayError as exc:
+        if emitted:
+            raise GatewayError("The free-model stream stopped before the answer was complete.") from exc
+        first_error = exc
     except (requests.RequestException, ValueError, TypeError) as exc:
-        raise GatewayError(_request_error(exc)) from exc
+        if emitted:
+            raise GatewayError("The free-model stream stopped before the answer was complete.") from exc
+        first_error = GatewayError(_request_error(exc))
+
+    token = _token(oidc_token)
+    if token:
+        try:
+            for part in _iter_sse_reply(
+                f"{GATEWAY_BASE_URL}/chat/completions",
+                _headers("text/event-stream", oidc_token),
+                _payload(messages, system_prompt, temperature, stream=True),
+            ):
+                emitted = True
+                yield part
+            if emitted:
+                return
+        except GatewayError:
+            pass
+        except (requests.RequestException, ValueError, TypeError):
+            pass
+
+    raise first_error or GatewayError("The free model service is temporarily unavailable.")
 
 
 def transcribe_audio(
