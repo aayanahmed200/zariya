@@ -10,9 +10,9 @@ The Flask web app in `webapp/` is the deployable browser application. Chat reque
 
 The model is hosted by a third-party provider. Its current provider listing does not advertise zero-data-retention or a no-training guarantee. Avoid entering passwords, private records or other sensitive information in chat.
 
-The composer also includes browser voice typing with an English/Urdu language choice when the browser supports Web Speech recognition. It requires microphone permission; voice audio may be processed by the browser's speech-recognition provider. Zariya does not store voice recordings. The workspace also supports JSON backup export and restore, and existing flashcard decks can be edited without resetting their spaced-repetition history.
+The composer records microphone audio in the browser and sends a short WAV recording to the server-side transcription endpoint. Vercel AI Gateway routes it to Microsoft MAI-Transcribe 2, with automatic language detection or explicit English/Urdu selection. This avoids the browser's experimental Web Speech Recognition API. Microphone permission and a secure HTTPS context are required. Zariya does not save recordings, but audio is transmitted to Vercel AI Gateway and Microsoft Azure for transcription. The listed transcription rate is approximately $0.10 per audio hour and may change. The workspace also supports JSON backup export and restore, and existing flashcard decks can be edited without resetting their spaced-repetition history.
 
-Quick actions for summaries, key points, translation and flashcard creation use the hosted model with the built-in knowledge engine as a fallback.
+Quick actions for summaries, key points, translation and flashcard creation use the hosted model with the built-in knowledge engine as a fallback. Urdu is rendered with a dedicated Noto Sans Arabic typeface, including Urdu phrases embedded in English answers. Response-style presets (Balanced, Concise, Step-by-step and Detailed) work alongside optional custom instructions; flashcards and quiz controls use bilingual text rendering and clear answer feedback.
 
 The older Streamlit app remains available for local experimentation and uses a separate GGUF model workflow; it is not required to use the hosted website.
 
@@ -69,7 +69,7 @@ The default NVIDIA Nemotron 3.5 Lightning Free model is currently listed at $0 p
 
 ## Data and limitations
 
-Chats, notes and flashcards are stored in the visitor's browser local storage; they are not synced across devices or accounts. Clearing browser storage removes them. For AI chat, message content is transmitted to Vercel AI Gateway and the selected model provider. The current NVIDIA provider listing does not claim zero data retention or a no-training guarantee; do not send sensitive information. Generated answers can be inaccurate. Browser voice recognition availability and its audio handling depend on the browser and its speech service.
+Chats, notes and flashcards are stored in the visitor's browser local storage; they are not synced across devices or accounts. Clearing browser storage removes them. For AI chat, message content is transmitted to Vercel AI Gateway and the selected model provider. The current NVIDIA model listing does not claim zero data retention or a no-training guarantee; do not send sensitive information. Voice recordings are transmitted to Vercel AI Gateway and Microsoft Azure for transcription and are not saved by Zariya. Generated answers and transcripts can be inaccurate; review them before relying on or sending them.
 
 The built-in knowledge engine supports selected calculations, translations and curated knowledge entries. It is not a general-purpose language model. Optional Google Search sends search terms to Google when enabled.
 
