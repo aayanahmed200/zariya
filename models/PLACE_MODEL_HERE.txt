@@ -1,0 +1,7 @@
+Place your GGUF model file here and rename it to model.gguf
+
+Recommended models (see core/model_downloader.py's RECOMMENDED_MODELS for the
+exact, up-to-date URLs used by the in-app downloader):
+- Phi-3-mini-4k-instruct-q4.gguf        (~2.2 GB, faster) - from https://huggingface.co/microsoft
+- Mistral-7B-Instruct-v0.2.Q4_K_M.gguf  (~4.4 GB) - from https://huggingface.co/TheBloke
+- Meta-Llama-3-8B-Instruct.Q4_K_M.gguf  (~4.9 GB) - from https://huggingface.co/QuantFactory

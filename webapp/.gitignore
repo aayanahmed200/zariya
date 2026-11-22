@@ -1,0 +1,6 @@
+.env
+__pycache__/
+*.pyc
+server/store.json
+server/learned.json
+server/kb_embeddings_cache.json

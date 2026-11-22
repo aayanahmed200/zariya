@@ -1,0 +1,6 @@
+Flask>=3.0
+requests>=2.31
+python-dotenv>=1.0
+# No extra package needed for the local model -- it talks to Ollama
+# (https://ollama.com) over plain HTTP using the requests library above.
+# Install Ollama itself once, separately: https://ollama.com/download
