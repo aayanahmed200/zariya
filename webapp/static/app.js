@@ -7,7 +7,29 @@ const LS = {
   set(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); return true; }catch(e){ return false; } }
 };
 let uiPrefs = LS.get('zariya_ui_prefs', { theme:'light', fontSize:15, showTimestamps:true, ttsEnabled:false });
-let genPrefs = LS.get('zariya_gen_prefs', { persona:'', temperature:0.5 });
+let genPrefs = LS.get('zariya_gen_prefs', { persona:'', temperature:0.5, responseStyle:'balanced' });
+const responseStylePresets = {
+  balanced:{
+    label:'Balanced',
+    description:'Clear answers with useful context',
+    instruction:'Give clear, balanced answers with enough context to understand the point. Keep the structure easy to scan and avoid unnecessary repetition.'
+  },
+  concise:{
+    label:'Concise',
+    description:'Short, direct answers',
+    instruction:'Be concise. Lead with the direct answer, keep paragraphs short, and avoid repeating points. Keep essential caveats and steps.'
+  },
+  steps:{
+    label:'Step-by-step',
+    description:'Ordered explanations and guidance',
+    instruction:'When explaining a process or problem, break it into clear ordered steps and briefly explain why each step matters. Use examples only when useful.'
+  },
+  detailed:{
+    label:'Detailed',
+    description:'More context and worked examples',
+    instruction:'Give thorough explanations with helpful context and examples. Organize longer answers into clear sections and avoid padding or repetition.'
+  }
+};
 
 let sessions = [];
 let notes = [];
@@ -376,11 +398,25 @@ function applyUiPrefs(){
   ttsToggle.classList.toggle('on',uiPrefs.ttsEnabled);
   ttsToggle.setAttribute('aria-pressed',String(!!uiPrefs.ttsEnabled));
 }
+function setResponseStyle(style,persist=true){
+  if(!Object.prototype.hasOwnProperty.call(responseStylePresets,style)) style='balanced';
+  genPrefs.responseStyle=style;
+  const preset=responseStylePresets[style];
+  const label=document.getElementById('responsePresetLabel');
+  const trigger=document.getElementById('responsePresetTrigger');
+  if(label) label.textContent=preset.label;
+  if(trigger) trigger.setAttribute('aria-label','Response style: '+preset.label);
+  document.querySelectorAll('[data-response-style]').forEach(option=>{
+    option.setAttribute('aria-selected',String(option.dataset.responseStyle===style));
+  });
+  if(persist) LS.set('zariya_gen_prefs',genPrefs);
+}
 function applyGenPrefs(){
   document.getElementById('personaInput').value = genPrefs.persona || '';
   const pct = Math.round((typeof genPrefs.temperature==='number'? genPrefs.temperature : 0.5) * 100);
   document.getElementById('creativitySlider').value = pct;
   updateCreativityLabel(pct);
+  setResponseStyle(genPrefs.responseStyle||'balanced',false);
 }
 function updateCreativityLabel(pct){
   const label = document.getElementById('creativityLabel');
@@ -849,7 +885,7 @@ async function respondTo(session){
       headers:{'Content-Type':'application/json','Accept':'text/event-stream'},
       body:JSON.stringify({
         messages:session.messages.map(message=>({role:message.role,content:message.content})),
-        systemPrompt:genPrefs.persona || undefined,
+        systemPrompt:[responseStylePresets[genPrefs.responseStyle||'balanced']?.instruction,genPrefs.persona].filter(Boolean).join('\n\n') || undefined,
         temperature:typeof genPrefs.temperature==='number' ? genPrefs.temperature : undefined
       }),
       signal:generation.controller.signal
@@ -1924,9 +1960,53 @@ document.getElementById('themeToggleBtn').addEventListener('click', ()=>{ uiPref
 document.getElementById('fontSizeSlider').addEventListener('input', (e)=>{ uiPrefs.fontSize=parseInt(e.target.value,10); LS.set('zariya_ui_prefs',uiPrefs); applyUiPrefs(); });
 document.getElementById('toggleTimestamps').addEventListener('click', ()=>{ uiPrefs.showTimestamps=!uiPrefs.showTimestamps; LS.set('zariya_ui_prefs',uiPrefs); applyUiPrefs(); renderChat(); });
 document.getElementById('toggleTTS').addEventListener('click', ()=>{ uiPrefs.ttsEnabled=!uiPrefs.ttsEnabled; LS.set('zariya_ui_prefs',uiPrefs); applyUiPrefs(); });
+const responsePresetDropdown=document.getElementById('responsePresetDropdown');
+const responsePresetTrigger=document.getElementById('responsePresetTrigger');
+const responsePresetMenu=document.getElementById('responsePresetMenu');
+const responsePresetOptions=[...document.querySelectorAll('[data-response-style]')];
+function setResponsePresetMenuOpen(open){
+  responsePresetDropdown.classList.toggle('open',open);
+  responsePresetMenu.hidden=!open;
+  responsePresetTrigger.setAttribute('aria-expanded',String(open));
+}
+responsePresetTrigger.addEventListener('click',()=>{
+  setResponsePresetMenuOpen(responsePresetMenu.hidden);
+});
+responsePresetOptions.forEach((option,index)=>{
+  option.addEventListener('click',()=>{
+    setResponseStyle(option.dataset.responseStyle);
+    setResponsePresetMenuOpen(false);
+    responsePresetTrigger.focus();
+  });
+  option.addEventListener('keydown',event=>{
+    if(event.key==='Escape'){
+      event.preventDefault();setResponsePresetMenuOpen(false);responsePresetTrigger.focus();
+    }else if(event.key==='ArrowDown'||event.key==='ArrowUp'){
+      event.preventDefault();
+      const direction=event.key==='ArrowDown'?1:-1;
+      responsePresetOptions[(index+direction+responsePresetOptions.length)%responsePresetOptions.length].focus();
+    }else if(event.key==='Home'||event.key==='End'){
+      event.preventDefault();responsePresetOptions[event.key==='Home'?0:responsePresetOptions.length-1].focus();
+    }
+  });
+});
+responsePresetTrigger.addEventListener('keydown',event=>{
+  if(event.key==='ArrowDown'||event.key==='Enter'||event.key===' '){
+    event.preventDefault();setResponsePresetMenuOpen(true);responsePresetOptions[0].focus();
+  }else if(event.key==='Escape'){
+    setResponsePresetMenuOpen(false);
+  }
+});
+document.addEventListener('pointerdown',event=>{
+  if(!responsePresetDropdown.contains(event.target)) setResponsePresetMenuOpen(false);
+});
 document.getElementById('personaInput').addEventListener('input', (e)=>{ genPrefs.persona=e.target.value; LS.set('zariya_gen_prefs',genPrefs); });
 document.getElementById('creativitySlider').addEventListener('input', (e)=>{ const pct=parseInt(e.target.value,10); genPrefs.temperature=pct/100; LS.set('zariya_gen_prefs',genPrefs); updateCreativityLabel(pct); });
-document.getElementById('resetPersonaBtn').addEventListener('click', ()=>{ genPrefs={persona:'', temperature:0.5}; LS.set('zariya_gen_prefs',genPrefs); applyGenPrefs(); });
+document.getElementById('resetPersonaBtn').addEventListener('click', ()=>{
+  genPrefs.persona='';
+  LS.set('zariya_gen_prefs',genPrefs);
+  document.getElementById('personaInput').value='';
+});
 
 function downloadFile(filename, content, type='text/plain;charset=utf-8'){
   const blob = new Blob([content], {type});
