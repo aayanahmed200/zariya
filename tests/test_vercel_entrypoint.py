@@ -273,6 +273,7 @@ def test_flask_seo_routes_serve_assets():
     robots = client.get("/robots.txt")
     sitemap = client.get("/sitemap.xml")
     manifest = client.get("/site.webmanifest")
+    transparent_favicon = client.get("/favicon.png")
     assert favicon.status_code == 200
     assert favicon.mimetype == "image/svg+xml"
     assert b"#ff762b" in favicon.data
@@ -281,7 +282,10 @@ def test_flask_seo_routes_serve_assets():
     assert sitemap.status_code == 200
     assert b"https://zariyas.vercel.app/" in sitemap.data
     assert manifest.status_code == 200
-    assert b"/favicon.svg" in manifest.data
+    assert transparent_favicon.status_code == 200
+    assert transparent_favicon.mimetype == "image/png"
+    assert transparent_favicon.data.startswith(bytes([137,80,78,71,13,10,26,10]))
+    assert b"/favicon.png" in manifest.data
 
 
 def test_static_frontend_copies_are_identical():
