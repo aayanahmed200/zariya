@@ -816,3 +816,16 @@ def test_response_style_dropdown_is_accessible_and_preserves_custom_instructions
     assert "genPrefs.persona='';" in source
     assert "genPrefs={persona:'', temperature:0.5}" not in source
     assert "responsePresetOptions[(index+direction+responsePresetOptions.length)%responsePresetOptions.length].focus();" in source
+
+
+def test_urdu_direction_updates_in_custom_instructions_and_flashcard_editor():
+    html = (ROOT / "webapp" / "templates" / "index.html").read_text(encoding="utf-8")
+    source = (ROOT / "webapp" / "static" / "app.js").read_text(encoding="utf-8")
+    css = (ROOT / "webapp" / "static" / "style.css").read_text(encoding="utf-8")
+    assert 'id="personaInput"' in html and 'id="personaInput"' in html[html.index('id="personaInput"')-20:html.index('id="personaInput"')+200]
+    assert 'dir="auto"' in html[html.index('id="personaInput"')-20:html.index('id="personaInput"')+280]
+    assert 'class="deck-front" maxlength="600" required placeholder="Question or term" dir="auto"' in source
+    assert 'class="deck-back" maxlength="2400" required rows="2" placeholder="Answer or definition" dir="auto"' in source
+    assert "frontInput.addEventListener('input',()=>syncUrduInput(frontInput));" in source
+    assert "backInput.addEventListener('input',()=>syncUrduInput(backInput));" in source
+    assert "#personaInput.input-urdu,.deck-front.input-urdu,.deck-back.input-urdu" in css
