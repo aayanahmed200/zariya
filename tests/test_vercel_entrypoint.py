@@ -673,7 +673,10 @@ def test_gateway_transcription_uses_oidc_and_microsoft_provider_options(monkeypa
     assert captured["url"].endswith("/v4/ai/transcription-model")
     assert captured["headers"]["Authorization"] == "Bearer oidc-token"
     assert captured["headers"]["ai-model-id"] == "microsoft/mai-transcribe-2"
-    assert captured["payload"]["providerOptions"]["azure"]["locales"] == ["ur"]
+    assert captured["payload"]["providerOptions"]["azure"]["language"] == "ur"
+    assert "locales" not in captured["payload"]["providerOptions"]["azure"]
+    assert "transcribeStyle" not in captured["payload"]["providerOptions"]["azure"]
+    assert captured["timeout"] == (8, 50)
 
 
 def test_microphone_uses_recorded_wav_and_custom_accessible_language_dropdown():
