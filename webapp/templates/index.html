@@ -11,9 +11,9 @@
 <meta name="author" content="Zariya">
 <title>Zariya — Free Urdu &amp; English AI Workspace</title>
 <link rel="canonical" href="https://zariyas.vercel.app/">
-<link rel="icon" type="image/png" sizes="128x128" href="/favicon.png?v=20261122-3">
-<link rel="shortcut icon" type="image/png" href="/favicon.png?v=20261122-3">
-<link rel="apple-touch-icon" sizes="128x128" href="/static/logo.png?v=20261122-3">
+<link rel="icon" type="image/png" sizes="128x128" href="/favicon.png?v=20261122-4">
+<link rel="shortcut icon" type="image/png" href="/favicon.png?v=20261122-4">
+<link rel="apple-touch-icon" sizes="128x128" href="/static/logo.png?v=20261122-4">
 <link rel="manifest" href="/site.webmanifest?v=20261121-5">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Zariya">
@@ -30,7 +30,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Lora:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=Markazi+Text:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/static/style.css?v=20261122-3">
+<link rel="stylesheet" href="/static/style.css?v=20261122-4">
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
@@ -269,9 +269,29 @@
             </div>
             <div class="setting-content">
               <div class="setting-row" id="accountSignedOutRow">
-                <div><label>Optional GitHub profile</label><div class="sub" id="githubConfigNote">Guest mode is ready.</div></div>
-                <button class="btn" id="githubSignInBtn" type="button">Sign in with GitHub</button>
+                <div class="account-connect-copy"><label>Connect your GitHub account</label><div class="sub" id="githubConfigNote">Sign in to identify your workspace profile.</div></div>
+                <button class="btn github-sign-in" id="githubSignInBtn" type="button">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 .8a11.2 11.2 0 0 0-3.54 21.82c.56.1.77-.24.77-.54v-2.1c-3.14.68-3.8-1.33-3.8-1.33-.51-1.3-1.26-1.65-1.26-1.65-1.02-.7.08-.69.08-.69 1.13.08 1.73 1.16 1.73 1.16 1 .1.77 1.48 2.55 1.1.1-.72.4-1.2.73-1.48-2.5-.28-5.13-1.25-5.13-5.57 0-1.23.44-2.24 1.16-3.03-.12-.28-.5-1.43.1-2.98 0 0 .94-.3 3.08 1.16a10.7 10.7 0 0 1 5.6 0c2.14-1.46 3.08-1.16 3.08-1.16.6 1.55.22 2.7.1 2.98.72.79 1.15 1.8 1.15 3.03 0 4.33-2.63 5.28-5.14 5.56.4.35.77 1.03.77 2.08v3.08c0 .3.2.65.78.54A11.2 11.2 0 0 0 12 .8Z"/></svg>
+                  <span>Sign in with GitHub</span>
+                </button>
               </div>
+              <div class="github-setup-panel" id="githubSetupPanel" hidden>
+                <div class="github-setup-heading"><strong>Finish the one-time GitHub setup</strong><span>About two minutes</span></div>
+                <p>Create a GitHub OAuth App, then add its Client ID and Client Secret to your Vercel project. Keep the secret in Vercel; never paste it into this page or commit it to GitHub.</p>
+                <div class="github-url-field">
+                  <span>Homepage URL</span>
+                  <code>https://zariyas.vercel.app</code>
+                </div>
+                <div class="github-url-field">
+                  <span>Authorization callback URL</span>
+                  <code>https://zariyas.vercel.app/auth/github/callback</code>
+                  <button type="button" class="github-copy-url" id="copyGithubCallbackBtn">Copy</button>
+                </div>
+                <a class="github-setup-link" href="https://github.com/settings/developers" target="_blank" rel="noopener noreferrer">Open GitHub Developer settings ↗</a>
+                <p class="github-setup-footnote">In Vercel → Project Settings → Environment Variables, add <code>GITHUB_CLIENT_ID</code> and <code>GITHUB_CLIENT_SECRET</code> for Production, Preview and Development. A stable session secret and the callback URL have already been prepared in this project.</p>
+                <p class="github-setup-footnote">GitHub sign-in identifies your profile. Chats, notes and flashcards are still saved on this device; signing in does not sync them across devices.</p>
+              </div>
+              <div class="account-auth-status" id="accountAuthStatus" role="status" aria-live="polite" hidden></div>
               <div class="setting-row signed-in-row" id="accountSignedInRow" style="display:none;">
                 <img id="accountAvatar" src="/static/logo.png" alt="Profile avatar">
                 <div class="account-details"><strong id="accountName"></strong><span class="sub" id="accountBio"></span></div>
@@ -420,7 +440,7 @@
   </form>
 </dialog>
 </div>
-<script src="/static/sse.js?v=20261122-3"></script>
-<script src="/static/app.js?v=20261122-3"></script>
+<script src="/static/sse.js?v=20261122-4"></script>
+<script src="/static/app.js?v=20261122-4"></script>
 </body>
 </html>
