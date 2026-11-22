@@ -347,12 +347,20 @@ function saveServerState(){
 /* ============ THEME / UI PREFS ============ */
 function applyUiPrefs(){
   document.documentElement.setAttribute('data-theme', uiPrefs.theme);
-  document.querySelectorAll('[data-theme-opt]').forEach(el=> el.classList.toggle('active', el.dataset.themeOpt===uiPrefs.theme));
+  document.querySelectorAll('[data-theme-opt]').forEach(el=>{
+    const active=el.dataset.themeOpt===uiPrefs.theme;
+    el.classList.toggle('active',active);
+    el.setAttribute('aria-pressed',String(active));
+  });
   document.getElementById('fontSizeSlider').value = uiPrefs.fontSize;
   document.getElementById('fontSizeLabel').textContent = uiPrefs.fontSize+'px';
   document.documentElement.style.setProperty('--chat-font-size', uiPrefs.fontSize+'px');
-  document.getElementById('toggleTimestamps').classList.toggle('on', uiPrefs.showTimestamps);
-  document.getElementById('toggleTTS').classList.toggle('on', uiPrefs.ttsEnabled);
+  const timestampsToggle=document.getElementById('toggleTimestamps');
+  const ttsToggle=document.getElementById('toggleTTS');
+  timestampsToggle.classList.toggle('on',uiPrefs.showTimestamps);
+  timestampsToggle.setAttribute('aria-pressed',String(!!uiPrefs.showTimestamps));
+  ttsToggle.classList.toggle('on',uiPrefs.ttsEnabled);
+  ttsToggle.setAttribute('aria-pressed',String(!!uiPrefs.ttsEnabled));
 }
 function applyGenPrefs(){
   document.getElementById('personaInput').value = genPrefs.persona || '';
@@ -468,8 +476,16 @@ function switchView(name){
 }
 document.querySelectorAll('[data-view]').forEach(n=> n.addEventListener('click', ()=>switchView(n.dataset.view)));
 
-function openSidebarMobile(){ document.getElementById('sidebar').classList.add('open'); document.getElementById('sbScrim').classList.add('show'); }
-function closeSidebarMobile(){ document.getElementById('sidebar').classList.remove('open'); document.getElementById('sbScrim').classList.remove('show'); }
+function openSidebarMobile(){
+  document.getElementById('sidebar').classList.add('open');
+  document.getElementById('sbScrim').classList.add('show');
+  document.getElementById('hamburgerBtn').setAttribute('aria-expanded','true');
+}
+function closeSidebarMobile(){
+  document.getElementById('sidebar').classList.remove('open');
+  document.getElementById('sbScrim').classList.remove('show');
+  document.getElementById('hamburgerBtn').setAttribute('aria-expanded','false');
+}
 document.getElementById('hamburgerBtn').addEventListener('click', openSidebarMobile);
 document.getElementById('sbScrim').addEventListener('click', closeSidebarMobile);
 
@@ -1197,6 +1213,12 @@ function updateNoteActionState(){
   document.getElementById('deleteNoteBtn').disabled=!hasNote;
   document.getElementById('noteToFlashBtn').disabled=!hasBody;
 }
+function setNoteSaveStatus(message,warning=false){
+  const status=document.getElementById('noteSaveStatus');
+  if(!status) return;
+  status.textContent=message;
+  status.classList.toggle('warning',!!warning);
+}
 function syncNoteEditorState(){
   const note=notes.find(n=>n.id===currentNoteId);
   const hasNote=!!note;
@@ -1210,6 +1232,7 @@ function syncNoteEditorState(){
     document.getElementById('note-title-input').value=note.title||'';
     document.getElementById('note-body-input').value=note.body||'';
     document.getElementById('note-tags-input').value=(note.tags||[]).join(', ');
+    setNoteSaveStatus('Saved on this device');
   }else{
     document.getElementById('note-title-input').value='';
     document.getElementById('note-body-input').value='';
@@ -1284,13 +1307,31 @@ document.getElementById('deleteNoteBtn').addEventListener('click', ()=>{
 });
 let noteTitleSaveTimer, noteBodySaveTimer;
 document.getElementById('note-title-input').addEventListener('input', ()=>{
+  setNoteSaveStatus('Unsaved changes');
   clearTimeout(noteTitleSaveTimer);
-  noteTitleSaveTimer = setTimeout(()=>{ const n=notes.find(n=>n.id===currentNoteId); if(n){ n.title=document.getElementById('note-title-input').value||'Untitled note'; saveServerState(); renderNotesList(); } }, 400);
+  noteTitleSaveTimer = setTimeout(()=>{
+    const n=notes.find(n=>n.id===currentNoteId);
+    if(n){
+      n.title=document.getElementById('note-title-input').value||'Untitled note';
+      const saved=saveServerState();
+      setNoteSaveStatus(saved===false?'Could not save':'Saved just now',saved===false);
+      renderNotesList();
+    }
+  },400);
 });
 document.getElementById('note-body-input').addEventListener('input', ()=>{
   updateNoteActionState();
+  setNoteSaveStatus('Unsaved changes');
   clearTimeout(noteBodySaveTimer);
-  noteBodySaveTimer = setTimeout(()=>{ const n=notes.find(n=>n.id===currentNoteId); if(n){ n.body=document.getElementById('note-body-input').value; saveServerState(); renderNotesList(); } }, 400);
+  noteBodySaveTimer = setTimeout(()=>{
+    const n=notes.find(n=>n.id===currentNoteId);
+    if(n){
+      n.body=document.getElementById('note-body-input').value;
+      const saved=saveServerState();
+      setNoteSaveStatus(saved===false?'Could not save':'Saved just now',saved===false);
+      renderNotesList();
+    }
+  },400);
 });
 document.getElementById('exportNoteBtn').addEventListener('click', ()=>{
   const n = notes.find(n=>n.id===currentNoteId); if(!n) return;
@@ -1299,12 +1340,15 @@ document.getElementById('exportNoteBtn').addEventListener('click', ()=>{
 });
   let noteTagsSaveTimer;
   document.getElementById('note-tags-input').addEventListener('input', ()=>{
+      setNoteSaveStatus('Unsaved changes');
       clearTimeout(noteTagsSaveTimer);
       noteTagsSaveTimer = setTimeout(()=>{
             const n = notes.find(n=>n.id===currentNoteId);
             if(n){
                     n.tags = document.getElementById('note-tags-input').value.split(',').map(t=>t.trim().toLowerCase()).filter(Boolean);
-                    saveServerState(); renderNotesList();
+                    const saved=saveServerState();
+                    setNoteSaveStatus(saved===false?'Could not save':'Saved just now',saved===false);
+                    renderNotesList();
             }
       }, 400);
   });
