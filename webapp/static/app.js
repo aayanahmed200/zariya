@@ -478,6 +478,7 @@ function newSession(){
   if(isGenerating) stopGenerating();
   const s = { id:uid(), title:'New chat', messages:[], createdAt:Date.now() };
   sessions.unshift(s); currentSessionId = s.id;
+  switchView('chat');
   saveServerState(); renderSessionList(); renderChat();
 }
 function currentSession(){ return sessions.find(s=>s.id===currentSessionId); }
@@ -495,7 +496,23 @@ function renderSessionList(){
   const q = document.getElementById('sessSearch').value.trim().toLowerCase();
   wrap.innerHTML = '<div class="sb-sessions-label">Recents</div>';
   const filtered = sessions.filter(s=> !q || s.title.toLowerCase().includes(q) || s.messages.some(m=>m.content.toLowerCase().includes(q)));
-  if(!filtered.length) wrap.innerHTML += '<div style="padding:8px 9px;color:var(--text-muted);font-size:12px;">No chats yet</div>';
+  if(!filtered.length){
+    const empty=document.createElement('div');
+    empty.className='sess-empty';
+    empty.textContent=q ? 'No matching chats' : 'No chats yet';
+    if(q){
+      const clear=document.createElement('button');
+      clear.type='button';
+      clear.textContent='Clear search';
+      clear.addEventListener('click',()=>{
+        document.getElementById('sessSearch').value='';
+        renderSessionList();
+        document.getElementById('sessSearch').focus();
+      });
+      empty.appendChild(clear);
+    }
+    wrap.appendChild(empty);
+  }
   filtered.forEach(s=>{
     const div = document.createElement('div');
     div.className = 'sess-item' + (s.id===currentSessionId?' active':'');
@@ -504,9 +521,9 @@ function renderSessionList(){
       if(isGenerating && currentSessionId!==s.id) stopGenerating();
       currentSessionId = s.id;
       editingIndex=null;
+      switchView('chat');
       renderSessionList();
       renderChat();
-      closeSidebarMobile();
     });
     div.querySelector('.sess-del').addEventListener('click', (e)=>deleteSession(s.id, e));
     wrap.appendChild(div);
@@ -1180,11 +1197,32 @@ function updateNoteActionState(){
   document.getElementById('deleteNoteBtn').disabled=!hasNote;
   document.getElementById('noteToFlashBtn').disabled=!hasBody;
 }
+function syncNoteEditorState(){
+  const note=notes.find(n=>n.id===currentNoteId);
+  const hasNote=!!note;
+  const editor=document.querySelector('.note-editor');
+  const emptyState=document.getElementById('noteEmptyState');
+  const fields=document.getElementById('noteEditorFields');
+  if(editor) editor.classList.toggle('is-empty',!hasNote);
+  if(emptyState) emptyState.hidden=hasNote;
+  if(fields) fields.hidden=!hasNote;
+  if(note){
+    document.getElementById('note-title-input').value=note.title||'';
+    document.getElementById('note-body-input').value=note.body||'';
+    document.getElementById('note-tags-input').value=(note.tags||[]).join(', ');
+  }else{
+    document.getElementById('note-title-input').value='';
+    document.getElementById('note-body-input').value='';
+    document.getElementById('note-tags-input').value='';
+  }
+}
 function renderNotesList(){
   const wrap = document.getElementById('notesList'); wrap.innerHTML='';
-    renderNoteTagFilterRow();
-    const visibleNotes = activeNoteTagFilter ? notes.filter(n=>(n.tags||[]).includes(activeNoteTagFilter)) : notes;
-  if(!visibleNotes.length) wrap.innerHTML = '<div class="empty-mini"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg><span>No notes yet</span></div>';
+  renderNoteTagFilterRow();
+  const visibleNotes = activeNoteTagFilter ? notes.filter(n=>(n.tags||[]).includes(activeNoteTagFilter)) : notes;
+  if(!visibleNotes.length){
+    wrap.innerHTML = '<div class="empty-mini"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg><span>'+(activeNoteTagFilter?'No notes with this tag':'No notes yet')+'</span></div>';
+  }
   visibleNotes.forEach(n=>{
     const div = document.createElement('div');
     div.className = 'note-card'+(n.id===currentNoteId?' active':'');
@@ -1192,12 +1230,10 @@ function renderNotesList(){
     div.addEventListener('click', ()=>openNote(n.id));
     wrap.appendChild(div);
   });
-  if(!currentNoteId && notes.length) openNote(notes[0].id);
-  if(!notes.length){
-    document.getElementById('note-title-input').value='';
-    document.getElementById('note-body-input').value='';
-    document.getElementById('note-tags-input').value='';
+  if(!visibleNotes.some(n=>n.id===currentNoteId)){
+    currentNoteId=visibleNotes.length ? visibleNotes[0].id : null;
   }
+  syncNoteEditorState();
   updateNoteActionState();
 }
   function renderNoteTagFilterRow(){
@@ -1232,6 +1268,9 @@ document.getElementById('newNoteBtn').addEventListener('click', ()=>{
   saveServerState();
   openNote(n.id);
   document.getElementById('note-title-input').focus();
+});
+document.getElementById('createFirstNoteBtn').addEventListener('click', ()=>{
+  document.getElementById('newNoteBtn').click();
 });
 document.getElementById('deleteNoteBtn').addEventListener('click', ()=>{
   if(!currentNoteId) return;
@@ -1361,7 +1400,23 @@ function renderDeckGrid(){
     decks.forEach(d=>{ if(!d.tags) d.tags = []; });
     renderDeckTagFilterRow();
     const visibleDecks = activeDeckTagFilter ? decks.filter(d=>(d.tags||[]).includes(activeDeckTagFilter)) : decks;
-  if(!visibleDecks.length){ grid.innerHTML='<div class="empty-mini" style="grid-column:1/-1;"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="6" width="16" height="12" rx="2"/><path d="M6 2h16v12"/></svg><span>No decks yet -- chat, then use "Make flashcards" above the message box</span></div>'; return; }
+  if(!visibleDecks.length){
+    const empty=document.createElement('div');
+    empty.className='empty-mini deck-empty';
+    empty.innerHTML='<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="2" y="6" width="16" height="12" rx="2"/><path d="M6 2h16v12"/></svg><strong>Your first deck starts here</strong><span>Create a deck yourself, or ask Zariya to turn a chat into flashcards.</span><button class="btn primary" type="button">Create first deck</button>';
+    const action=empty.querySelector('button');
+    action.addEventListener('click',()=>{
+      if(activeDeckTagFilter){
+        activeDeckTagFilter=null;
+        renderDeckGrid();
+      }else{
+        document.getElementById('newDeckBtn').click();
+      }
+    });
+    if(activeDeckTagFilter) action.textContent='Clear filter';
+    grid.appendChild(empty);
+    return;
+  }
   visibleDecks.forEach(d=>{
     d.cards.forEach(migrateCardForSpacedRepetition);
     const known = d.cards.filter(c=>c.known).length;
