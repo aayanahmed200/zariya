@@ -282,14 +282,14 @@ def transcribe_audio(
         "mediaType": media_type,
     }
     if language in ("en", "ur"):
-        payload["providerOptions"] = {"azure": {"locales": [language], "transcribeStyle": "clean"}}
+        payload["providerOptions"] = {"azure": {"language": language}}
 
     try:
         response = requests.post(
             "https://ai-gateway.vercel.sh/v4/ai/transcription-model",
             headers=headers,
             json=payload,
-            timeout=(10, 75),
+            timeout=(8, 50),
         )
         _raise_for_status(response)
         data = response.json()
