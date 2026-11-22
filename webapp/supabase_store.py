@@ -7,6 +7,7 @@ requests are authenticated only from this server.
 from __future__ import annotations
 
 import re
+from datetime import datetime, timezone
 from typing import Any
 
 import requests
@@ -22,7 +23,7 @@ class SupabaseWorkspaceStore:
     def configured(self) -> bool:
         return (
             self.url.startswith("https://")
-            and bool(re.fullmatch(r"[A-Za-z0-9_-]+", self.api_key))
+            and bool(re.fullmatch(r"[A-Za-z0-9_.-]+", self.api_key))
             and len(self.api_key) >= 24
         )
 
@@ -76,7 +77,7 @@ class SupabaseWorkspaceStore:
             json={
                 "owner_id": owner_id,
                 "state": state,
-                "updated_at": "now()",
+                "updated_at": datetime.now(timezone.utc).isoformat(),
             },
             timeout=self.timeout,
         )

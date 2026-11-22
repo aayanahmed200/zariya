@@ -393,7 +393,11 @@ async function loadServerState(){
       if(serverConfig.supabaseConfigured){
         state=mergeWorkspaceState(remote,cached);
         if(JSON.stringify(state)!==JSON.stringify(remote)){
-          await apiPost('/api/state',state);
+          try{
+            await apiPost('/api/state',state);
+          }catch(syncError){
+            localStateMessage='Some local changes could not be synced yet. They are still saved in this browser.';
+          }
         }
       }else{
         state=remote;
@@ -436,10 +440,10 @@ async function loadServerState(){
       ? 'With Supabase connected, your workspace syncs across devices for this GitHub account.'
       : 'GitHub sign-in identifies your profile. Without Supabase, chats, notes and flashcards remain on this device.';
   }
-  updateStorageStatus(stateBackendAvailable || !serverConfig.hostedMode,
-    serverConfig.supabaseConfigured && stateBackendAvailable
+  updateStorageStatus((stateBackendAvailable || !serverConfig.hostedMode) && !localStateMessage,
+    localStateMessage || (serverConfig.supabaseConfigured && stateBackendAvailable
       ? 'Connected to Supabase. Workspace data is synced.'
-      : (localStateMessage || (serverConfig.hostedMode
+      : (serverConfig.hostedMode
         ? 'Saved in this browser only.'
         : 'Saved by this local development server.')));
 }
