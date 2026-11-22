@@ -1733,8 +1733,8 @@ function renderStudy(){
   const c = studyQueue[studyIndex];
   area.innerHTML = '<div class="study-progress-text">Card '+(studyIndex+1)+' of '+studyQueue.length+' -- '+escapeHtml(deck.name)+'</div>'+
     '<div class="card-flip-zone"><div class="flip-card '+(studyFlipped?'flipped':'')+'" id="flipCard">'+
-    '<div class="flip-face front '+(isUrdu(c.front)?'is-urdu urdu':'')+'">'+escapeHtml(c.front)+'</div>'+
-    '<div class="flip-face back '+(isUrdu(c.back)?'is-urdu urdu':'')+'">'+escapeHtml(c.back)+'</div></div></div>'+
+    '<div class="flip-face front '+(isPureUrdu(c.front)?'is-urdu urdu':'')+'" dir="auto">'+wrapUrduRuns(escapeHtml(c.front))+'</div>'+
+    '<div class="flip-face back '+(isPureUrdu(c.back)?'is-urdu urdu':'')+'" dir="auto">'+wrapUrduRuns(escapeHtml(c.back))+'</div></div></div>'+
     (studyFlipped
       ? '<div class="study-controls"><button class="sc-btn again" data-q="0">Again</button><button class="sc-btn" data-q="3">Hard</button><button class="sc-btn known" data-q="4">Good</button><button class="sc-btn known" data-q="5">Easy</button></div>'
       : '<div class="study-controls"><button class="sc-btn" id="scFlip">Flip to grade</button></div>');
@@ -1878,11 +1878,12 @@ function renderQuiz(){
   }
   const q = quizQueue[quizIndex];
   let optionsHtml = q.options.map((opt,i)=>
-    '<button class="quiz-option'+(isUrdu(opt)?' is-urdu urdu':'')+'" data-i="'+i+'">'+escapeHtml(opt)+'</button>'
+    '<button class="quiz-option'+(isPureUrdu(opt)?' is-urdu urdu':'')+'" data-i="'+i+'" data-answer-index="'+i+'" aria-pressed="false" dir="auto">'+wrapUrduRuns(escapeHtml(opt))+'</button>'
   ).join('');
   area.innerHTML = '<div class="study-progress-text">Question '+(quizIndex+1)+' of '+quizQueue.length+' -- '+escapeHtml(deck.name)+' · Score: '+quizScore+'</div>'+
-    '<div class="quiz-question'+(isUrdu(q.front)?' is-urdu urdu':'')+'">'+escapeHtml(q.front)+'</div>'+
+    '<div class="quiz-question'+(isPureUrdu(q.front)?' is-urdu urdu':'')+'" dir="auto">'+wrapUrduRuns(escapeHtml(q.front))+'</div>'+
     '<div class="quiz-options">'+optionsHtml+'</div>'+
+    '<div class="quiz-feedback" id="quizFeedback" role="status" aria-live="polite"></div>'+
     '<div class="study-controls" id="quizNextRow" style="display:none;"><button class="btn primary" id="quizNext">Next question</button></div>';
   quizAnswered = false;
   area.querySelectorAll('.quiz-option').forEach(btn=>{
@@ -1892,10 +1893,24 @@ function renderQuiz(){
       const chosen = q.options[parseInt(btn.dataset.i,10)];
       area.querySelectorAll('.quiz-option').forEach(b=>{
         const val = q.options[parseInt(b.dataset.i,10)];
-        if(val===q.correct) b.classList.add('correct');
-        else if(b===btn) b.classList.add('wrong');
+        const isCorrect=val===q.correct;
+        const isChosen=b===btn;
+        if(isCorrect) b.classList.add('correct');
+        else if(isChosen) b.classList.add('wrong');
+        b.disabled=true;
+        b.setAttribute('aria-pressed',String(isChosen));
+        b.setAttribute('aria-label',isChosen
+          ? (isCorrect?'Your answer, correct':'Your answer, incorrect')
+          : (isCorrect?'Correct answer':'Answer option'));
       });
-      if(chosen===q.correct) quizScore++;
+      const feedback=document.getElementById('quizFeedback');
+      const isCorrect=chosen===q.correct;
+      feedback.classList.toggle('correct',isCorrect);
+      feedback.classList.toggle('wrong',!isCorrect);
+      feedback.innerHTML=isCorrect
+        ? 'Correct answer.'
+        : 'Not quite. Correct answer: '+wrapUrduRuns(escapeHtml(q.correct));
+      if(isCorrect) quizScore++;
       document.getElementById('quizNextRow').style.display='flex';
     });
   });
