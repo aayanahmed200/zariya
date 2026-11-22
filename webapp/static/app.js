@@ -413,15 +413,23 @@ function renderAccountUI(){
     document.getElementById('accountName').textContent=me.name || me.login;
     document.getElementById('accountBio').textContent=me.bio || '';
   }else{
-    sbName.textContent=serverConfig.githubConfigured ? 'Sign in with GitHub' : 'Saved in this browser';
+    sbName.textContent=serverConfig.githubConfigured ? 'Sign in with GitHub' : 'Guest workspace';
     sbAvatar.textContent='Z';
-    signedOutRow.style.display=serverConfig.githubConfigured ? 'flex' : 'none';
+    signedOutRow.style.display='flex';
     signedInRow.style.display='none';
   }
-  configNote.textContent=serverConfig.githubConfigured
-    ? 'GitHub identifies this browser profile; it does not provide cloud sync.'
-    : 'Guest mode is ready. Your chats and notes stay in this browser.';
-  document.getElementById('githubSignInBtn').disabled=!serverConfig.githubConfigured;
+  const setupPanel=document.getElementById('githubSetupPanel');
+  const signInButton=document.getElementById('githubSignInBtn');
+  if(serverConfig.githubConfigured){
+    configNote.textContent='Connect your GitHub profile. Your workspace data remains saved on this device.';
+    signInButton.disabled=false;
+    signInButton.querySelector('span').textContent='Sign in with GitHub';
+    if(setupPanel) setupPanel.hidden=true;
+  }else{
+    configNote.textContent='One-time setup is needed before GitHub sign-in can be used. Select the button for the exact setup details.';
+    signInButton.disabled=false;
+    signInButton.querySelector('span').textContent='Set up GitHub sign-in';
+  }
 
   const modelStatus=document.getElementById('aiModelStatusText');
   if(modelStatus) modelStatus.textContent=serverConfig.aiStatus || 'Checking hosted model…';
@@ -453,14 +461,55 @@ function renderAccountUI(){
   const onboardingDismissBtn = document.getElementById('onboardingDismissBtn');
   if(onboardingDismissBtn) onboardingDismissBtn.addEventListener('click', ()=>{ LS.set(ONBOARDING_DISMISS_KEY, true); updateOnboardingBanner(); });
 document.getElementById('sbProfileRow').addEventListener('click', ()=>switchView('settings'));
-document.getElementById('githubSignInBtn').addEventListener('click', ()=>{ window.location.href = '/auth/github/login'; });
-document.getElementById('githubSignOutBtn').addEventListener('click', async ()=>{
-  await fetch('/auth/logout', { method:'POST' });
-  me = { signedIn:false };
-  renderAccountUI();
-  await loadServerState();
-  renderSessionList(); renderChat();
+document.getElementById('githubSignInBtn').addEventListener('click', ()=>{
+  if(serverConfig.githubConfigured){
+    window.location.href = '/auth/github/login';
+    return;
+  }
+  const setupPanel=document.getElementById('githubSetupPanel');
+  if(setupPanel){
+    setupPanel.hidden=false;
+    setupPanel.scrollIntoView({behavior:'smooth',block:'nearest'});
+  }
 });
+document.getElementById('copyGithubCallbackBtn').addEventListener('click', async ()=>{
+  const status=document.getElementById('accountAuthStatus');
+  const value='https://zariyas.vercel.app/auth/github/callback';
+  try{
+    if(!navigator.clipboard || !navigator.clipboard.writeText) throw new Error('Clipboard unavailable');
+    await navigator.clipboard.writeText(value);
+    status.textContent='Callback URL copied.';
+    status.hidden=false;
+  }catch(error){
+    status.textContent='Copy is not available in this browser. Select the callback URL above and copy it manually.';
+    status.hidden=false;
+  }
+});
+document.getElementById('githubSignOutBtn').addEventListener('click', async ()=>{
+  const button=document.getElementById('githubSignOutBtn');
+  button.disabled=true;
+  try{
+    const response=await fetch('/auth/logout', { method:'POST' });
+    if(!response.ok) throw new Error('Could not sign out. Please try again.');
+    me = { signedIn:false };
+    await loadServerState();
+    renderAccountUI();renderSessionList();renderChat();
+  }catch(error){
+    const status=document.getElementById('accountAuthStatus');
+    status.textContent=error.message||'Could not sign out. Please try again.';
+    status.hidden=false;
+  }finally{
+    button.disabled=false;
+  }
+});
+const authError=new URLSearchParams(window.location.search).get('authError');
+if(authError){
+  const status=document.getElementById('accountAuthStatus');
+  status.textContent=authError;
+  status.hidden=false;
+  window.history.replaceState({},'',window.location.pathname+window.location.hash);
+  document.getElementById('githubSetupPanel').hidden=!serverConfig.githubConfigured;
+}
 
 /* ============ VIEW SWITCHING ============ */
 function switchView(name){
