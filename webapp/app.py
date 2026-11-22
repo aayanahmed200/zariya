@@ -25,6 +25,13 @@ import time
 import json
 from pathlib import Path
 from urllib.parse import urlencode
+import sys
+
+# Vercel imports this app as `webapp.app`; add its directory so the
+# existing sibling modules (kb_engine.py and local_model.py) resolve reliably.
+_WEBAPP_DIR = str(Path(__file__).resolve().parent)
+if _WEBAPP_DIR not in sys.path:
+    sys.path.insert(0, _WEBAPP_DIR)
 
 import requests
 from dotenv import load_dotenv
