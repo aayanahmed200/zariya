@@ -342,8 +342,23 @@
               <div><h3>Response style</h3><p class="desc">Adjust the tone and creativity of hosted model replies.</p></div>
             </div>
             <div class="setting-content">
+              <div class="setting-row response-preset-row">
+                <div><label>Reply structure</label><span class="sub">Choose how answers are organized</span></div>
+                <div class="response-preset-dropdown" id="responsePresetDropdown">
+                  <button class="response-preset-trigger" id="responsePresetTrigger" type="button" aria-haspopup="listbox" aria-expanded="false" aria-controls="responsePresetMenu" aria-label="Response style: Balanced">
+                    <span id="responsePresetLabel">Balanced</span>
+                    <svg viewBox="0 0 16 16" aria-hidden="true"><path d="m4 6 4 4 4-4"/></svg>
+                  </button>
+                  <div class="response-preset-menu" id="responsePresetMenu" role="listbox" aria-label="Response style" hidden>
+                    <button type="button" role="option" data-response-style="balanced" aria-selected="true"><span>Balanced</span><small>Clear answers with useful context</small><i>✓</i></button>
+                    <button type="button" role="option" data-response-style="concise" aria-selected="false"><span>Concise</span><small>Short, direct answers</small><i>✓</i></button>
+                    <button type="button" role="option" data-response-style="steps" aria-selected="false"><span>Step-by-step</span><small>Ordered explanations and guidance</small><i>✓</i></button>
+                    <button type="button" role="option" data-response-style="detailed" aria-selected="false"><span>Detailed</span><small>More context and examples</small><i>✓</i></button>
+                  </div>
+                </div>
+              </div>
               <div class="setting-row" style="align-items:flex-start;flex-direction:column;gap:8px;">
-                <div><label for="personaInput">Custom instructions</label><span class="sub">Optional. These instructions are sent with your messages to the hosted model.</span></div>
+                <div><label for="personaInput">Custom instructions</label><span class="sub">Optional. These are added on top of the reply structure you choose.</span></div>
                 <textarea id="personaInput" placeholder="For example: explain ideas step by step and use simple language." style="width:100%;min-height:76px;padding:10px;background:var(--surface-soft);border:1px solid var(--border);border-radius:9px;color:var(--text);font:11px/1.6 var(--font);resize:vertical;"></textarea>
               </div>
               <div class="setting-row">
