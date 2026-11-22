@@ -688,6 +688,11 @@ def health():
 def favicon():
     return send_from_directory(PUBLIC_DIR, "favicon.svg", mimetype="image/svg+xml", max_age=3600)
 
+
+@app.route("/favicon.png")
+def favicon_png():
+    return send_from_directory(PUBLIC_DIR, "favicon.png", mimetype="image/png", max_age=3600)
+
 @app.route("/robots.txt")
 def robots_txt():
     return send_from_directory(PUBLIC_DIR, "robots.txt", mimetype="text/plain", max_age=3600)
