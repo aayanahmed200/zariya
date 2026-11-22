@@ -1181,10 +1181,146 @@ if(localModelRetryBtn){
   });
 }
 
-function downloadFile(filename, content){
-  const blob = new Blob([content], {type:'text/plain;charset=utf-8'});
-  const a = document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=filename; a.click();
-  URL.revokeObjectURL(a.href);
+function downloadFile(filename, content, mimeType='text/plain;charset=utf-8'){
+  const blob = new Blob([content], {type:mimeType});
+  const a = document.createElement('a');
+  const objectUrl = URL.createObjectURL(blob);
+  a.href = objectUrl;
+  a.download = filename;
+  a.click();
+  setTimeout(()=>URL.revokeObjectURL(objectUrl),1000);
+}
+
+
+/* ============ WORKSPACE BACKUP ============ */
+function exportWorkspaceBackup(){
+  const backup = {
+    format:'zariya-workspace-backup',
+    version:1,
+    exportedAt:new Date().toISOString(),
+    sessions,
+    notes,
+    decks
+  };
+  const stamp = new Date().toISOString().slice(0,10);
+  downloadFile('zariya-backup-'+stamp+'.json',JSON.stringify(backup,null,2),'application/json;charset=utf-8');
+  const note = document.getElementById('workspaceBackupNote');
+  if(note) note.textContent = 'Backup created. Keep the file somewhere private.';
+}
+
+function validateWorkspaceBackup(raw){
+  if(!raw || typeof raw!=='object' || raw.format!=='zariya-workspace-backup' || raw.version!==1){
+    throw new Error('This is not a supported Zariya workspace backup.');
+  }
+  if(!Array.isArray(raw.sessions) || !Array.isArray(raw.notes) || !Array.isArray(raw.decks)){
+    throw new Error('The backup is missing chats, notes or flashcards.');
+  }
+  if(raw.sessions.length>1000 || raw.notes.length>2000 || raw.decks.length>500){
+    throw new Error('The backup contains more items than Zariya can restore at once.');
+  }
+
+  const restoredSessions = raw.sessions.map((session,index)=>{
+    if(!session || typeof session!=='object' || !Array.isArray(session.messages) || session.messages.length>500){
+      throw new Error('Chat '+(index+1)+' has an invalid message list.');
+    }
+    const messages = session.messages.map(message=>{
+      if(!message || !['user','assistant'].includes(message.role) || typeof message.content!=='string'){
+        throw new Error('A chat contains an invalid message.');
+      }
+      return {role:message.role,content:message.content.slice(0,200000),ts:typeof message.ts==='string'?message.ts.slice(0,80):''};
+    });
+    return {
+      id:typeof session.id==='string' && session.id ? session.id.slice(0,100):uid(),
+      title:typeof session.title==='string'?session.title.slice(0,120):'Imported chat',
+      createdAt:Number.isFinite(Number(session.createdAt))?Number(session.createdAt):Date.now(),
+      messages
+    };
+  });
+
+  const restoredNotes = raw.notes.map((note,index)=>{
+    if(!note || typeof note!=='object' || typeof note.body!=='string'){
+      throw new Error('Note '+(index+1)+' is invalid.');
+    }
+    return {
+      id:typeof note.id==='string' && note.id?note.id.slice(0,100):uid(),
+      title:typeof note.title==='string'?note.title.slice(0,160):'Untitled note',
+      body:note.body.slice(0,200000),
+      tags:Array.isArray(note.tags)?note.tags.filter(tag=>typeof tag==='string').slice(0,30).map(tag=>tag.slice(0,40)):[]
+    };
+  });
+
+  const restoredDecks = raw.decks.map((deck,index)=>{
+    if(!deck || typeof deck!=='object' || !Array.isArray(deck.cards) || deck.cards.length>500){
+      throw new Error('Flashcard deck '+(index+1)+' has an invalid card list.');
+    }
+    const cards = deck.cards.map(card=>{
+      if(!card || typeof card.front!=='string' || typeof card.back!=='string'){
+        throw new Error('A flashcard is missing its front or back.');
+      }
+      return migrateCardForSpacedRepetition({
+        ...card,
+        id:typeof card.id==='string' && card.id?card.id.slice(0,100):uid(),
+        front:card.front.slice(0,2000),
+        back:card.back.slice(0,5000)
+      });
+    });
+    return {
+      id:typeof deck.id==='string' && deck.id?deck.id.slice(0,100):uid(),
+      name:typeof deck.name==='string'?deck.name.slice(0,120):'Imported deck',
+      tags:Array.isArray(deck.tags)?deck.tags.filter(tag=>typeof tag==='string').slice(0,30).map(tag=>tag.slice(0,40)):[],
+      cards,
+      createdAt:Number.isFinite(Number(deck.createdAt))?Number(deck.createdAt):Date.now()
+    };
+  });
+
+  return {sessions:restoredSessions,notes:restoredNotes,decks:restoredDecks};
+}
+
+const exportWorkspaceBtn=document.getElementById('exportWorkspaceBtn');
+const importWorkspaceBtn=document.getElementById('importWorkspaceBtn');
+const importWorkspaceFile=document.getElementById('importWorkspaceFile');
+if(exportWorkspaceBtn){
+  exportWorkspaceBtn.addEventListener('click',exportWorkspaceBackup);
+}
+if(importWorkspaceBtn && importWorkspaceFile){
+  importWorkspaceBtn.addEventListener('click',()=>importWorkspaceFile.click());
+  importWorkspaceFile.addEventListener('change',async event=>{
+    const file=event.target.files && event.target.files[0];
+    event.target.value='';
+    if(!file) return;
+    const note=document.getElementById('workspaceBackupNote');
+    if(file.size>4*1024*1024){
+      if(note) note.textContent='That backup is larger than 4 MB. Export a smaller workspace backup first.';
+      return;
+    }
+    importWorkspaceBtn.disabled=true;
+    const oldLabel=importWorkspaceBtn.textContent;
+    importWorkspaceBtn.textContent='Checking backup…';
+    try{
+      const raw=JSON.parse(await file.text());
+      const restored=validateWorkspaceBackup(raw);
+      const summary=restored.sessions.length+' chats, '+restored.notes.length+' notes and '+restored.decks.length+' decks';
+      if(!confirm('Replace this browser’s current Zariya workspace with '+summary+' from the selected backup?')) return;
+      sessions=restored.sessions;
+      notes=restored.notes;
+      decks=restored.decks;
+      currentSessionId=sessions.length?sessions[0].id:null;
+      currentNoteId=null;
+      currentDeckId=null;
+      editingIndex=null;
+      saveServerState();
+      renderSessionList();
+      renderChat();
+      renderNotesList();
+      renderDeckGrid();
+      if(note) note.textContent='Backup restored: '+summary+'.';
+    }catch(err){
+      if(note) note.textContent='Could not restore that backup. '+(err.message||'Choose a valid Zariya JSON backup.');
+    }finally{
+      importWorkspaceBtn.disabled=false;
+      importWorkspaceBtn.textContent=oldLabel;
+    }
+  });
 }
 
 /* ============ LIVE STATUS POLLING ============ */

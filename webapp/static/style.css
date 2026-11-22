@@ -655,3 +655,6 @@ button:disabled{cursor:not-allowed;}
 
 .composer-hint.local-save{color:var(--text-dim);}
 #hostedModelNote{max-width:70ch;line-height:1.55;}
+
+#workspaceBackupNote{max-width:72ch;line-height:1.55;}
+#exportWorkspaceBtn,#importWorkspaceBtn{min-width:132px;}
