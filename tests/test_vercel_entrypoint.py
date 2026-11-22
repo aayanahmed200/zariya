@@ -784,3 +784,22 @@ def test_chat_and_notepad_apply_urdu_typography_while_typing():
     assert "syncUrduInput(document.getElementById('note-tags-input'));" in source
     assert ".urdu-run{" in css
     assert "unicode-bidi:isolate" in css
+
+
+def test_flashcards_and_quiz_render_mixed_urdu_english_without_forcing_full_rtl():
+    source = (ROOT / "webapp" / "static" / "app.js").read_text(encoding="utf-8")
+    assert "dir=\"auto\">'+wrapUrduRuns(escapeHtml(c.front))" in source
+    assert "dir=\"auto\">'+wrapUrduRuns(escapeHtml(c.back))" in source
+    assert "wrapUrduRuns(escapeHtml(opt))" in source
+    assert "wrapUrduRuns(escapeHtml(q.front))" in source
+    assert "isPureUrdu(opt)?' is-urdu urdu':''" in source
+
+
+def test_quiz_options_lock_after_answer_and_show_accessible_feedback():
+    source = (ROOT / "webapp" / "static" / "app.js").read_text(encoding="utf-8")
+    assert 'id=\"quizFeedback\" role=\"status\" aria-live=\"polite\"' in source
+    assert "b.disabled=true;" in source
+    assert "b.setAttribute('aria-pressed',String(isChosen));" in source
+    assert "Your answer, correct" in source
+    assert "Your answer, incorrect" in source
+    assert "quiz-feedback.correct" in (ROOT / "webapp" / "static" / "style.css").read_text(encoding="utf-8")
