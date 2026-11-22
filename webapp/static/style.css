@@ -26,7 +26,7 @@
   --font:'DM Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
   --serif:'Lora',Georgia,serif;
   --mono:'IBM Plex Mono',monospace;
-  --urdu:'Markazi Text',serif;
+  --urdu:'Noto Sans Arabic',sans-serif;
 }
 [data-theme="dark"]{
   color-scheme:dark;
@@ -62,7 +62,7 @@ button{color:inherit}
 ::-webkit-scrollbar-thumb{background:var(--border-strong);border-radius:12px}
 ::-webkit-scrollbar-thumb:hover{background:var(--muted)}
 .urdu,[dir="rtl"]{font-family:var(--urdu);direction:rtl;text-align:right;line-height:2.45;font-weight:500}
-input.input-urdu,textarea.input-urdu{font-family:var(--urdu)!important;direction:rtl;text-align:right}
+.input-urdu{font-family:var(--urdu)!important}
 
 /* App frame */
 #app{display:flex;width:100%;height:100dvh;min-height:0;background:var(--bg)}
@@ -901,7 +901,7 @@ body{direction:ltr;text-align:left;background:var(--bg);color:var(--text)}
 
 
 /* Zariya readability and interaction polish */
-:root{--urdu:'Markazi Text',serif;--ui-press:color-mix(in srgb,var(--accent) 11%,var(--surface))}
+:root{--urdu:'Noto Sans Arabic',sans-serif;--ui-press:color-mix(in srgb,var(--accent) 11%,var(--surface))}
 .urdu,[dir="rtl"]{font-family:var(--urdu);direction:rtl;text-align:right;line-height:1.85;font-weight:500;font-size:1.06em}
 #chat-input[dir="rtl"],#note-title-input[dir="rtl"],#note-body-input[dir="rtl"]{font-family:var(--urdu);font-size:17px;line-height:1.8;text-align:right}
 .bubble.is-urdu{font-family:var(--urdu);font-size:1.14em;line-height:1.95;font-weight:500;direction:rtl;text-align:right}
@@ -999,3 +999,24 @@ button:disabled,.btn:disabled,.qt-btn:disabled,.deck-action-btn:disabled{cursor:
 }
 .toggle:active:not(:disabled) .toggle-knob{width:19px}
 .toggle:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+
+
+
+/* Urdu text rendering in mixed-language blocks and editable fields */
+.urdu-run{
+  font-family:var(--urdu);
+  direction:rtl;
+  unicode-bidi:isolate;
+  font-weight:500;
+  line-height:1.9;
+}
+.bubble .urdu-run{font-size:1.08em}
+.bubble h1 .urdu-run,.bubble h2 .urdu-run,.bubble h3 .urdu-run,.bubble h4 .urdu-run{
+  font-family:var(--urdu);
+}
+#chat-input.input-urdu,#note-title-input.input-urdu,#note-body-input.input-urdu,#note-tags-input.input-urdu{
+  font-family:var(--urdu)!important;
+  font-size:17px;
+  line-height:1.85;
+}
+.note-card-title .urdu-run,.note-card-preview .urdu-run{font-size:1.06em}
