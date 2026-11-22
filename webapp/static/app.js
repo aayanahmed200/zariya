@@ -4,7 +4,7 @@
 /* ============ LOCAL UI PREFERENCES (theme/font/etc -- not API keys, those are server-side) ============ */
 const LS = {
   get(k, d){ try{ const v = localStorage.getItem(k); return v===null? d : JSON.parse(v); }catch(e){ return d; } },
-  set(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} }
+  set(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); return true; }catch(e){ return false; } }
 };
 let uiPrefs = LS.get('zariya_ui_prefs', { theme:'light', fontSize:15, showTimestamps:true, ttsEnabled:false });
 let genPrefs = LS.get('zariya_gen_prefs', { persona:'', temperature:0.5 });
@@ -121,14 +121,16 @@ let saveFeedbackTimer = null;
 function saveServerState(){
   clearTimeout(saveTimer);
   const snapshot = {sessions,notes,decks};
-  LS.set(localStateKey, snapshot);
+  const localSaved = LS.set(localStateKey, snapshot);
   saveTimer = setTimeout(async ()=>{
     const hint = document.getElementById('composerHint');
     if(!stateBackendAvailable){
       if(hint){
-        hint.textContent = localStateMessage || "Saved on this device. Cloud sync is unavailable.";
-        hint.classList.remove('save-error');
-        hint.classList.add('local-save');
+        hint.textContent = localSaved
+          ? (localStateMessage || "Saved in this browser only.")
+          : "This browser could not save changes. Check its storage settings or export your chat.";
+        hint.classList.toggle('save-error',!localSaved);
+        hint.classList.toggle('local-save',localSaved);
         delete hint.dataset.saveError;
       }
       return;
@@ -142,18 +144,19 @@ function saveServerState(){
       }
     }catch(err){
       stateBackendAvailable = false;
-      localStateMessage = "Saved on this device. Cloud sync is unavailable.";
-      LS.set(localStateKey, snapshot);
+      localStateMessage = "Saved in this browser only · cloud sync is unavailable.";
+      const fallbackSaved = LS.set(localStateKey, snapshot);
       if(hint){
-        hint.textContent = localStateMessage;
-        hint.classList.remove('save-error');
-        hint.classList.add('local-save');
+        hint.textContent = fallbackSaved
+          ? localStateMessage
+          : "This browser could not save changes. Check its storage settings or export your chat.";
+        hint.classList.toggle('save-error',!fallbackSaved);
+        hint.classList.toggle('local-save',fallbackSaved);
         hint.dataset.saveError = 'true';
       }
     }
   }, 300);
 }
-
 
 /* ============ THEME / UI PREFS ============ */
 function applyUiPrefs(){
@@ -329,28 +332,34 @@ function renderChat(){
     scroll.classList.add('empty-mode'); inner.classList.add('empty-mode');
     const hero = document.createElement('div');
     hero.className = 'empty-hero';
+    const hasGenerativeModel = !!(serverConfig.claudeConfigured || serverConfig.localModelAvailable);
+    const promptCards = hasGenerativeModel ? [
+      {title:"Explain a concept",detail:"Break it down in Urdu or English.",prompt:"Explain photosynthesis in simple Urdu, step by step.",icon:'<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2Z"/><path d="M8 7h8M8 11h6"/>'},
+      {title:"Translate a phrase",detail:"Find the right words and meaning.",prompt:"Translate a fresh start into Urdu and explain the meaning.",icon:'<path d="m5 8 6 6M4 14l6-6 2-3M2 5h12M7 2h1M14 19l3-7 3 7M15.2 16h3.6"/>'},
+      {title:"Understand a problem",detail:"Work through it one step at a time.",prompt:"Help me understand how a quadratic equation works, step by step.",icon:'<path d="M9.5 18h5M10 22h4M8.2 14.5a7 7 0 1 1 7.6 0c-.8.6-1.3 1.4-1.5 2.5h-4.6c-.2-1.1-.7-1.9-1.5-2.5Z"/>'}
+    ] : [
+      {title:"Calculate",detail:"Try a quick arithmetic question.",prompt:"What is 12*14?",icon:'<path d="M4 3h16v18H4zM8 7h8M8 12h2m4 0h2m-8 4h2m4 0h2"/>'},
+      {title:"Convert a distance",detail:"Convert kilometres to miles.",prompt:"Convert 10 km to miles.",icon:'<path d="M4 7h15m-4-4 4 4-4 4M20 17H5m4-4-4 4 4 4"/>'},
+      {title:"Find a percentage",detail:"Calculate a percentage directly.",prompt:"17% of 240",icon:'<path d="M19 5 5 19M7 7h.01M17 17h.01"/><circle cx="7" cy="7" r="2"/><circle cx="17" cy="17" r="2"/>'}
+    ];
+    const heroHeadline = hasGenerativeModel ? "Understand more, in Urdu or English." : "Useful tools, in Urdu or English.";
+    const heroDescription = hasGenerativeModel
+      ? "Ask a question, explore an idea, or turn a useful reply into notes and flashcards."
+      : "Use built-in calculations and conversions, then keep useful work in notes and flashcards. Open-ended AI replies are not connected on this deployment yet.";
     hero.innerHTML =
       '<div class="hero-copy">'+
-        '<h1>Understand more, in Urdu or English.</h1>'+
-        '<p>Ask a question, explore an idea, or turn a useful reply into notes and flashcards.</p>'+
+        '<h1>'+heroHeadline+'</h1>'+
+        '<p>'+heroDescription+'</p>'+
         '<div class="hero-urdu" lang="ur" dir="rtl">کچھ بھی پوچھیں</div>'+
       '</div>'+
       '<div class="hero-prompts" aria-label="Start with an example">'+
-        '<button class="suggest-card" type="button" data-prompt="Explain photosynthesis in simple Urdu, step by step.">'+
-          '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2Z"/><path d="M8 7h8M8 11h6"/></svg>'+
-          '<span class="suggest-copy"><strong>Explain a concept</strong><small>Break it down in simple Urdu or English.</small></span>'+
-          '<svg class="suggest-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>'+
-        '</button>'+
-        '<button class="suggest-card" type="button" data-prompt="Translate a fresh start into Urdu and explain the meaning.">'+
-          '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 8 6 6M4 14l6-6 2-3M2 5h12M7 2h1M14 19l3-7 3 7M15.2 16h3.6"/></svg>'+
-          '<span class="suggest-copy"><strong>Translate a phrase</strong><small>Find the right words and meaning.</small></span>'+
-          '<svg class="suggest-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>'+
-        '</button>'+
-        '<button class="suggest-card" type="button" data-prompt="Help me understand how a quadratic equation works, step by step.">'+
-          '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9.5 18h5M10 22h4M8.2 14.5a7 7 0 1 1 7.6 0c-.8.6-1.3 1.4-1.5 2.5h-4.6c-.2-1.1-.7-1.9-1.5-2.5Z"/></svg>'+
-          '<span class="suggest-copy"><strong>Understand a problem</strong><small>Work through it one step at a time.</small></span>'+
-          '<svg class="suggest-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>'+
-        '</button>'+
+        promptCards.map(card=>
+          '<button class="suggest-card" type="button" data-prompt="'+escapeHtml(card.prompt)+'">'+
+            '<svg viewBox="0 0 24 24" aria-hidden="true">'+card.icon+'</svg>'+
+            '<span class="suggest-copy"><strong>'+escapeHtml(card.title)+'</strong><small>'+escapeHtml(card.detail)+'</small></span>'+
+            '<svg class="suggest-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>'+
+          '</button>'
+        ).join('')+
       '</div>';
     inner.appendChild(hero);
     hero.querySelectorAll('[data-prompt]').forEach(button=>{
@@ -1207,6 +1216,11 @@ function pollLocalModelStatus(){
     renderAccountUI();
     renderSessionList();
     renderChat();
+    if(!stateBackendAvailable){
+      const hint = document.getElementById('composerHint');
+      hint.textContent = localStateMessage;
+      hint.classList.add('local-save');
+    }
     pollLocalModelStatus();
   }catch(err){
     const inner = document.getElementById('chat-inner');
