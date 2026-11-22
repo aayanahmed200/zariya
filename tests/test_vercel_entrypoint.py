@@ -699,3 +699,41 @@ def test_transparent_favicon_is_used_by_page_and_manifest():
     assert 'href="/favicon.png?v=20261122-3"' in html
     assert manifest["icons"][0]["src"] == "/favicon.png?v=20261122-3"
     assert manifest["icons"][0]["type"] == "image/png"
+
+
+def test_github_sign_in_is_visible_with_setup_instructions_when_not_configured():
+    html = (ROOT / "webapp" / "templates" / "index.html").read_text(encoding="utf-8")
+    source = (ROOT / "webapp" / "static" / "app.js").read_text(encoding="utf-8")
+    assert 'id="githubSignInBtn"' in html
+    assert 'id="githubSetupPanel"' in html
+    assert "https://zariyas.vercel.app/auth/github/callback" in html
+    assert "GITHUB_CLIENT_ID" in html
+    assert "GITHUB_CLIENT_SECRET" in html
+    assert "serverConfig.githubConfigured ? 'flex' : 'none'" not in source
+    assert "Set up GitHub sign-in" in source
+    assert "GitHub identifies your profile" in html
+
+
+def test_github_login_uses_canonical_callback_and_signed_oauth_state(monkeypatch):
+    from webapp import app as webapp_module
+    webapp_module.GITHUB_OAUTH_CONFIGURED = True
+    webapp_module.GITHUB_CLIENT_ID = "test-client-id"
+    webapp_module.APP_BASE_URL = "https://zariyas.vercel.app"
+    client = index.app.test_client()
+    response = client.get("/auth/github/login")
+    assert response.status_code == 302
+    from urllib.parse import urlparse, parse_qs
+    query = parse_qs(urlparse(response.location).query)
+    assert query["client_id"] == ["test-client-id"]
+    assert query["redirect_uri"] == ["https://zariyas.vercel.app/auth/github/callback"]
+    assert len(query["state"][0]) >= 32
+    # Restore values so other tests see the usual unconfigured test environment.
+    webapp_module.GITHUB_OAUTH_CONFIGURED = False
+    webapp_module.GITHUB_CLIENT_ID = ""
+
+
+def test_github_callback_rejects_missing_or_wrong_state():
+    client = index.app.test_client()
+    response = client.get("/auth/github/callback?code=test&state=wrong")
+    assert response.status_code == 302
+    assert "authError=" in response.location
