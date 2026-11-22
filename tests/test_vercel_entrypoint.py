@@ -414,17 +414,20 @@ def test_quick_tool_falls_back_when_hosted_model_fails(monkeypatch):
     assert response.get_json()["result"] == "Fallback summary."
 
 
-def test_voice_input_has_urdu_english_choice_and_permission_feedback():
+def test_voice_input_records_wav_and_offers_urdu_english_language_choice():
     html = (ROOT / "webapp" / "templates" / "index.html").read_text(encoding="utf-8")
     source = (ROOT / "webapp" / "static" / "app.js").read_text(encoding="utf-8")
     assert 'id="voiceLanguage"' in html
     assert 'dir="auto"' in html
-    assert 'value="ur-PK"' in html
-    assert "recognizer.continuous = true" in source
-    assert "recognizer.interimResults = true" in source
+    assert 'data-language="en"' in html
+    assert 'data-language="ur"' in html
+    assert "navigator.mediaDevices.getUserMedia" in source
+    assert "function encodeWav(samples,sampleRate)" in source
+    assert "fetch('/api/transcribe'" in source
     assert "Microphone permission was blocked" in source
-    assert "Voice captured. Review the transcript before sending." in source
+    assert "Transcript ready. Review it, then press send." in source
     assert "stopVoiceRecognition();" in source
+    assert "SpeechRecognition" not in source
 
 
 def test_workspace_backup_and_flashcard_edit_controls_exist():
@@ -499,14 +502,15 @@ def test_deleting_or_restoring_notes_selects_a_valid_note():
     assert "currentNoteId=null;" in restore_block
 
 
-def test_voice_settings_explain_browser_processing_and_hosted_model_wording():
+def test_voice_settings_explain_hosted_transcription_and_privacy():
     html = (ROOT / "webapp" / "templates" / "index.html").read_text(encoding="utf-8")
-    assert "English and Urdu voice typing" in html
-    assert "Zariya does not save voice recordings" in html
-    assert "browser's speech-recognition provider" in html
+    assert "English and Urdu voice transcription" in html
+    assert "Zariya does not save microphone audio" in html
+    assert "Vercel AI Gateway and Microsoft Azure" in html
+    assert "about $0.10 per audio hour" in html
     assert "Ollama replies" not in html
     assert "sent with your messages to Ollama" not in html
-    assert "Hosted open-model chat" in html
+    assert "Hosted AI" in html
 
 
 def test_flashcard_json_import_is_bounded_and_repairs_review_values():
@@ -711,7 +715,7 @@ def test_github_sign_in_is_visible_with_setup_instructions_when_not_configured()
     assert "GITHUB_CLIENT_SECRET" in html
     assert "serverConfig.githubConfigured ? 'flex' : 'none'" not in source
     assert "Set up GitHub sign-in" in source
-    assert "GitHub identifies your profile" in html
+    assert "GitHub sign-in identifies your profile" in html
 
 
 def test_github_login_uses_canonical_callback_and_signed_oauth_state(monkeypatch):
