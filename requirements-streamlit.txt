@@ -1,0 +1,4 @@
+streamlit>=1.35.0
+llama-cpp-python>=0.2.80
+pyttsx3>=2.90
+requests>=2.31.0

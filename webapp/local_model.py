@@ -1,291 +1,373 @@
+"""Ollama inference for local development and hosted Vercel deployments.
+
+Local development uses the Ollama daemon at http://localhost:11434 by default.
+Vercel uses Ollama Cloud at https://ollama.com and requires OLLAMA_API_KEY.
+Credentials stay server-side and are never returned by an API route.
 """
-Local-model inference via Ollama, server-side.
+from __future__ import annotations
 
-Why Ollama instead of embedding llama-cpp-python directly: llama-cpp-python
-needs a working C++ build toolchain to install on many machines, which fails
-silently or loudly depending on the platform. Ollama (https://ollama.com) is
-a free, single-installer application -- prebuilt for Windows/Mac/Linux, no
-compiler, no account, no API key -- that runs open-source models locally and
-exposes them over a small local HTTP API. This module just talks to that API.
-
-Setup, once, on the machine that runs this server:
-1. Install Ollama from https://ollama.com/download (a normal app installer).
-2. Make sure it's running (it starts automatically after install on most
-   platforms; otherwise run the ollama app / 'ollama serve').
-3. That's it. On first request, this module asks Ollama to pull a small
-   default model automatically if it isn't already present -- no need to run
-   any command yourself.
-
-If Ollama isn't installed or isn't running, this module simply reports
-itself as unavailable and app.py falls through to the offline knowledge
-engine, so the app is never broken by this being absent.
-
-Override the model with LOCAL_MODEL_NAME in .env (any name from
-https://ollama.com/library). Override the Ollama address with OLLAMA_URL if
-it's running on a different host/port. Set DISABLE_LOCAL_MODEL=1 to skip
-trying to use a local model entirely. The active model can also be switched
-at runtime from Settings, without touching .env or restarting -- see
-set_active_model() below.
-"""
 import json
 import os
+import re
 import threading
-import time
+from urllib.parse import urlparse
 
 import requests
 
-OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://localhost:11434")
-DEFAULT_MODEL = os.environ.get("LOCAL_MODEL_NAME", "qwen2.5:1.5b")
-_DISABLED = os.environ.get("DISABLE_LOCAL_MODEL", "").lower() in ("1", "true", "yes")
+HOSTED_MODE = bool(os.environ.get("VERCEL"))
+OLLAMA_BASE_URL = (
+    os.environ.get("OLLAMA_BASE_URL")
+    or os.environ.get("OLLAMA_URL")
+    or ("https://ollama.com" if HOSTED_MODE else "http://localhost:11434")
+).rstrip("/")
+OLLAMA_API_KEY = os.environ.get("OLLAMA_API_KEY", "").strip()
+DEFAULT_MODEL = os.environ.get(
+    "OLLAMA_MODEL",
+    "gemma4:31b" if HOSTED_MODE else "qwen2.5:1.5b",
+).strip()
 
-_status = "starting"
-_ready = False
-_pulling = False
+_CLOUD_HOSTS = {"ollama.com", "www.ollama.com"}
+_MODE = "cloud" if (urlparse(OLLAMA_BASE_URL).hostname or "").lower() in _CLOUD_HOSTS else (
+    "remote" if HOSTED_MODE else "local"
+)
+_status = "Checking Ollama"
 _progress = {"completed": 0, "total": 0}
-_wake_event = threading.Event()
+_last_error = ""
+_pull_thread: threading.Thread | None = None
+_pull_lock = threading.Lock()
+_probe_cache = {"at": 0.0, "available": False, "status": "Not checked"}
+_MODEL_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$")
 
 
-def is_available() -> bool:
-    return _ready
-
-
-def load_status() -> str:
-    return _status
-
-
-def load_progress() -> dict:
-    """Bytes downloaded so far for the current/most recent pull, if known."""
-    return dict(_progress)
+class OllamaError(RuntimeError):
+    """A safe, user-facing Ollama error without credentials or request headers."""
 
 
 def current_model() -> str:
-    """The Ollama model name currently in use (or being downloaded, if a
-    switch to a new model is in progress)."""
     return DEFAULT_MODEL
 
 
-def retry_now() -> dict:
-    """Wakes the background loop up immediately instead of waiting out the
-    current backoff delay. Safe to call any time -- a no-op if a pull is
-    already in flight or the model is already loaded."""
-    if _ready:
-        return {"ok": True, "status": _status}
-    if _pulling:
-        return {"ok": False, "status": _status}
-    _wake_event.set()
-    return {"ok": True, "status": "Retrying now..."}
+def mode() -> str:
+    return _MODE
 
 
-def _ollama_running() -> bool:
+def _headers() -> dict[str, str]:
+    headers = {"Content-Type": "application/json"}
+    if OLLAMA_API_KEY:
+        headers["Authorization"] = f"Bearer {OLLAMA_API_KEY}"
+    return headers
+
+
+def configured() -> bool:
+    if HOSTED_MODE:
+        # Vercel must use an authenticated endpoint. Direct Ollama Cloud
+        # requires an API key; private self-hosted endpoints should too.
+        return bool(OLLAMA_API_KEY) and not OLLAMA_BASE_URL.startswith(("http://localhost", "http://127.0.0.1"))
+    if _MODE in ("cloud", "remote"):
+        return bool(OLLAMA_API_KEY)
+    return True
+
+
+def _friendly_http_error(response: requests.Response) -> str:
+    if response.status_code in (401, 403):
+        return "Ollama rejected the API key. Check OLLAMA_API_KEY in your deployment settings."
+    if response.status_code == 402:
+        return "Ollama Cloud needs usage credits for this model. Connect local Ollama in Settings to use a model on this device without cloud charges."
+    if response.status_code == 404:
+        return "Ollama could not find that model. Choose a model listed in Settings."
+    if response.status_code == 429:
+        return "Ollama is busy or the current usage limit was reached. Try again shortly."
+    if response.status_code >= 500:
+        return "Ollama is temporarily unavailable. Try again in a moment."
+    return f"Ollama returned HTTP {response.status_code}. Check the endpoint and model settings."
+
+
+def _request_error(exc: Exception) -> str:
+    if isinstance(exc, requests.Timeout):
+        return "Ollama took too long to respond. Try again or choose a smaller model."
+    if isinstance(exc, requests.ConnectionError):
+        return "Could not connect to Ollama. Check the configured Ollama endpoint."
+    return "The Ollama request failed. Check the model and endpoint settings."
+
+
+def _probe(force: bool = False) -> tuple[bool, str]:
+    """Check a local/remote Ollama server. Ollama Cloud has no local model
+    inventory endpoint, so for Cloud we validate presence of the API key here
+    and let the first chat request verify that the key and model are accepted."""
+    global _probe_cache, _status
+    if not configured():
+        if HOSTED_MODE:
+            _status = "Add OLLAMA_API_KEY in Vercel Environment Variables to connect Ollama Cloud."
+        else:
+            _status = "Start Ollama locally, or configure an authenticated remote Ollama endpoint."
+        return False, _status
+
+    import time
+    now = time.monotonic()
+    if _MODE == "cloud":
+        status_text = f"Ollama Cloud key set · {DEFAULT_MODEL} (verified on first message)"
+        _probe_cache = {"at": now, "available": True, "status": status_text}
+        _status = status_text
+        return True, status_text
+
+    if not force and now - _probe_cache["at"] < 15:
+        return bool(_probe_cache["available"]), str(_probe_cache["status"])
+
     try:
-        r = requests.get(f"{OLLAMA_URL}/api/tags", timeout=3)
-        return r.status_code == 200
-    except Exception:
-        return False
+        response = requests.get(f"{OLLAMA_BASE_URL}/api/tags", headers=_headers(), timeout=6)
+        if not response.ok:
+            status_text = _friendly_http_error(response)
+            available = False
+        else:
+            available = True
+            status_text = f"Ollama server connected · {DEFAULT_MODEL}"
+    except requests.RequestException as exc:
+        available = False
+        status_text = _request_error(exc)
+
+    _probe_cache = {"at": now, "available": available, "status": status_text}
+    _status = status_text
+    return available, status_text
 
 
-def _model_present(model: str) -> bool:
-    try:
-        r = requests.get(f"{OLLAMA_URL}/api/tags", timeout=5)
-        r.raise_for_status()
-        names = [m.get("name", "") for m in r.json().get("models", [])]
-        if ":" in model:
-            # Caller asked for a specific tag (e.g. "qwen2.5:1.5b") -- only an
-            # exact match counts. A prefix match here would let a completely
-            # different-sized pulled model (e.g. "qwen2.5:7b") silently pass
-            # as if the requested one were present.
-            return model in names
-        # No tag specified -- accept any tag of this base model (e.g. this
-        # picks up an already-pulled "qwen2.5:latest" for a bare "qwen2.5").
-        return any(n == model or n.startswith(model + ":") for n in names)
-    except Exception:
-        return False
+def connection_status() -> dict:
+    available, status_text = _probe()
+    return {
+        "configured": configured(),
+        "available": available,
+        "mode": _MODE,
+        "status": status_text,
+        "model": DEFAULT_MODEL,
+    }
+
+
+def is_available() -> bool:
+    return _probe()[0]
+
+
+def load_status() -> str:
+    return _probe()[1]
+
+
+def load_progress() -> dict:
+    return dict(_progress)
+
+
+def last_error() -> str:
+    return _last_error
 
 
 def list_models() -> list[dict]:
-    """Every model Ollama already has pulled on this machine, so Settings can
-    offer a dropdown of models that are instantly usable, with no download
-    wait, alongside the option to pull a new one by name."""
+    """List locally available models, or show the configured Cloud model.
+
+    Ollama Cloud's direct API exposes chat/inference endpoints rather than the
+    local daemon's /api/tags inventory, so cloud users can switch model names
+    manually in Settings.
+    """
+    if not configured():
+        return []
+    if _MODE == "cloud":
+        return [{"name": DEFAULT_MODEL, "size": 0}]
     try:
-        r = requests.get(f"{OLLAMA_URL}/api/tags", timeout=5)
-        r.raise_for_status()
+        response = requests.get(f"{OLLAMA_BASE_URL}/api/tags", headers=_headers(), timeout=8)
+        response.raise_for_status()
+        data = response.json()
+        models = data.get("models", []) if isinstance(data, dict) else []
         return [
-            {"name": m.get("name", ""), "size": m.get("size", 0)}
-            for m in r.json().get("models", [])
-            if m.get("name")
+            {"name": str(item.get("name", "")), "size": int(item.get("size") or 0)}
+            for item in models
+            if isinstance(item, dict) and item.get("name")
         ]
-    except Exception:
+    except (requests.RequestException, ValueError, TypeError):
         return []
 
 
-def _pull_model(model: str) -> bool:
-    """Streams a model pull from Ollama, actually reading each progress line
-    instead of discarding it, so a failure reported mid-stream (bad model
-    name, disk full, network drop) is caught instead of being silently
-    treated as success. Always re-checks with Ollama's own model list
-    afterwards before declaring victory, since a pull can end without an
-    exception and still not have produced a usable model.
+def _valid_model_name(name: str) -> bool:
+    return bool(_MODEL_NAME_RE.fullmatch(name.strip()))
+
+
+def set_active_model(name: str) -> dict:
+    """Select a model from the configured endpoint.
+
+    Hosted mode only changes the selected model; the cloud endpoint owns model
+    availability and downloads. Local mode may pull a missing model.
     """
-    global _status, _pulling, _progress
-    _pulling = True
+    global DEFAULT_MODEL, _status, _probe_cache
+    name = (name or "").strip()
+    if not _valid_model_name(name):
+        return {"ok": False, "error": "Enter a valid Ollama model name, such as gemma4:31b."}
+    if HOSTED_MODE:
+        if not configured():
+            return {"ok": False, "error": "Add OLLAMA_API_KEY in Vercel before selecting an Ollama Cloud model."}
+        DEFAULT_MODEL = name
+        _status = f"Selected {name}"
+        _probe_cache = {"at": 0.0, "available": False, "status": "Model selection changed"}
+        return {"ok": True, "model": DEFAULT_MODEL, "pulling": False}
+
+    available, _ = _probe(force=True)
+    if not available:
+        return {"ok": False, "error": _status}
+    names = {item["name"] for item in list_models()}
+    if name in names or (":" not in name and any(item.startswith(name + ":") for item in names)):
+        DEFAULT_MODEL = name
+        _status = f"Ollama connected · {DEFAULT_MODEL}"
+        return {"ok": True, "model": DEFAULT_MODEL, "pulling": False}
+
+    if _MODE != "local":
+        return {"ok": False, "error": "The selected model is not available on this Ollama endpoint."}
+    result = _start_pull(name)
+    return result
+
+
+def _start_pull(model: str) -> dict:
+    global _pull_thread
+    if HOSTED_MODE or _MODE != "local":
+        return {"ok": False, "error": "Model downloads are only supported by a local Ollama server."}
+    with _pull_lock:
+        if _pull_thread and _pull_thread.is_alive():
+            return {"ok": False, "error": "An Ollama model download is already running."}
+        _pull_thread = threading.Thread(target=_pull_and_activate, args=(model,), daemon=True)
+        _pull_thread.start()
+    return {"ok": True, "model": model, "pulling": True, "status": f"Downloading {model} from Ollama…"}
+
+
+def _pull_and_activate(model: str) -> None:
+    global DEFAULT_MODEL, _status, _progress, _probe_cache
     _progress = {"completed": 0, "total": 0}
     try:
-        _status = f"Downloading '{model}' via Ollama (one-time, may take a few minutes)..."
         with requests.post(
-            f"{OLLAMA_URL}/api/pull", json={"name": model}, stream=True, timeout=None
-        ) as r:
-            r.raise_for_status()
-            for line in r.iter_lines():
+            f"{OLLAMA_BASE_URL}/api/pull",
+            headers=_headers(),
+            json={"name": model, "stream": True},
+            stream=True,
+            timeout=(10, 900),
+        ) as response:
+            response.raise_for_status()
+            for line in response.iter_lines():
                 if not line:
                     continue
                 try:
                     payload = json.loads(line)
                 except (ValueError, TypeError):
                     continue
-
                 if payload.get("error"):
-                    _status = f"Failed to pull model '{model}' from Ollama: {payload['error']}"
-                    return False
-
+                    _status = "Ollama could not download that model. Check the model name and available disk space."
+                    return
                 total = payload.get("total")
                 completed = payload.get("completed")
                 if isinstance(total, int):
                     _progress["total"] = total
                 if isinstance(completed, int):
                     _progress["completed"] = completed
-                status_line = payload.get("status")
-                if status_line:
-                    if _progress["total"]:
-                        pct = round(_progress["completed"] / _progress["total"] * 100)
-                        _status = f"{status_line} ({pct}%)"
-                    else:
-                        _status = status_line
-
-        # A 200 response with no explicit "error" line still isn't proof the
-        # model is actually usable -- confirm it shows up in Ollama's own
-        # model list before telling the rest of the app it's ready.
-        if not _model_present(model):
-            _status = (
-                f"Ollama finished responding but '{model}' still isn't in its model "
-                "list -- the pull may have been interrupted. Will retry."
-            )
-            return False
-
-        return True
-    except Exception as e:
-        _status = f"Failed to pull model '{model}' from Ollama: {e}"
-        return False
-    finally:
-        _pulling = False
-
-
-def _init_in_background():
-    global _ready, _status
-    if _DISABLED:
-        _status = "not configured (DISABLE_LOCAL_MODEL is set)"
-        return
-    delay = 3
-    while True:
-        if not _ollama_running():
-            _status = ("Ollama isn't running yet -- install it from https://ollama.com/download and start it "
-                        "(this will retry automatically once it's up)")
-        elif not _model_present(DEFAULT_MODEL):
-            if _pull_model(DEFAULT_MODEL):
-                _status = "loaded"
-                _ready = True
-                return
-            # pull failed -- _pull_model already set a status message; retry after a delay
-        else:
-            _status = "loaded"
-            _ready = True
-            return
-        _wake_event.wait(delay)
-        _wake_event.clear()
-        delay = min(delay * 2, 60)
-
-
-threading.Thread(target=_init_in_background, daemon=True).start()
-
-
-def _pull_and_activate(model: str):
-    """Background worker for set_active_model() when the requested model
-    isn't already pulled: downloads it, and only flips the active model over
-    once it's confirmed present, so a failed switch leaves the previous
-    (working) model in place instead of pointing the app at nothing."""
-    global DEFAULT_MODEL, _ready, _status
-    if _pull_model(model):
+                if payload.get("status"):
+                    _status = str(payload["status"])
         DEFAULT_MODEL = model
-        _status = "loaded"
-        _ready = True
+        _status = f"Model ready · {model}"
+        _probe_cache = {"at": 0.0, "available": True, "status": _status}
+    except requests.RequestException as exc:
+        _status = _request_error(exc)
+    finally:
+        if _progress["total"] and _progress["completed"] >= _progress["total"]:
+            _progress = {"completed": 0, "total": 0}
 
 
-def set_active_model(name: str) -> dict:
-    """Switch which Ollama model Zariya talks to, at runtime, from Settings --
-    no .env edit or restart required. If the model is already pulled locally
-    this takes effect immediately; otherwise it kicks off a background
-    download and the frontend can poll /api/config in the meantime, exactly
-    like first-run setup does."""
-    global DEFAULT_MODEL, _ready, _status
-    name = (name or "").strip()
-    if not name:
-        return {"ok": False, "error": "No model name provided"}
-    if _pulling:
-        return {"ok": False, "error": "A model download is already in progress -- try again once it finishes"}
-    if not _ollama_running():
-        return {"ok": False, "error": "Ollama isn't running, so no model can be selected right now"}
-    if _model_present(name):
-        DEFAULT_MODEL = name
-        _status = "loaded"
-        _ready = True
-        return {"ok": True, "status": _status, "model": DEFAULT_MODEL, "pulling": False}
-    threading.Thread(target=_pull_and_activate, args=(name,), daemon=True).start()
-    return {"ok": True, "status": f"Downloading '{name}'...", "model": name, "pulling": True}
+def retry_now() -> dict:
+    if HOSTED_MODE or _MODE != "local":
+        return {"ok": False, "status": "Ollama Cloud manages hosted models; local pulls are not available on Vercel."}
+    if not configured():
+        return {"ok": False, "status": "Start your local Ollama server first."}
+    result = _start_pull(DEFAULT_MODEL)
+    return {"ok": result.get("ok", False), "status": result.get("status", result.get("error", ""))}
 
 
-def generate_reply(messages: list[dict], system_prompt: str, temperature: float | None = None) -> str | None:
-    if not _ready:
-        return None
-    chat_messages = [{"role": "system", "content": system_prompt}]
-    chat_messages += [{"role": m["role"], "content": m["content"]} for m in messages[-24:]]
-    payload = {"model": DEFAULT_MODEL, "messages": chat_messages, "stream": False}
+def _normalise_messages(messages: list[dict], system_prompt: str) -> list[dict]:
+    result = [{"role": "system", "content": system_prompt}]
+    result.extend(
+        {"role": item["role"], "content": item["content"]}
+        for item in messages[-24:]
+        if item.get("role") in ("user", "assistant") and isinstance(item.get("content"), str)
+    )
+    return result
+
+
+def _chat_payload(messages: list[dict], system_prompt: str, temperature: float | None, model: str | None) -> dict:
+    payload = {
+        "model": model.strip() if isinstance(model, str) and _valid_model_name(model.strip()) else DEFAULT_MODEL,
+        "messages": _normalise_messages(messages, system_prompt),
+        "stream": True,
+        "options": {"num_predict": 1200},
+    }
     if temperature is not None:
-        payload["options"] = {"temperature": temperature}
-    try:
-        res = requests.post(f"{OLLAMA_URL}/api/chat", json=payload, timeout=60)
-        res.raise_for_status()
-        data = res.json()
-        return data.get("message", {}).get("content")
-    except Exception:
+        payload["options"]["temperature"] = max(0.0, min(1.0, float(temperature)))
+    return payload
+
+
+def _raise_response_error(response: requests.Response) -> None:
+    if not response.ok:
+        raise OllamaError(_friendly_http_error(response))
+
+
+def generate_reply(
+    messages: list[dict],
+    system_prompt: str,
+    temperature: float | None = None,
+    model: str | None = None,
+) -> str | None:
+    if not is_available():
         return None
-
-
-def stream_reply(messages: list[dict], system_prompt: str, temperature: float | None = None):
-    """Yields reply tokens as they arrive from Ollama's streaming chat API,
-    for a real-time typing effect in the UI. Yields nothing (an empty
-    generator) if the local model isn't ready or the request fails partway --
-    callers should treat "no tokens yielded" the same as generate_reply()
-    returning None."""
-    if not _ready:
-        return
-    chat_messages = [{"role": "system", "content": system_prompt}]
-    chat_messages += [{"role": m["role"], "content": m["content"]} for m in messages[-24:]]
-    payload = {"model": DEFAULT_MODEL, "messages": chat_messages, "stream": True}
-    if temperature is not None:
-        payload["options"] = {"temperature": temperature}
+    payload = _chat_payload(messages, system_prompt, temperature, model)
+    payload["stream"] = False
     try:
-        with requests.post(f"{OLLAMA_URL}/api/chat", json=payload, timeout=120, stream=True) as res:
-            res.raise_for_status()
-            for line in res.iter_lines():
+        response = requests.post(
+            f"{OLLAMA_BASE_URL}/api/chat",
+            headers=_headers(),
+            json=payload,
+            timeout=(10, 55),
+        )
+        _raise_response_error(response)
+        data = response.json()
+        answer = data.get("message", {}).get("content")
+        return answer if isinstance(answer, str) and answer.strip() else None
+    except OllamaError:
+        raise
+    except (requests.RequestException, ValueError, TypeError) as exc:
+        raise OllamaError(_request_error(exc)) from exc
+
+
+def stream_reply(
+    messages: list[dict],
+    system_prompt: str,
+    temperature: float | None = None,
+    model: str | None = None,
+):
+    """Yield content tokens from Ollama's streaming chat endpoint."""
+    if not is_available():
+        raise OllamaError(load_status())
+    payload = _chat_payload(messages, system_prompt, temperature, model)
+    try:
+        with requests.post(
+            f"{OLLAMA_BASE_URL}/api/chat",
+            headers=_headers(),
+            json=payload,
+            stream=True,
+            timeout=(10, 55),
+        ) as response:
+            _raise_response_error(response)
+            for line in response.iter_lines():
                 if not line:
                     continue
                 try:
-                    payload_line = json.loads(line)
+                    chunk = json.loads(line)
                 except (ValueError, TypeError):
                     continue
-                token = payload_line.get("message", {}).get("content")
-                if token:
+                if chunk.get("error"):
+                    raise OllamaError("Ollama reported an error while generating the response.")
+                token = chunk.get("message", {}).get("content")
+                if isinstance(token, str) and token:
                     yield token
-                if payload_line.get("done"):
+                if chunk.get("done"):
                     return
-    except Exception:
-        return
+    except OllamaError:
+        raise
+    except (requests.RequestException, ValueError, TypeError) as exc:
+        raise OllamaError(_request_error(exc)) from exc

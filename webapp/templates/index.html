@@ -2,260 +2,460 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Zariya</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#ef702f">
+<meta name="color-scheme" content="light dark">
+<meta name="application-name" content="Zariya">
+<meta name="description" content="Zariya is a free Urdu and English AI workspace with hosted open-model chat, notes and flashcards. No local model installation or personal API key is required.">
+<meta name="robots" content="index, follow, max-image-preview:large">
+<meta name="author" content="Zariya">
+<title>Zariya — Free Urdu &amp; English AI Workspace</title>
+<link rel="canonical" href="https://zariyas.vercel.app/">
+<link rel="icon" type="image/png" sizes="128x128" href="/favicon.png?v=20261122-5">
+<link rel="shortcut icon" type="image/png" href="/favicon.png?v=20261122-5">
+<link rel="apple-touch-icon" sizes="128x128" href="/static/logo.png?v=20261122-4">
+<link rel="manifest" href="/site.webmanifest?v=20261122-5">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Zariya">
+<meta property="og:title" content="Zariya — Free Urdu &amp; English AI Workspace">
+<meta property="og:description" content="Chat in Urdu or English with a hosted open model. Keep notes and flashcards together in one simple workspace — no software install required.">
+<meta property="og:url" content="https://zariyas.vercel.app/">
+<meta property="og:locale" content="en_PK">
+<meta property="og:image" content="https://zariyas.vercel.app/static/logo.png">
+<meta property="og:image:alt" content="Zariya orange interlocking mark">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Zariya — Free Urdu &amp; English AI Workspace">
+<meta name="twitter:description" content="A free Urdu and English workspace for hosted AI chat, notes and flashcards. No local model installation required.">
+<meta name="twitter:image" content="https://zariyas.vercel.app/static/logo.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=IBM+Plex+Mono:wght@400;500&family=Noto+Nastaliq+Urdu:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Lora:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/style.css?v=20261122-4">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "WebApplication",
+  "name": "Zariya",
+  "url": "https://zariyas.vercel.app/",
+  "description": "A free Urdu and English AI workspace for hosted chat, voice typing, notes and flashcards.",
+  "applicationCategory": "Education",
+  "operatingSystem": "Any",
+  "inLanguage": ["en", "ur"],
+  "featureList": [
+    "Urdu and English chat",
+    "Hosted open-model chat",
+    "English and Urdu browser voice typing",
+    "Personal notes",
+    "Flashcards and study review"
+  ]
+}
+</script>
 </head>
 <body>
-
 <div id="app">
-<div class="sb-scrim" id="sbScrim"></div>
+  <div class="sb-scrim" id="sbScrim"></div>
 
-<aside id="sidebar">
-<div class="sb-header">
-<div class="sb-brand">
-<img class="sb-mark" src="{{ url_for('static', filename='logo.png') }}" alt="Zariya">
-<div class="sb-name">Zariya</div>
-</div>
-</div>
+  <aside id="sidebar" aria-label="Main navigation">
+    <div class="sb-header">
+      <a class="sb-brand" href="/" aria-label="Zariya home">
+        <img class="sb-mark" src="/static/logo.png" alt="">
+        <span class="sb-name">zariya</span>
+      </a>
+    </div>
 
-<button class="new-chat-btn" id="newChatBtn">
-<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
-New chat
-</button>
+    <button class="new-chat-btn" id="newChatBtn" type="button">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+      <span>New chat</span>
+      <span class="new-chat-shortcut">Ctrl K</span>
+    </button>
 
-<div class="sb-search">
-<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
-<input id="sessSearch" placeholder="Search chats">
-</div>
+    <label class="sb-search" for="sessSearch">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7.5"/><path d="m16.5 16.5 4 4"/></svg>
+      <input id="sessSearch" type="search" placeholder="Search conversations" autocomplete="off">
+    </label>
 
-<nav class="nav">
-<div class="nav-item active" data-view="chat">
-<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-Chat
-</div>
-<div class="nav-item" data-view="notepad">
-<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>
-Notepad
-</div>
-<div class="nav-item" data-view="flashcards">
-<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="16" height="12" rx="2"/><path d="M6 2h16v12"/></svg>
-Flashcards
-</div>
-<div class="nav-item" data-view="settings">
-<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-Settings
-</div>
-</nav>
+    <div class="nav-label">Workspace</div>
+    <nav class="nav">
+      <button class="nav-item active" type="button" data-view="chat">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11.5a7.5 7.5 0 0 1-7.5 7.5H6l-3 2v-6.5A7.5 7.5 0 0 1 10.5 7H12.5A7.5 7.5 0 0 1 20 14.5z"/><path d="M8 12h8M8 15h5"/></svg>
+        <span>Chat</span>
+      </button>
+      <button class="nav-item" type="button" data-view="notepad">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3.5h8l4 4V20a1.5 1.5 0 0 1-1.5 1.5h-10A1.5 1.5 0 0 1 6 20V5a1.5 1.5 0 0 1 1-1.5Z"/><path d="M14.5 3.5V8H19M9 12h6M9 16h6"/></svg>
+        <span>Notepad</span>
+      </button>
+      <button class="nav-item" type="button" data-view="flashcards">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="6" width="15" height="13" rx="2"/><path d="M7 3h13a1 1 0 0 1 1 1v12M7 10h7M7 14h4"/></svg>
+        <span>Flashcards</span>
+      </button>
+    </nav>
 
-<div class="sb-sessions" id="sessList">
-<div class="sb-sessions-label">Recents</div>
-</div>
+    <div class="sb-sessions" id="sessList">
+      <div class="sb-sessions-label">Recent chats</div>
+    </div>
 
-<div class="sb-footer">
-<button class="sb-profile-row" id="sbProfileRow">
-<span class="sb-profile-avatar" id="sbProfileAvatar">Z</span>
-<span class="sb-profile-name" id="sbProfileName">Sign in with GitHub</span>
-</button>
-<div class="sb-footer-bottom">
-<div class="status-pill"><span class="status-dot off" id="statusDot"></span><span id="statusText">Offline mode</span></div>
-<button class="icon-btn" id="themeToggleBtn" title="Toggle theme" aria-label="Toggle theme">
-<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
-</button>
-</div>
-</div>
-</aside>
+    <div class="sb-footer">
+      <button class="sb-profile-row" id="sbProfileRow" type="button">
+        <span class="sb-profile-avatar" id="sbProfileAvatar">Z</span>
+        <span class="sb-profile-copy">
+          <span class="sb-profile-name" id="sbProfileName">Saved in this browser</span>
+          <span class="sb-profile-caption">Personal workspace</span>
+        </span>
+        <svg class="sb-profile-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
+      </button>
+      <div class="sb-footer-bottom">
+        <span class="storage-caption"><span class="storage-dot"></span> Stored on this device</span>
+        <button class="icon-btn" id="themeToggleBtn" type="button" title="Toggle theme" aria-label="Toggle theme">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v2M12 19v2M3 12h2m14 0h2M5.6 5.6 7 7m10 10 1.4 1.4M18.4 5.6 17 7M7 17l-1.4 1.4"/><circle cx="12" cy="12" r="4"/></svg>
+        </button>
+      </div>
+    </div>
+  </aside>
 
-<main id="main">
-<div class="onboarding-banner" id="onboardingBanner" style="display:none;">
-<span class="ob-text">Zariya's local AI model runs through <strong>Ollama</strong>. If replies seem stuck in offline mode, make sure <a href="https://ollama.com" target="_blank" rel="noopener noreferrer">Ollama</a> is installed and running on the machine hosting this server, then use Settings &rarr; Retry download.</span>
-<button class="ob-dismiss" id="onboardingDismissBtn" aria-label="Dismiss">&times;</button>
-</div>
-<div class="topbar">
-<button class="hamburger" id="hamburgerBtn" aria-label="Open sidebar">
-<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"/></svg>
-</button>
-<div class="sb-name" style="font-size:15px;">Zariya</div>
-</div>
+  <main id="main">
+    <header class="topbar">
+      <div class="topbar-left">
+        <button class="hamburger" id="hamburgerBtn" type="button" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+        </button>
+        <div class="mobile-brand"><img src="/static/logo.png" alt=""><span>zariya</span></div>
+        <span class="topbar-divider"></span>
+        <span class="topbar-section" id="topbarSection">Chat</span>
+      </div>
+      <div class="topbar-right">
+        <span class="status-pill" role="status" aria-live="polite" title="Hosted model status"><span class="status-dot off" id="statusDot"></span><span id="statusText">Checking hosted AI…</span></span>
+        <button class="topbar-settings" type="button" data-view="settings" aria-label="Open settings" title="Settings">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1-1.8 1.8-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5v.2h-2.6v-.2a1.7 1.7 0 0 0-1-1.5 1.7 1.7 0 0 0-1.9.3l-.1.1-1.8-1.8.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H4v-2.6h.2a1.7 1.7 0 0 0 1.5-1 1.7 1.7 0 0 0-.3-1.9l-.1-.1 1.8-1.8.1.1a1.7 1.7 0 0 0 1.9.3 1.7 1.7 0 0 0 1-1.5V4h2.6v.2a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1 1.8 1.8-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.5 1h.2v2.6h-.2a1.7 1.7 0 0 0-1.5 1Z"/></svg>
+        </button>
+      </div>
+    </header>
 
-<!-- CHAT VIEW -->
-<section class="view active" id="view-chat">
-<div id="chat-scroll">
-<div id="chat-inner"></div>
-</div>
-<div class="quick-tools" id="quickTools" style="display:none;">
-<button class="qt-btn" data-tool="summarize">Summarize</button>
-<button class="qt-btn" data-tool="keypoints">Key points</button>
-<button class="qt-btn" data-tool="flashcards">Make flashcards</button>
-<button class="qt-btn" data-tool="translate">Translate last</button>
-<button class="qt-btn" data-tool="websearch">Search web</button>
-<button class="qt-btn" data-tool="title">Auto-title</button>
-<button class="qt-btn" data-tool="exportchat">Export chat</button>
-</div>
-<div id="composer">
-<div class="composer-inner">
-<div class="composer-box" id="composerBox">
-<button class="composer-btn mic" id="micBtn" title="Voice input" aria-label="Voice input">
-<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2M12 19v4"/></svg>
-</button>
-<textarea id="chat-input" rows="1" placeholder="Reply to Zariya… کچھ بھی پوچھیں"></textarea>
-<button class="composer-btn send" id="sendBtn" data-mode="send" disabled aria-label="Send message">
-<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
-</button>
-</div>
-<div class="composer-hint" id="composerHint">Zariya can make mistakes. Offline core runs entirely on this server.</div>
-</div>
-</div>
-</section>
+    <div class="onboarding-banner" id="onboardingBanner" style="display:none;">
+      <span class="ob-icon">i</span>
+      <span class="ob-text">Hosted AI is ready to use. No installation required.</span>
+      <button class="ob-settings-link" type="button" data-view="settings">Open settings</button>
+      <button class="ob-dismiss" id="onboardingDismissBtn" type="button" aria-label="Dismiss">&times;</button>
+    </div>
 
-<!-- NOTEPAD VIEW -->
-<section class="view" id="view-notepad">
-<div class="page-head">
-<h1>Notepad</h1>
-<p>Notes saved server-side to your account</p>
-<div class="page-head-actions">
-<button class="btn" id="exportNoteBtn">Export .md</button>
-<button class="btn primary" id="newNoteBtn">New note</button>
-</div>
-</div>
-<div id="notepad-body">
-<div class="notes-list-wrap">
-<div class="tag-filter-row" id="noteTagFilterRow"></div>
-<div class="notes-list" id="notesList"></div>
-</div>
-<div class="note-editor">
-<div class="note-toolbar">
-<button class="btn" id="noteToFlashBtn">Turn into flashcards</button>
-<button class="btn danger" id="deleteNoteBtn">Delete note</button>
-</div>
-<input id="note-title-input" placeholder="Untitled note">
-<input id="note-tags-input" class="tag-input" placeholder="Tags: comma, separated (e.g. urdu, grammar)">
-<textarea id="note-body-input" placeholder="Start writing… اردو یا انگریزی میں لکھیں"></textarea>
-</div>
-</div>
-</section>
+    <section class="view active" id="view-chat" aria-label="Chat">
+      <div id="chat-scroll">
+        <div id="chat-inner" class="empty-mode">
+          <div class="empty-hero">
+            <div class="hero-kicker">URDU · ENGLISH · MORE</div>
+            <h1>What would you like to work on?</h1>
+            <div class="urdu-line" lang="ur" dir="rtl">آئیے کچھ نیا سیکھتے ہیں</div>
+            <p>Ask a question, explore an idea, or practise something you are learning.</p>
+          </div>
+        </div>
+      </div>
 
-<!-- FLASHCARDS VIEW -->
-<section class="view" id="view-flashcards">
-<div class="page-head">
-<h1>Flashcards</h1>
-<p>Spaced review decks, generated or hand-made</p>
-<div class="page-head-actions">
-<button class="btn" id="importDeckBtn">Import deck</button>
-<input type="file" id="importDeckFile" accept="application/json" style="display:none;">
-<button class="btn primary" id="newDeckBtn">New deck</button>
-</div>
-</div>
-<div id="fc-body">
-<div class="tag-filter-row" id="deckTagFilterRow"></div>
-<div class="deck-grid" id="deckGrid"></div>
-<div class="study-area" id="studyArea" style="display:none;"></div>
-<div class="study-area" id="quizArea" style="display:none;"></div>
-</div>
-</section>
+      <div class="chat-dock">
+        <div class="quick-tools" id="quickTools">
+          <button class="qt-btn" type="button" data-tool="summarize">Summarise</button>
+          <button class="qt-btn" type="button" data-tool="keypoints">Key points</button>
+          <button class="qt-btn" type="button" data-tool="flashcards">Make flashcards</button>
+          <button class="qt-btn" type="button" data-tool="translate">Translate</button>
+          <button class="qt-btn" type="button" data-tool="websearch">Search web</button>
+          <button class="qt-btn" type="button" data-tool="exportchat">Export chat</button>
+        </div>
+        <div id="composer">
+          <div class="composer-inner">
+            <div class="composer-box" id="composerBox">
+              <button class="composer-btn mic" id="micBtn" type="button" title="Start voice typing" aria-label="Start voice typing" aria-pressed="false">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="2.5" width="6" height="12" rx="3"/><path d="M5.5 11.5a6.5 6.5 0 0 0 13 0M12 18v3.5M8.5 21.5h7"/></svg>
+              </button>
+              <div class="voice-dropdown" id="voiceDropdown">
+                <input type="hidden" id="voiceLanguage" value="auto">
+                <button class="voice-dropdown-trigger" id="voiceDropdownTrigger" type="button" aria-haspopup="listbox" aria-expanded="false" aria-controls="voiceDropdownMenu" aria-label="Transcription language: Auto detect">
+                  <span id="voiceDropdownLabel">AUTO</span>
+                  <svg viewBox="0 0 16 16" aria-hidden="true"><path d="m4 6 4 4 4-4"/></svg>
+                </button>
+                <div class="voice-dropdown-menu" id="voiceDropdownMenu" role="listbox" aria-label="Transcription language" hidden>
+                  <button type="button" role="option" data-language="auto" aria-selected="true"><span>Auto detect</span><small>Urdu and English</small><i>✓</i></button>
+                  <button type="button" role="option" data-language="en" aria-selected="false"><span>English</span><small>English speech</small><i>✓</i></button>
+                  <button type="button" role="option" data-language="ur" aria-selected="false"><span lang="ur" dir="rtl">اردو</span><small>Urdu speech</small><i>✓</i></button>
+                </div>
+              </div>
+              <textarea id="chat-input" rows="1" dir="auto" placeholder="Message Zariya…  اردو میں بھی لکھیں" aria-label="Message Zariya"></textarea>
+              <button class="composer-btn send" id="sendBtn" type="button" data-mode="send" disabled aria-label="Send message">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+              </button>
+            </div>
+            <div class="composer-footer">
+              <span class="composer-hint" id="composerHint" role="status" aria-live="polite">Start a chat in Urdu or English.</span>
+              <span class="composer-enter">Enter to send · Shift + Enter for a new line</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
 
-<!-- SETTINGS VIEW -->
-<section class="view" id="view-settings">
-<div class="page-head"><h1>Settings</h1><p>Personalize your experience -- saved per browser, no restart needed</p></div>
-<div id="settings-body">
+    <section class="view" id="view-notepad" aria-label="Notepad">
+      <div class="page-head">
+        <div>
+          <div class="page-eyebrow">YOUR WORKSPACE</div>
+          <h2>Notepad</h2>
+          <p id="storageDescription">Saved in this browser. Not synced across devices.</p>
+        </div>
+        <div class="page-head-actions">
+          <button class="btn" id="exportNoteBtn" type="button">Export note</button>
+          <button class="btn primary" id="newNoteBtn" type="button"><span class="button-plus">+</span> New note</button>
+        </div>
+      </div>
+      <div id="notepad-body">
+        <div class="notes-list-wrap">
+          <div class="notes-list-head">Your notes</div>
+          <div class="tag-filter-row" id="noteTagFilterRow"></div>
+          <div class="notes-list" id="notesList"></div>
+        </div>
+        <div class="note-editor is-empty">
+          <div class="note-toolbar">
+            <div class="note-toolbar-left"><span class="note-editor-label">EDITOR</span><span class="note-save-status" id="noteSaveStatus" role="status" aria-live="polite">Saved on this device</span></div>
+            <div class="note-toolbar-actions">
+              <button class="btn" id="noteToFlashBtn" type="button" disabled>Turn into flashcards</button>
+              <button class="btn danger" id="deleteNoteBtn" type="button" disabled>Delete</button>
+            </div>
+          </div>
+          <div class="note-editor-empty" id="noteEmptyState">
+            <span class="note-empty-mark" aria-hidden="true">✎</span>
+            <h3>Your notes start here</h3>
+            <p>Create a note to collect ideas, class notes and things you want to remember.</p>
+            <button class="btn primary" id="createFirstNoteBtn" type="button">Create your first note</button>
+          </div>
+          <div class="note-editor-fields" id="noteEditorFields" hidden>
+            <input id="note-title-input" placeholder="Untitled note" aria-label="Note title" dir="auto">
+            <input id="note-tags-input" class="tag-input" placeholder="Add tags, separated by commas" aria-label="Note tags" dir="auto">
+            <textarea id="note-body-input" placeholder="Start writing here…" dir="auto"></textarea>
+          </div>
+        </div>
+      </div>
+    </section>
 
-<div class="setting-group">
-<h3><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:6px;"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>Account</h3>
-<p class="desc">Real GitHub sign-in (OAuth) -- the server holds the credentials, never the browser.</p>
-<div class="setting-row" id="accountSignedOutRow">
-<button class="btn primary" id="githubSignInBtn">Sign in with GitHub</button>
-</div>
-<div class="setting-row" id="accountSignedInRow" style="display:none; align-items:center; gap:12px;">
-<img id="accountAvatar" style="width:40px;height:40px;border-radius:50%;" alt="">
-<div style="flex:1;">
-<div id="accountName" style="font-weight:700;"></div>
-<div id="accountBio" style="font-size:12px;color:var(--text-muted);"></div>
-</div>
-<button class="btn danger" id="githubSignOutBtn">Sign out</button>
-</div>
-<div class="small-note" id="githubConfigNote"></div>
-</div>
+    <section class="view" id="view-flashcards" aria-label="Flashcards">
+      <div class="page-head">
+        <div>
+          <div class="page-eyebrow">LEARN BY REVIEWING</div>
+          <h2>Flashcards</h2>
+          <p>Small reviews make knowledge easier to remember.</p>
+        </div>
+        <div class="page-head-actions">
+          <button class="btn" id="importDeckBtn" type="button">Import deck</button>
+          <input type="file" id="importDeckFile" accept="application/json" hidden>
+          <button class="btn primary" id="newDeckBtn" type="button"><span class="button-plus">+</span> New deck</button>
+        </div>
+      </div>
+      <div id="fc-body">
+        <div class="tag-filter-row" id="deckTagFilterRow"></div>
+        <div class="deck-grid" id="deckGrid"></div>
+        <div class="study-area" id="studyArea" style="display:none;"></div>
+        <div class="study-area" id="quizArea" style="display:none;"></div>
+      </div>
+    </section>
 
-<div class="setting-group">
-<h3><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:6px;"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>Appearance</h3>
-<p class="desc">Theme and reading comfort</p>
-<div class="setting-row">
-<div><label>Theme</label></div>
-<div class="theme-row">
-<div class="theme-opt" data-theme-opt="light">Light</div>
-<div class="theme-opt" data-theme-opt="dark">Dark</div>
-</div>
-</div>
-<div class="setting-row">
-<div><label>Message font size</label><div class="sub" id="fontSizeLabel">15px</div></div>
-<input type="range" min="13" max="19" value="15" class="slider" id="fontSizeSlider" style="width:140px;">
-</div>
-<div class="setting-row">
-<div><label>Show timestamps</label></div>
-<div class="toggle" id="toggleTimestamps"><div class="toggle-knob"></div></div>
-</div>
-</div>
+    <section class="view" id="view-settings" aria-label="Settings">
+      <div class="page-head">
+        <div>
+          <div class="page-eyebrow">MAKE IT YOURS</div>
+          <h2>Settings</h2>
+          <p>Adjust your workspace, replies and voice tools.</p>
+        </div>
+      </div>
+      <div id="settings-body">
+        <div class="settings-layout">
+          <div class="setting-group">
+            <div class="setting-heading">
+              <span class="setting-icon">◎</span>
+              <div><h3>Account &amp; storage</h3><p class="desc">Your current workspace is stored in this browser.</p></div>
+            </div>
+            <div class="setting-content">
+              <div class="setting-row" id="accountSignedOutRow">
+                <div class="account-connect-copy"><label>Connect your GitHub account</label><div class="sub" id="githubConfigNote">Sign in to identify your workspace profile.</div></div>
+                <button class="btn github-sign-in" id="githubSignInBtn" type="button">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 .8a11.2 11.2 0 0 0-3.54 21.82c.56.1.77-.24.77-.54v-2.1c-3.14.68-3.8-1.33-3.8-1.33-.51-1.3-1.26-1.65-1.26-1.65-1.02-.7.08-.69.08-.69 1.13.08 1.73 1.16 1.73 1.16 1 .1.77 1.48 2.55 1.1.1-.72.4-1.2.73-1.48-2.5-.28-5.13-1.25-5.13-5.57 0-1.23.44-2.24 1.16-3.03-.12-.28-.5-1.43.1-2.98 0 0 .94-.3 3.08 1.16a10.7 10.7 0 0 1 5.6 0c2.14-1.46 3.08-1.16 3.08-1.16.6 1.55.22 2.7.1 2.98.72.79 1.15 1.8 1.15 3.03 0 4.33-2.63 5.28-5.14 5.56.4.35.77 1.03.77 2.08v3.08c0 .3.2.65.78.54A11.2 11.2 0 0 0 12 .8Z"/></svg>
+                  <span>Sign in with GitHub</span>
+                </button>
+              </div>
+              <div class="github-setup-panel" id="githubSetupPanel" hidden>
+                <div class="github-setup-heading"><strong>Finish the one-time GitHub setup</strong><span>About two minutes</span></div>
+                <p>Create a GitHub OAuth App, then add its Client ID and Client Secret to your Vercel project. Keep the secret in Vercel; never paste it into this page or commit it to GitHub.</p>
+                <div class="github-url-field">
+                  <span>Homepage URL</span>
+                  <code>https://zariyas.vercel.app</code>
+                </div>
+                <div class="github-url-field">
+                  <span>Authorization callback URL</span>
+                  <code>https://zariyas.vercel.app/auth/github/callback</code>
+                  <button type="button" class="github-copy-url" id="copyGithubCallbackBtn">Copy</button>
+                </div>
+                <a class="github-setup-link" href="https://github.com/settings/developers" target="_blank" rel="noopener noreferrer">Open GitHub Developer settings ↗</a>
+                <p class="github-setup-footnote">In Vercel → Project Settings → Environment Variables, add <code>GITHUB_CLIENT_ID</code> and <code>GITHUB_CLIENT_SECRET</code> for Production, Preview and Development. A stable session secret and the callback URL have already been prepared in this project.</p>
+                <p class="github-setup-footnote">GitHub sign-in identifies your profile. Chats, notes and flashcards are still saved on this device; signing in does not sync them across devices.</p>
+              </div>
+              <div class="account-auth-status" id="accountAuthStatus" role="status" aria-live="polite" hidden></div>
+              <div class="setting-row signed-in-row" id="accountSignedInRow" style="display:none;">
+                <img id="accountAvatar" src="/static/logo.png" alt="Profile avatar">
+                <div class="account-details"><strong id="accountName"></strong><span class="sub" id="accountBio"></span></div>
+                <button class="btn danger" id="githubSignOutBtn" type="button">Sign out</button>
+              </div>
+              <div class="workspace-backup">
+                <div>
+                  <strong>Protect your workspace</strong>
+                  <p>Chats, notes and flashcards are saved in this browser only. Export a backup before clearing browser data or moving devices.</p>
+                </div>
+                <div class="workspace-backup-actions">
+                  <button class="btn primary" id="exportWorkspaceBtn" type="button">Export backup</button>
+                  <button class="btn" id="importWorkspaceBtn" type="button">Restore backup</button>
+                  <input id="importWorkspaceFile" type="file" accept="application/json,.json" hidden>
+                </div>
+                <span class="storage-status" id="storageStatus" role="status" aria-live="polite">Changes are saved automatically on this device.</span>
+              </div>
+            </div>
+          </div>
 
-<div class="setting-group">
-<h3><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:6px;"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2M12 19v4"/></svg>Voice</h3>
-<p class="desc">Browser's built-in speech engine</p>
-<div class="setting-row">
-<div><label>Read replies aloud</label></div>
-<div class="toggle" id="toggleTTS"><div class="toggle-knob"></div></div>
-</div>
-</div>
+          <div class="setting-group">
+            <div class="setting-heading">
+              <span class="setting-icon">◐</span>
+              <div><h3>Appearance</h3><p class="desc">Keep the workspace comfortable to read.</p></div>
+            </div>
+            <div class="setting-content">
+              <div class="setting-row">
+                <div><label>Theme</label><div class="sub">Light or dark interface</div></div>
+                <div class="theme-row">
+                  <button class="theme-opt active" type="button" data-theme-opt="light" aria-pressed="true">Light</button>
+                  <button class="theme-opt" type="button" data-theme-opt="dark" aria-pressed="false">Dark</button>
+                </div>
+              </div>
+              <div class="setting-row">
+                <div><label for="fontSizeSlider">Message text size</label><div class="sub" id="fontSizeLabel">15px</div></div>
+                <input type="range" min="13" max="19" value="15" class="slider" id="fontSizeSlider">
+              </div>
+              <div class="setting-row">
+                <div><label>Show timestamps</label><div class="sub">Display the time below each message</div></div>
+                <button class="toggle" id="toggleTimestamps" type="button" aria-label="Toggle timestamps"><span class="toggle-knob"></span></button>
+              </div>
+            </div>
+          </div>
 
-<div class="setting-group">
-<h3><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:6px;"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>Persona &amp; creativity</h3>
-<p class="desc">Tune how Zariya replies to you specifically -- these are saved in this browser and sent with each message, applied to whichever model answers (Claude or the local model).</p>
-<div class="setting-row" style="align-items:flex-start;flex-direction:column;gap:8px;">
-<label for="personaInput">Custom persona / system prompt</label>
-<textarea id="personaInput" placeholder="Leave blank to use Zariya's default personality" style="width:100%;min-height:70px;font-family:inherit;font-size:13px;padding:10px;border-radius:10px;border:1px solid var(--border);background:var(--bg-elevated);color:var(--text);resize:vertical;"></textarea>
-</div>
-<div class="setting-row">
-<div><label>Creativity</label><div class="sub" id="creativityLabel">Balanced (0.5)</div></div>
-<input type="range" min="0" max="100" value="50" class="slider" id="creativitySlider" style="width:140px;">
-</div>
-<div class="setting-row">
-<button class="btn" id="resetPersonaBtn">Reset to defaults</button>
-</div>
-</div>
+          <div class="setting-group">
+            <div class="setting-heading">
+              <span class="setting-icon">✎</span>
+              <div><h3>Response style</h3><p class="desc">Adjust the tone and creativity of hosted model replies.</p></div>
+            </div>
+            <div class="setting-content">
+              <div class="setting-row response-preset-row">
+                <div><label>Reply structure</label><span class="sub">Choose how answers are organized</span></div>
+                <div class="response-preset-dropdown" id="responsePresetDropdown">
+                  <button class="response-preset-trigger" id="responsePresetTrigger" type="button" aria-haspopup="listbox" aria-expanded="false" aria-controls="responsePresetMenu" aria-label="Response style: Balanced">
+                    <span id="responsePresetLabel">Balanced</span>
+                    <svg viewBox="0 0 16 16" aria-hidden="true"><path d="m4 6 4 4 4-4"/></svg>
+                  </button>
+                  <div class="response-preset-menu" id="responsePresetMenu" role="listbox" aria-label="Response style" hidden>
+                    <button type="button" role="option" data-response-style="balanced" aria-selected="true"><span>Balanced</span><small>Clear answers with useful context</small><i>✓</i></button>
+                    <button type="button" role="option" data-response-style="concise" aria-selected="false"><span>Concise</span><small>Short, direct answers</small><i>✓</i></button>
+                    <button type="button" role="option" data-response-style="steps" aria-selected="false"><span>Step-by-step</span><small>Ordered explanations and guidance</small><i>✓</i></button>
+                    <button type="button" role="option" data-response-style="detailed" aria-selected="false"><span>Detailed</span><small>More context and examples</small><i>✓</i></button>
+                  </div>
+                </div>
+              </div>
+              <div class="setting-row" style="align-items:flex-start;flex-direction:column;gap:8px;">
+                <div><label for="personaInput">Custom instructions</label><span class="sub">Optional. These are added on top of the reply structure you choose.</span></div>
+                <textarea id="personaInput" placeholder="For example: explain ideas step by step and use simple language." dir="auto" style="width:100%;min-height:76px;padding:10px;background:var(--surface-soft);border:1px solid var(--border);border-radius:9px;color:var(--text);font:11px/1.6 var(--font);resize:vertical;"></textarea>
+              </div>
+              <div class="setting-row">
+                <div><label for="creativitySlider">Creativity</label><span class="sub" id="creativityLabel">Balanced (0.50)</span></div>
+                <input type="range" min="0" max="100" value="50" class="slider" id="creativitySlider">
+              </div>
+              <div class="setting-row"><span></span><button class="btn" id="resetPersonaBtn" type="button">Reset instructions</button></div>
+            </div>
+          </div>
 
-<div class="setting-group">
-<h3><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:6px;"><path d="M12 2a10 10 0 1 0 10 10"/><path d="M12 2v10l7 4"/></svg>AI status</h3>
-<p class="desc">Local AI model is the default and needs no key -- it downloads and runs entirely on this server. Claude API and web search below are both entirely optional, for whoever deploys this server to add if they want.</p>
-<div class="setting-row"><label>Local AI model (default)</label><span id="localModelStatusText" class="sub"></span></div>
-<div class="setting-row" id="localModelRetryRow" style="display:none;">
-<div class="progress-bar-track"><div class="progress-bar-fill" id="localModelProgressFill"></div></div>
-<button class="btn" id="localModelRetryBtn">Retry download</button>
-</div>
-<div class="setting-row" style="align-items:flex-start;flex-direction:column;gap:8px;">
-<label for="modelSelect">Switch local model</label>
-<select id="modelSelect" style="width:100%;padding:8px 10px;border-radius:10px;border:1px solid var(--border);background:var(--bg-elevated);color:var(--text);font-size:13px;">
-<option value="">Loading models…</option>
-</select>
-</div>
-<div class="setting-row" style="gap:8px;">
-<input id="newModelInput" placeholder="Or pull a new model, e.g. llama3.2:1b" style="flex:1;padding:8px 10px;border-radius:10px;border:1px solid var(--border);background:var(--bg-elevated);color:var(--text);font-size:13px;">
-<button class="btn" id="pullModelBtn">Pull &amp; use</button>
-</div>
-<div class="small-note" id="modelSwitchNote"></div>
-<div class="setting-row"><label>Claude API (optional)</label><span id="claudeStatusText" class="sub"></span></div>
-<div class="setting-row"><label>Web search (optional)</label><span id="searchStatusText" class="sub"></span></div>
-</div>
+          <div class="setting-group">
+            <div class="setting-heading">
+              <span class="setting-icon">◖</span>
+              <div><h3>Voice</h3><p class="desc">Use the speech features available in your browser.</p></div>
+            </div>
+            <div class="setting-content">
+              <div class="setting-row">
+                <div><label>Read replies aloud</label><div class="sub">Uses your browser's speech engine.</div></div>
+                <button class="toggle" id="toggleTTS" type="button" aria-label="Toggle read aloud"><span class="toggle-knob"></span></button>
+              </div>
+              <div class="voice-typing-note">
+                <strong>English and Urdu voice transcription</strong>
+                <p>Record up to 60 seconds. Zariya transcribes the WAV recording through Vercel AI Gateway using Microsoft MAI-Transcribe 2, with automatic language detection or an English/Urdu hint. Zariya does not save microphone audio. The recording is sent to Vercel AI Gateway and Microsoft Azure for transcription; avoid recording private or sensitive conversations.</p>
+                <p class="voice-cost-note">The listed transcription rate is about $0.10 per audio hour (roughly $0.0017 per minute). Usage is billed to the service owner and can change.</p>
+              </div>
+            </div>
+          </div>
 
-<div class="setting-group">
-<h3><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:6px;"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>About</h3>
-<p class="desc">Zariya -- an offline-first, privacy-focused assistant for Urdu and other low-resource languages. Built to work with zero setup on its offline core, with optional server-side AI, search, and real GitHub sign-in layered on top.</p>
-</div>
-</div>
-</section>
-</main>
-</div>
+          <div class="setting-group hosted-ai-setting">
+            <div class="setting-heading">
+              <span class="setting-icon hosted-ai-icon">✦</span>
+              <div><h3>Hosted AI</h3><p class="desc">A ready-to-use open model, hosted for you. Nothing to install.</p></div>
+            </div>
+            <div class="setting-content">
+              <div class="hosted-ai-summary">
+                <div class="hosted-ai-model-copy">
+                  <span class="hosted-ai-overline">ACTIVE MODEL</span>
+                  <strong id="aiModelName">NVIDIA Nemotron 3.5 Lightning Free</strong>
+                  <span class="sub" id="aiModelStatusText">Checking hosted model…</span>
+                </div>
+                <span class="hosted-ai-status-mark" id="aiStatusMark"></span>
+              </div>
+              <p class="hosted-ai-note" id="aiProviderNote">Hosted AI is being checked.</p>
+              <div class="hosted-ai-benefits">
+                <span><i>✓</i> No Windows or Mac install</span>
+                <span><i>✓</i> No personal API key</span>
+                <span><i>✓</i> No model downloads</span>
+              </div>
+              <div class="hosted-ai-privacy">
+                <strong>About your chat data</strong>
+                <p>Your chat messages are sent to Vercel AI Gateway and the selected model provider. Voice recordings are sent to Vercel AI Gateway and Microsoft Azure for transcription; Zariya does not store the audio. The model provider lists zero-data-retention and no-training flags for transcription, but avoid sending passwords, private records or sensitive conversations.</p>
+              </div>
+              <p class="hosted-ai-limits">The selected model is listed at $0 per token, but it is a shared service and can be rate-limited or temporarily unavailable. Zariya then falls back to its smaller built-in knowledge mode.</p>
+            </div>
+          </div>
 
-<script src="{{ url_for('static', filename='app.js') }}"></script>
+          <div class="setting-group">
+            <div class="setting-heading">
+              <span class="setting-icon">⌕</span>
+              <div><h3>Optional tools</h3><p class="desc">Some tools need a separate service configuration.</p></div>
+            </div>
+            <div class="setting-content">
+              <div class="setting-row"><div><label>Web search</label><div class="sub">Used by the Search web chat tool.</div></div><span class="setting-value" id="searchStatusText">Not configured</span></div>
+            </div>
+          </div>
+
+          <div class="setting-group about-setting">
+            <div class="setting-heading">
+              <span class="setting-icon">i</span>
+              <div><h3>About Zariya</h3><p class="desc">An Urdu and English workspace for questions, notes and learning.</p></div>
+            </div>
+            <div class="setting-content about-copy">
+              Zariya connects to a hosted open model through Vercel AI Gateway, so you can start chatting without installing software or adding a personal API key. When the hosted service is unavailable, the app falls back to a smaller built-in knowledge mode. Your chats, notes and flashcards are stored in this browser.
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+<dialog class="app-dialog" id="newDeckDialog" aria-labelledby="newDeckTitle">
+  <form id="newDeckForm">
+    <div class="dialog-head">
+      <div><div class="page-eyebrow">FLASHCARDS</div><h2 id="newDeckTitle">Create a deck</h2><p>Write a question on the front and its answer on the back.</p></div>
+      <button class="dialog-close" type="button" id="newDeckCancelBtn" aria-label="Close">×</button>
+    </div>
+    <label class="dialog-field">Deck name<input id="newDeckName" required maxlength="80" placeholder="e.g. Biology — cell structure"></label>
+    <label class="dialog-field">Tags <span class="dialog-optional">Optional</span><input id="newDeckTags" maxlength="160" placeholder="biology, revision"></label>
+    <div class="dialog-cards-heading"><strong>Cards</strong><span>Add up to 30 cards</span></div>
+    <div id="newDeckCards" class="dialog-cards"></div>
+    <div class="dialog-footer">
+      <span id="newDeckFormHint" role="status"></span>
+      <div><button class="btn" type="button" id="addDeckCardBtn">+ Add card</button><button class="btn primary" type="submit" id="saveDeckBtn">Create deck</button></div>
+    </div>
+  </form>
+</dialog>
+</div>
+<script src="/static/sse.js?v=20261122-4"></script>
+<script src="/static/app.js?v=20261122-4"></script>
 </body>
 </html>

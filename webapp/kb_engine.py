@@ -87,10 +87,9 @@ def _load_learned():
     return []
 
 def _save_learned(entries):
-    """Writes to a temp file in the same directory, then atomically renames it
-    over the real file, so a crash or kill mid-write can never leave
-    learned.json truncated or corrupted (matches the pattern already used by
-    core/model_downloader.py for its downloaded model file)."""
+    """Persist the learned-answer cache only on a writable local installation."""
+    if os.environ.get("VERCEL"):
+        return
     tmp_path = LEARNED_PATH.with_suffix(".json.tmp")
     tmp_path.write_text(json.dumps(entries, ensure_ascii=False, indent=2), encoding="utf-8")
     tmp_path.replace(LEARNED_PATH)
@@ -276,6 +275,8 @@ def semantic_kb_lookup(text: str):
     the final generic reply) already has this message covered either way.
     """
     global _SEMANTIC_KB_VECTORS
+    if os.environ.get("VERCEL") or os.environ.get("DISABLE_LOCAL_MODEL", "").lower() in ("1", "true", "yes"):
+        return None
     if _kb_embeddings is None:
         return None
     try:

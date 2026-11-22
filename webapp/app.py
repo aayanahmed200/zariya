@@ -1,48 +1,44 @@
-"""
-Zariya -- offline-first, privacy-focused AI platform for Urdu and low-resource languages.
+"""Zariya — a bilingual workspace with hosted open-model chat and a curated fallback.
 
-Architecture, and why it's built this way:
-- All API keys (Anthropic, Google, GitHub OAuth) live server-side in environment
-  variables. The browser never sees them, never stores them, and never has to
-  ask the person using the app for anything -- that's configured once by whoever
-  deploys it, not per visitor.
-- The offline knowledge engine (kb_engine.py) has zero dependencies and zero
-  network calls. It's the guaranteed fallback if no keys are configured, and it's
-  what makes this genuinely offline-capable, not just "offline until the API key
-  runs out."
-- GitHub sign-in is real OAuth (authorization-code flow), not a public-profile
-  lookup -- the client secret is exchanged server-side, exactly the way GitHub's
-  own docs require, and is never exposed to the browser.
-- Two generation knobs (a custom system prompt / persona, and a temperature /
-  creativity value) can be sent per-request from the client and are applied to
-  whichever backend (Claude or the local model) ends up answering. Both are
-  optional and fall back to sane defaults, so older requests without them still
-  work unchanged.
+Hosted chat uses a free open-weight model through Vercel AI Gateway. Vercel
+OIDC authenticates the server-to-server request; no browser API key or local
+model installation is required. If hosted inference is unavailable, selected
+requests fall back to the bundled rule-based knowledge engine.
 """
+import base64
+import binascii
+import io
 import os
 import secrets
 import time
+import wave
 import json
 from pathlib import Path
 from urllib.parse import urlencode
 
 import requests
 from dotenv import load_dotenv
-from flask import Flask, jsonify, redirect, request, session, url_for, render_template, Response, stream_with_context
+from flask import Flask, jsonify, redirect, request, session, url_for, render_template, Response, stream_with_context, send_from_directory
 
 import kb_engine
-import local_model
+import hosted_model
 
 load_dotenv()
 
 app = Flask(__name__)
-app.secret_key = os.environ.get("FLASK_SECRET_KEY") or secrets.token_hex(32)
+FLASK_SECRET_KEY = os.environ.get("FLASK_SECRET_KEY", "")
+SESSION_SECRET_VALUE = FLASK_SECRET_KEY.lower()
+SESSION_SECRET_CONFIGURED = len(FLASK_SECRET_KEY) >= 32 and not any(
+    marker in SESSION_SECRET_VALUE for marker in ("change-this", "replace-with", "your-secret", "example")
+)
+app.secret_key = FLASK_SECRET_KEY or secrets.token_hex(32)
 
 # Debug mode is opt-in only (never on by default) since Flask's debugger
 # exposes an interactive Python console / arbitrary code execution to anyone
 # who can trigger an unhandled exception -- fine for local development,
 # dangerous left on for anything reachable over a network.
 DEBUG_MODE = os.environ.get("FLASK_DEBUG", "0") == "1"
+HOSTED_MODE = bool(os.environ.get("VERCEL"))
 
 # Basic session-cookie hardening: SameSite=Lax blocks the cookie from being
 # sent on most cross-site requests (CSRF mitigation) without breaking normal
@@ -50,24 +46,34 @@ DEBUG_MODE = os.environ.get("FLASK_DEBUG", "0") == "1"
 # mode so plain http://localhost dev still works; a bounded lifetime means a
 # stale session cookie doesn't stay valid forever.
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
-app.config["SESSION_COOKIE_SECURE"] = not DEBUG_MODE
+app.config["SESSION_COOKIE_SECURE"] = HOSTED_MODE or not DEBUG_MODE
 app.config["PERMANENT_SESSION_LIFETIME"] = 60 * 60 * 24 * 7  # 7 days
 
-ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
-ANTHROPIC_MODEL = os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-4-6")
 GOOGLE_API_KEY = os.environ.get("GOOGLE_API_KEY", "")
 GOOGLE_CX = os.environ.get("GOOGLE_CX", "")
 GITHUB_CLIENT_ID = os.environ.get("GITHUB_CLIENT_ID", "")
 GITHUB_CLIENT_SECRET = os.environ.get("GITHUB_CLIENT_SECRET", "")
-APP_BASE_URL = os.environ.get("APP_BASE_URL", "http://localhost:5000")
+VERCEL_HOST = os.environ.get("VERCEL_URL", "").strip()
+DEFAULT_BASE_URL = f"https://{VERCEL_HOST}" if VERCEL_HOST else "http://localhost:5000"
+APP_BASE_URL = (os.environ.get("APP_BASE_URL") or DEFAULT_BASE_URL).rstrip("/")
+GITHUB_OAUTH_CONFIGURED = bool(GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET and SESSION_SECRET_CONFIGURED)
 
 DATA_DIR = Path(__file__).parent / "server"
+PUBLIC_DIR = Path(__file__).resolve().parents[1] / "public"
 STORE_PATH = DATA_DIR / "store.json"
 
 SYSTEM_PROMPT = (
-    "You are Zariya, a warm, concise bilingual Urdu/English assistant built as a "
-    "privacy-first, offline-first platform for Urdu and other low-resource languages. "
-    "Reply in whichever language the user writes in, mixing naturally if they mix."
+    "You are Zariya, a clear, capable bilingual assistant for Urdu and English. "
+    "Reply in the language the user uses. If the user writes in English, reply in "
+    "natural, correctly written English. If the user writes in Urdu, reply in Urdu "
+    "script. If they mix languages, mirror that mix naturally. Keep every English "
+    "paragraph, heading, list and table left-to-right. Keep Urdu-only blocks right-to-left. "
+    "Format answers for easy reading: use a short direct opening, descriptive Markdown "
+    "headings when the answer is long, blank lines between sections, concise bullet or "
+    "numbered lists for steps, and tables only when they genuinely clarify comparisons. "
+    "Avoid huge unbroken paragraphs, excessive headings, decorative symbols, fake citations, "
+    "and repetitive introductions. Use fenced code blocks for code. Be accurate, explain "
+    "uncertainty, and never claim a lookup or action you did not perform."
 )
 
 # ---------------------------------------------------------------------------
@@ -107,7 +113,7 @@ def _user_bucket(store):
 # Basic request-size guards, consistent with the systemPrompt cap below: an
 # unbounded messages array or unbounded combined content length is an easy way
 # for a misbehaving client (or a deliberately abusive one) to force huge
-# memory/CPU use or huge outbound payloads to Claude/Ollama on every request.
+# memory/CPU use or excessive outbound payloads to the hosted AI Gateway.
 MAX_MESSAGES = 200
 MAX_TOTAL_CONTENT_CHARS = 200_000
 
@@ -145,7 +151,7 @@ def _generation_params(body):
     system_prompt = SYSTEM_PROMPT
     custom = body.get("systemPrompt")
     if isinstance(custom, str) and custom.strip():
-        system_prompt = custom.strip()[:2000]  # generous cap, just to stop abuse
+        system_prompt += "\n\nAdditional response preferences from the user:\n" + custom.strip()[:1200]
 
     temperature = None
     raw_temp = body.get("temperature")
@@ -159,26 +165,39 @@ def _generation_params(body):
 # ---------------------------------------------------------------------------
 @app.route("/auth/github/login")
 def github_login():
-    if not GITHUB_CLIENT_ID:
-        return jsonify({"error": "GitHub OAuth isn't configured on this server yet. "
-                                  "Set GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET in .env."}), 400
-    state = secrets.token_urlsafe(16)
+    if not GITHUB_OAUTH_CONFIGURED:
+        return redirect("/?" + urlencode({
+            "authError": "GitHub sign-in is not connected yet. Open Settings → Account & storage for the one-time setup."
+        }))
+    state = secrets.token_urlsafe(32)
+    session.permanent = True
     session["oauth_state"] = state
     redirect_uri = f"{APP_BASE_URL}/auth/github/callback"
-    authorize_url = (
-        "https://github.com/login/oauth/authorize"
-        f"?client_id={GITHUB_CLIENT_ID}&redirect_uri={redirect_uri}"
-        f"&scope=read:user&state={state}"
-    )
+    authorize_url = "https://github.com/login/oauth/authorize?" + urlencode({
+        "client_id": GITHUB_CLIENT_ID,
+        "redirect_uri": redirect_uri,
+        "scope": "read:user",
+        "state": state,
+    })
     return redirect(authorize_url)
 
 @app.route("/auth/github/callback")
 def github_callback():
-    if request.args.get("state") != session.get("oauth_state"):
-        return jsonify({"error": "State mismatch -- possible CSRF, or your session expired. Try signing in again."}), 400
+    expected_state = session.pop("oauth_state", None)
+    returned_state = request.args.get("state", "")
+    if not expected_state or not secrets.compare_digest(returned_state, expected_state):
+        return redirect("/?" + urlencode({
+            "authError": "GitHub sign-in expired or could not be verified. Please start again from Settings."
+        }))
+    if request.args.get("error"):
+        return redirect("/?" + urlencode({
+            "authError": "GitHub sign-in was cancelled. You can try again from Settings."
+        }))
     code = request.args.get("code")
     if not code:
-        return jsonify({"error": "GitHub didn't return an authorization code."}), 400
+        return redirect("/?" + urlencode({
+            "authError": "GitHub did not return an authorization code. Please try again."
+        }))
 
     try:
         token_res = requests.post(
@@ -214,8 +233,14 @@ def github_callback():
         app.logger.warning("GitHub profile fetch failed: %s", e)
         return redirect("/?" + urlencode({"authError": "GitHub sign-in failed while fetching your profile. Please try again."}))
 
-    session["github_login"] = profile.get("login")
-    session["github_name"] = profile.get("name") or profile.get("login")
+    login = profile.get("login")
+    if not isinstance(login, str) or not login.strip():
+        return redirect("/?" + urlencode({
+            "authError": "GitHub did not return a usable account profile. Please try again."
+        }))
+    session.permanent = True
+    session["github_login"] = login
+    session["github_name"] = profile.get("name") or login
     session["github_avatar"] = profile.get("avatar_url")
     session["github_bio"] = profile.get("bio") or ""
     return redirect("/")
@@ -234,15 +259,98 @@ def me():
             "name": session.get("github_name"),
             "avatar": session.get("github_avatar"),
             "bio": session.get("github_bio"),
-            "githubConfigured": bool(GITHUB_CLIENT_ID),
+            "githubConfigured": GITHUB_OAUTH_CONFIGURED,
         })
-    return jsonify({"signedIn": False, "githubConfigured": bool(GITHUB_CLIENT_ID)})
+    return jsonify({"signedIn": False, "githubConfigured": GITHUB_OAUTH_CONFIGURED})
+
+def _gateway_oidc_token() -> str | None:
+    """Read Vercel's runtime-injected OIDC token from the incoming request."""
+    return request.headers.get("x-vercel-oidc-token") or None
+
 
 # ---------------------------------------------------------------------------
-# Chat: Claude API (server-side key) -> local model -> offline knowledge engine.
-# The person using the app is never asked for a key -- whoever deploys the
-# server configures it once in .env.
+# Chat: Vercel AI Gateway hosted open model -> curated knowledge fallback.
+# Gateway authentication is server-side Vercel OIDC; no visitor key is required.
 # ---------------------------------------------------------------------------
+
+_TRANSCRIPTION_REQUESTS: dict[str, list[float]] = {}
+MAX_TRANSCRIPTION_SECONDS = 60
+MAX_TRANSCRIPTION_B64_CHARS = 3_400_000
+MAX_TRANSCRIPTION_BYTES = 2_500_000
+
+
+def _transcription_rate_limited(client_ip: str) -> bool:
+    """Small per-function guard against accidental rapid repeat recordings."""
+    now = time.monotonic()
+    recent = [stamp for stamp in _TRANSCRIPTION_REQUESTS.get(client_ip, []) if now - stamp < 60]
+    if len(recent) >= 8:
+        _TRANSCRIPTION_REQUESTS[client_ip] = recent
+        return True
+    recent.append(now)
+    if len(_TRANSCRIPTION_REQUESTS) > 512:
+        oldest = min(_TRANSCRIPTION_REQUESTS, key=lambda key: max(_TRANSCRIPTION_REQUESTS[key] or [0]))
+        _TRANSCRIPTION_REQUESTS.pop(oldest, None)
+    _TRANSCRIPTION_REQUESTS[client_ip] = recent
+    return False
+
+
+@app.route("/api/transcribe", methods=["POST"])
+def transcribe():
+    body = request.get_json(silent=True)
+    if not isinstance(body, dict):
+        return jsonify({"error": "A recording was not received. Please try again."}), 400
+    encoded_audio = body.get("audio")
+    if not isinstance(encoded_audio, str) or not encoded_audio:
+        return jsonify({"error": "No microphone audio was received."}), 400
+    if len(encoded_audio) > MAX_TRANSCRIPTION_B64_CHARS:
+        return jsonify({"error": "That recording is too large. Keep voice notes under 60 seconds."}), 413
+    language = body.get("language", "auto")
+    if language not in ("auto", "en", "ur"):
+        return jsonify({"error": "Choose Auto, English or Urdu before recording."}), 400
+
+    try:
+        audio_bytes = base64.b64decode(encoded_audio, validate=True)
+    except (binascii.Error, ValueError):
+        return jsonify({"error": "The audio data was incomplete. Please record again."}), 400
+    if not audio_bytes or len(audio_bytes) > MAX_TRANSCRIPTION_BYTES:
+        return jsonify({"error": "That recording is too large or empty. Please record again."}), 413
+
+    try:
+        with wave.open(io.BytesIO(audio_bytes), "rb") as wav_file:
+            channels = wav_file.getnchannels()
+            sample_width = wav_file.getsampwidth()
+            sample_rate = wav_file.getframerate()
+            frame_count = wav_file.getnframes()
+            duration = frame_count / float(sample_rate or 1)
+            if channels != 1 or sample_width != 2 or sample_rate != 16000:
+                return jsonify({"error": "The microphone audio format was not supported. Please refresh and try again."}), 400
+            if frame_count < 4000 or duration > MAX_TRANSCRIPTION_SECONDS + 1:
+                return jsonify({"error": "Record between a quarter of a second and 60 seconds of speech."}), 400
+    except (wave.Error, EOFError, OSError):
+        return jsonify({"error": "The audio recording was not a valid WAV file. Please record again."}), 400
+
+    client_ip = request.headers.get("x-forwarded-for", request.remote_addr or "unknown").split(",")[0].strip()
+    if _transcription_rate_limited(client_ip):
+        return jsonify({"error": "Too many voice recordings in a short time. Please try again in a minute."}), 429
+
+    try:
+        result = hosted_model.transcribe_audio(
+            audio_bytes,
+            media_type="audio/wav",
+            language=None if language == "auto" else language,
+            oidc_token=_gateway_oidc_token(),
+        )
+    except hosted_model.GatewayError as exc:
+        app.logger.info("Voice transcription failed: %s", exc)
+        return jsonify({"error": str(exc)}), 503
+
+    return jsonify({
+        "text": result["text"],
+        "language": result.get("language"),
+        "durationInSeconds": result.get("durationInSeconds") or duration,
+    })
+
+
 @app.route("/api/chat", methods=["POST"])
 def chat():
     body = request.get_json(silent=True) or {}
@@ -251,70 +359,46 @@ def chat():
         return jsonify({"error": err}), err_status
     system_prompt, temperature = _generation_params(body)
 
-    used_real_model = False
-    reply = None
-
-    if ANTHROPIC_API_KEY:
-        try:
-            claude_body = {
-                "model": ANTHROPIC_MODEL,
-                "max_tokens": 1000,
-                "system": system_prompt,
-                "messages": [{"role": m["role"], "content": m["content"]} for m in messages],
-            }
-            if temperature is not None:
-                claude_body["temperature"] = temperature
-            res = requests.post(
-                "https://api.anthropic.com/v1/messages",
-                headers={
-                    "Content-Type": "application/json",
-                    "x-api-key": ANTHROPIC_API_KEY,
-                    "anthropic-version": "2023-06-01",
-                },
-                json=claude_body,
-                timeout=30,
-            )
-            res.raise_for_status()
-            data = res.json()
-            text_block = next((b for b in data.get("content", []) if b.get("type") == "text"), None)
-            reply = text_block["text"] if text_block else None
-            used_real_model = reply is not None
-        except Exception as e:
-            app.logger.warning("Claude API call failed, falling back to offline: %s", e)
-
-    if reply is None and local_model.is_available():
-        local_reply = local_model.generate_reply(messages, system_prompt, temperature)
-        if local_reply:
-            reply = local_reply
-            used_real_model = True
-
+    try:
+        reply = hosted_model.generate_reply(
+            messages,
+            system_prompt,
+            temperature,
+            oidc_token=_gateway_oidc_token(),
+        )
+    except hosted_model.GatewayError as exc:
+        app.logger.info("Hosted AI request fell back to knowledge mode: %s", exc)
+        reply = None
+    used_model = bool(reply)
     if reply is None:
         try:
             reply = kb_engine.offline_reply(messages)
         except Exception:
             app.logger.exception("offline_reply crashed")
-            reply = ("Something went wrong answering that offline. Try rephrasing your "
-                      "message, or a simpler one like a math expression or a greeting.")
+            reply = (
+                "I couldn't answer that from the built-in knowledge base. "
+                "Hosted AI is temporarily unavailable; please try again later."
+            )
 
-    if used_real_model:
+    if used_model:
         last_user = next((m for m in reversed(messages) if m["role"] == "user"), None)
         if last_user and last_user.get("content", "").strip():
             kb_engine.remember_answer(last_user["content"], reply)
 
-    return jsonify({"reply": reply, "usedRealModel": used_real_model})
+    return jsonify({
+        "reply": reply,
+        "usedModel": used_model,
+        "provider": "ai_gateway" if used_model else "knowledge",
+    })
+
 
 def _sse(data):
-    return f"data: {json.dumps(data)}\n\n"
+    return f"data: {json.dumps(data, ensure_ascii=False)}\n\n"
+
 
 @app.route("/api/chat/stream", methods=["POST"])
 def chat_stream():
-    """Same fallback chain as /api/chat (Claude -> local model -> offline
-    knowledge engine), but streams the reply back as Server-Sent Events so
-    the local model can show up token-by-token like a real LLM chat instead
-    of the browser waiting on one big blocking response. Claude and the
-    offline knowledge engine don't support token streaming here, so their
-    replies are sent as a single event -- only the local model path streams
-    incrementally."""
+    """Stream hosted open-model output or fall back to the built-in knowledge engine."""
     body = request.get_json(silent=True) or {}
     messages, err, err_status = _normalize_messages(body.get("messages"))
     if err:
@@ -322,69 +406,59 @@ def chat_stream():
     system_prompt, temperature = _generation_params(body)
 
     def generate():
-        used_real_model = False
+        used_model = False
         full_reply = None
+        collected = []
 
-        if ANTHROPIC_API_KEY:
+        oidc_token = _gateway_oidc_token()
+        if hosted_model.connection_status(oidc_token=oidc_token)["available"]:
             try:
-                claude_body = {
-                    "model": ANTHROPIC_MODEL,
-                    "max_tokens": 1000,
-                    "system": system_prompt,
-                    "messages": [{"role": m["role"], "content": m["content"]} for m in messages],
-                }
-                if temperature is not None:
-                    claude_body["temperature"] = temperature
-                res = requests.post(
-                    "https://api.anthropic.com/v1/messages",
-                    headers={
-                        "Content-Type": "application/json",
-                        "x-api-key": ANTHROPIC_API_KEY,
-                        "anthropic-version": "2023-06-01",
-                    },
-                    json=claude_body,
-                    timeout=30,
-                )
-                res.raise_for_status()
-                data = res.json()
-                text_block = next((b for b in data.get("content", []) if b.get("type") == "text"), None)
-                if text_block:
-                    full_reply = text_block["text"]
-                    used_real_model = True
-                    yield _sse({"delta": full_reply})
-            except Exception as e:
-                app.logger.warning("Claude API call failed, falling back to offline: %s", e)
-
-        if full_reply is None and local_model.is_available():
-            collected = []
-            for token in local_model.stream_reply(messages, system_prompt, temperature):
-                collected.append(token)
-                yield _sse({"delta": token})
-            if collected:
-                full_reply = "".join(collected)
-                used_real_model = True
+                for token in hosted_model.stream_reply(
+                    messages,
+                    system_prompt,
+                    temperature,
+                    oidc_token=oidc_token,
+                ):
+                    collected.append(token)
+                    yield _sse({"delta": token})
+                if collected:
+                    full_reply = "".join(collected)
+                    used_model = True
+            except hosted_model.GatewayError as exc:
+                app.logger.info("Hosted AI stream fell back to knowledge mode: %s", exc)
+                if collected:
+                    collected.clear()
+                    yield _sse({"reset": True})
+                yield _sse({"notice": str(exc)})
 
         if full_reply is None:
             try:
                 full_reply = kb_engine.offline_reply(messages)
             except Exception:
                 app.logger.exception("offline_reply crashed")
-                full_reply = ("Something went wrong answering that offline. Try rephrasing your "
-                               "message, or a simpler one like a math expression or a greeting.")
+                full_reply = (
+                    "I couldn't answer that from the built-in knowledge base. "
+                    "Hosted AI is temporarily unavailable; please try again later."
+                )
             yield _sse({"delta": full_reply})
 
-        if used_real_model and full_reply:
+        if used_model and full_reply:
             last_user = next((m for m in reversed(messages) if m["role"] == "user"), None)
             if last_user and last_user.get("content", "").strip():
                 kb_engine.remember_answer(last_user["content"], full_reply)
 
-        yield _sse({"done": True, "usedRealModel": used_real_model})
+        yield _sse({
+            "done": True,
+            "usedModel": used_model,
+            "provider": "ai_gateway" if used_model else "knowledge",
+        })
 
     return Response(
         stream_with_context(generate()),
         mimetype="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
+
 
 @app.route("/api/feedback", methods=["POST"])
 def feedback():
@@ -432,19 +506,22 @@ def web_search():
 # ---------------------------------------------------------------------------
 @app.route("/api/state", methods=["GET"])
 def get_state():
+    # Vercel Functions do not provide a durable writable project filesystem.
+    # Hosted chat, notes and flashcards are stored in the visitor's browser.
+    if HOSTED_MODE:
+        return jsonify({"sessions": [], "notes": [], "decks": [], "storage": "browser"})
     store = _load_store()
     key = _current_user_key()
     is_new_user = key not in store["users"]
     bucket = _user_bucket(store)
-    # Only persist when a brand-new user bucket was actually just created --
-    # this route runs on every page load/poll, so writing the file on every
-    # GET (even when nothing changed) would mean constant, pointless disk I/O.
     if is_new_user:
         _save_store(store)
     return jsonify(bucket)
 
 @app.route("/api/state", methods=["POST"])
 def save_state():
+    if HOSTED_MODE:
+        return jsonify({"ok": False, "error": "Hosted mode uses browser-local storage."}), 409
     body = request.get_json(silent=True) or {}
     store = _load_store()
     key = _current_user_key()
@@ -456,6 +533,54 @@ def save_state():
     _save_store(store)
     return jsonify({"ok": True})
 
+def _tool_model_reply(messages, task_prompt: str):
+    """Run a focused tool task through the hosted model, if it is available."""
+    try:
+        return hosted_model.generate_reply(
+            messages,
+            SYSTEM_PROMPT + "\n\n" + task_prompt,
+            temperature=0.2,
+            oidc_token=_gateway_oidc_token(),
+        )
+    except hosted_model.GatewayError as exc:
+        app.logger.info("Hosted quick tool used knowledge fallback: %s", exc)
+        return None
+
+
+def _parse_flashcard_json(raw: str) -> list[dict]:
+    """Parse and validate model-produced flashcards without trusting raw HTML."""
+    candidate = raw.strip()
+    if candidate.startswith("```"):
+        candidate = candidate.split("\n", 1)[-1]
+        if candidate.endswith("```"):
+            candidate = candidate[:-3].strip()
+    try:
+        data = json.loads(candidate)
+    except (ValueError, TypeError):
+        left, right = candidate.find("{"), candidate.rfind("}")
+        if left < 0 or right <= left:
+            return []
+        try:
+            data = json.loads(candidate[left:right + 1])
+        except (ValueError, TypeError):
+            return []
+    source_cards = data.get("cards") if isinstance(data, dict) else None
+    if not isinstance(source_cards, list):
+        return []
+    cards = []
+    for item in source_cards[:20]:
+        if not isinstance(item, dict):
+            continue
+        front = item.get("front")
+        back = item.get("back")
+        if not isinstance(front, str) or not isinstance(back, str):
+            continue
+        front, back = front.strip(), back.strip()
+        if front and back and len(front) <= 600 and len(back) <= 2400:
+            cards.append({"front": front, "back": back})
+    return cards
+
+
 @app.route("/api/tools/<name>", methods=["POST"])
 def run_tool(name):
     body = request.get_json(silent=True) or {}
@@ -463,18 +588,66 @@ def run_tool(name):
     messages, err, err_status = _normalize_messages(raw_messages) if raw_messages else ([], None, None)
     if err:
         return jsonify({"error": err}), err_status
+    if name not in ("summarize", "keypoints", "translate", "flashcards"):
+        return jsonify({"error": f"Unknown tool '{name}'"}), 404
+    if not messages:
+        return jsonify({"error": "Add a message to the chat first."}), 400
+
     if name == "summarize":
-        return jsonify({"result": kb_engine.summarize_messages(messages)})
+        prompt = (
+            "Summarise this conversation for the user. Keep the important facts, "
+            "decisions and unresolved questions. Use a short title and clear bullet "
+            "points where useful. Do not invent information."
+        )
+        result = _tool_model_reply(messages, prompt)
+        if result is None:
+            result = kb_engine.summarize_messages(messages)
+        return jsonify({"result": result})
+
     if name == "keypoints":
-        return jsonify({"result": kb_engine.key_points(messages)})
+        prompt = (
+            "Extract the main points from this conversation. Return a concise, "
+            "well-organised bullet list in the language used by the user. Keep "
+            "specific names, dates and quantities accurate; do not invent facts."
+        )
+        result = _tool_model_reply(messages, prompt)
+        if result is None:
+            result = kb_engine.key_points(messages)
+        return jsonify({"result": result})
+
     if name == "translate":
         last_user = next((m for m in reversed(messages) if m["role"] == "user"), None)
         if not last_user:
             return jsonify({"result": ""})
-        return jsonify({"result": kb_engine.translate_words(last_user["content"])})
-    if name == "flashcards":
-        return jsonify({"cards": kb_engine.flashcards_from_messages(messages)})
-    return jsonify({"error": f"Unknown tool '{name}'"}), 404
+        translation_prompt = (
+            "Translate the user's text into the other primary language: English to "
+            "natural Urdu, or Urdu to natural English. Preserve the original meaning, "
+            "names, numbers, formatting and technical terms. If the source mixes "
+            "English and Urdu, translate the full message while keeping names and "
+            "terms that should remain unchanged. Return only the translation."
+        )
+        result = _tool_model_reply(
+            [{"role": "user", "content": last_user["content"]}],
+            translation_prompt,
+        )
+        if result is None:
+            result = kb_engine.translate_words(last_user["content"])
+        return jsonify({"result": result})
+
+    flashcard_prompt = (
+        "Create up to 12 useful revision flashcards from this conversation. "
+        "Prioritise central ideas, definitions and facts. Each card needs a clear "
+        "question or term in front and a concise answer in back. Keep both in "
+        "the user's language. Do not invent details. Return only valid JSON with a cards array; "
+        "each card must have front and back string fields. "
+        "Do not wrap it in Markdown fences or add commentary."
+    )
+    raw_cards = _tool_model_reply(messages, flashcard_prompt)
+    cards = _parse_flashcard_json(raw_cards) if raw_cards else []
+    if not cards:
+        cards = kb_engine.flashcards_from_messages(messages)
+    return jsonify({"cards": cards})
+
 
 @app.route("/api/kb-stats")
 def kb_stats():
@@ -482,43 +655,55 @@ def kb_stats():
 
 @app.route("/api/config")
 def config():
-    """Tells the frontend what's available server-side, without ever revealing keys."""
+    """Expose hosted-model readiness without returning authentication details."""
+    ai = hosted_model.connection_status(oidc_token=_gateway_oidc_token())
     return jsonify({
-        "claudeConfigured": bool(ANTHROPIC_API_KEY),
+        "hostedMode": HOSTED_MODE,
+        "aiConfigured": ai["configured"],
+        "aiAvailable": ai["available"],
+        "aiProvider": ai["provider"],
+        "aiStatus": ai["status"],
+        "aiModel": ai["model"],
         "searchConfigured": bool(GOOGLE_API_KEY and GOOGLE_CX),
-        "githubConfigured": bool(GITHUB_CLIENT_ID),
-        "localModelAvailable": local_model.is_available(),
-        "localModelStatus": local_model.load_status(),
-        "localModelProgress": local_model.load_progress(),
-        "localModelName": local_model.current_model(),
+        "githubConfigured": GITHUB_OAUTH_CONFIGURED,
     })
 
-@app.route("/api/local-model/retry", methods=["POST"])
-def local_model_retry():
-    """Manually wakes up the background model-download loop instead of waiting
-    out its backoff delay -- surfaced as a "Retry download" button in Settings
-    for when a pull has failed and the automatic wait would otherwise take up
-    to a minute."""
-    return jsonify(local_model.retry_now())
 
-@app.route("/api/local-model/models")
-def local_model_models():
-    """Lists every model Ollama already has pulled on this machine, plus which
-    one is currently active, so Settings can offer a model switcher without
-    ever needing to touch .env."""
-    return jsonify({"models": local_model.list_models(), "active": local_model.current_model()})
+@app.route("/api/health")
+def health():
+    ai = hosted_model.connection_status(oidc_token=_gateway_oidc_token())
+    return jsonify({
+        "ok": True,
+        "service": "zariya",
+        "mode": "hosted" if HOSTED_MODE else "local",
+        "aiConfigured": ai["configured"],
+        "aiProvider": ai["provider"],
+        "knowledgeEntries": len(kb_engine.KB),
+    })
 
-@app.route("/api/local-model/select", methods=["POST"])
-def local_model_select():
-    """Switches the active local model at runtime. If the requested model
-    isn't pulled yet, this starts a background download exactly like the
-    first-run setup does, and the frontend polls /api/config for progress."""
-    body = request.get_json(silent=True) or {}
-    name = body.get("model", "")
-    if not isinstance(name, str):
-        return jsonify({"ok": False, "error": "model must be a string"}), 400
-    result = local_model.set_active_model(name)
-    return jsonify(result)
+
+# SEO assets are served by Vercel's public directory in production. These
+# equivalent Flask routes also make local development and tests behave the same.
+@app.route("/favicon.svg")
+def favicon():
+    return send_from_directory(PUBLIC_DIR, "favicon.svg", mimetype="image/svg+xml", max_age=3600)
+
+
+@app.route("/favicon.png")
+def favicon_png():
+    return send_from_directory(PUBLIC_DIR, "favicon.png", mimetype="image/png", max_age=3600)
+
+@app.route("/robots.txt")
+def robots_txt():
+    return send_from_directory(PUBLIC_DIR, "robots.txt", mimetype="text/plain", max_age=3600)
+
+@app.route("/sitemap.xml")
+def sitemap_xml():
+    return send_from_directory(PUBLIC_DIR, "sitemap.xml", mimetype="application/xml", max_age=3600)
+
+@app.route("/site.webmanifest")
+def site_manifest():
+    return send_from_directory(PUBLIC_DIR, "site.webmanifest", mimetype="application/manifest+json", max_age=3600)
 
 @app.route("/")
 def index():
