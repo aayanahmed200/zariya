@@ -1186,6 +1186,7 @@ function resetVoiceUI(message){
 }
 async function startVoiceRecognition(){
   if(voiceState!=='idle') return;
+  let pendingStreamPromise=null;
   if(!window.isSecureContext || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia || !AudioContextClass){
     showVoiceHint('Microphone recording needs HTTPS and a browser that supports audio capture. Try the latest Chrome or Edge.');
     return;
@@ -1195,12 +1196,15 @@ async function startVoiceRecognition(){
   syncSendState();
   showVoiceHint('Requesting microphone access…');
   try{
-    // Resume the audio context while this click still carries user activation.
+    // Start both permission and audio-context requests directly from the mic tap,
+    // before yielding to an await (some browsers require this user activation).
     recordingContext=new AudioContextClass();
-    await recordingContext.resume();
-    const stream=await navigator.mediaDevices.getUserMedia({
+    pendingStreamPromise=navigator.mediaDevices.getUserMedia({
       audio:{channelCount:1,echoCancellation:true,noiseSuppression:true,autoGainControl:true}
     });
+    const resumePromise=recordingContext.resume();
+    const [stream]=await Promise.all([pendingStreamPromise,resumePromise]);
+    pendingStreamPromise=null;
     recordingStream=stream;
     recordingSampleRate=recordingContext.sampleRate;
     recordingChunks=[];recordingFrames=0;
@@ -1227,6 +1231,10 @@ async function startVoiceRecognition(){
     showVoiceHint('Recording '+voiceLanguageName(voiceLanguage.value)+'… press the microphone again to transcribe.', 'recording');
     recordingTimer=setTimeout(()=>stopVoiceRecognition(),MAX_VOICE_SECONDS*1000);
   }catch(error){
+    if(pendingStreamPromise){
+      pendingStreamPromise.then(stream=>stream.getTracks().forEach(track=>track.stop())).catch(()=>{});
+      pendingStreamPromise=null;
+    }
     cleanupVoiceCapture();
     if(recordingContext){
       try{await recordingContext.close();}catch(closeError){}
