@@ -30,7 +30,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Lora:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/static/style.css?v=20261122-4">
+<link rel="stylesheet" href="/static/style.css?v=20261122-6">
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
@@ -390,13 +390,13 @@
           <div class="setting-group hosted-ai-setting">
             <div class="setting-heading">
               <span class="setting-icon hosted-ai-icon">✦</span>
-              <div><h3>Hosted AI</h3><p class="desc">A ready-to-use open model, hosted for you. Nothing to install.</p></div>
+              <div><h3>Hosted AI</h3><p class="desc">Free hosted model access. No install, account, or personal API key.</p></div>
             </div>
             <div class="setting-content">
               <div class="hosted-ai-summary">
                 <div class="hosted-ai-model-copy">
                   <span class="hosted-ai-overline">ACTIVE MODEL</span>
-                  <strong id="aiModelName">NVIDIA Nemotron 3.5 Lightning Free</strong>
+                  <strong id="aiModelName">Kilo Auto Free model pool</strong>
                   <span class="sub" id="aiModelStatusText">Checking hosted model…</span>
                 </div>
                 <span class="hosted-ai-status-mark" id="aiStatusMark"></span>
@@ -409,9 +409,9 @@
               </div>
               <div class="hosted-ai-privacy">
                 <strong>About your chat data</strong>
-                <p>Your chat messages are sent to Vercel AI Gateway and the selected model provider. Voice recordings are sent to Vercel AI Gateway and Microsoft Azure for transcription; Zariya does not store the audio. The model provider lists zero-data-retention and no-training flags for transcription, but avoid sending passwords, private records or sensitive conversations.</p>
+                <p>Chat messages are sent through Kilo AI Gateway to a rotating free upstream model. Kilo warns that upstream providers may log prompts and use them to improve their services. Do not send passwords, private records, contact details, or other sensitive information. Voice transcription uses a separate service and sends recorded audio to its transcription provider.</p>
               </div>
-              <p class="hosted-ai-limits">The selected model is listed at $0 per token, but it is a shared service and can be rate-limited or temporarily unavailable. Zariya then falls back to its smaller built-in knowledge mode.</p>
+              <p class="hosted-ai-limits">The free pool requires no API key, but it is shared and rate-limited (Kilo documents 200 requests per hour per IP for free models). Providers can be busy or unavailable. Zariya now shows a real service error instead of presenting a canned answer as AI.</p>
             </div>
           </div>
 
