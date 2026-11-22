@@ -11,10 +11,9 @@
 <meta name="author" content="Zariya">
 <title>Zariya — Free Urdu &amp; English AI Workspace</title>
 <link rel="canonical" href="https://zariyas.vercel.app/">
-<link rel="icon" type="image/png" href="/static/logo.png?v=20261121-5">
-<link rel="shortcut icon" type="image/png" href="/static/logo.png?v=20261121-5">
-<link rel="icon" type="image/svg+xml" href="/favicon.svg?v=20261121-5">
-<link rel="apple-touch-icon" href="/static/logo.png?v=20261121-5">
+<link rel="icon" type="image/png" sizes="128x128" href="/favicon.png?v=20261122-3">
+<link rel="shortcut icon" type="image/png" href="/favicon.png?v=20261122-3">
+<link rel="apple-touch-icon" sizes="128x128" href="/static/logo.png?v=20261122-3">
 <link rel="manifest" href="/site.webmanifest?v=20261121-5">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Zariya">
@@ -30,8 +29,8 @@
 <meta name="twitter:image" content="https://zariyas.vercel.app/static/logo.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Lora:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=Noto+Nastaliq+Urdu:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/static/style.css?v=20261122-2">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Lora:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=Markazi+Text:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/style.css?v=20261122-3">
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
@@ -165,10 +164,18 @@
               <button class="composer-btn mic" id="micBtn" type="button" title="Start voice typing" aria-label="Start voice typing" aria-pressed="false">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="2.5" width="6" height="12" rx="3"/><path d="M5.5 11.5a6.5 6.5 0 0 0 13 0M12 18v3.5M8.5 21.5h7"/></svg>
               </button>
-              <select id="voiceLanguage" class="voice-language" aria-label="Speech recognition language" title="Choose the language you are speaking">
-                <option value="en-US">EN</option>
-                <option value="ur-PK">اردو</option>
-              </select>
+              <div class="voice-dropdown" id="voiceDropdown">
+                <input type="hidden" id="voiceLanguage" value="auto">
+                <button class="voice-dropdown-trigger" id="voiceDropdownTrigger" type="button" aria-haspopup="listbox" aria-expanded="false" aria-controls="voiceDropdownMenu" aria-label="Transcription language: Auto detect">
+                  <span id="voiceDropdownLabel">AUTO</span>
+                  <svg viewBox="0 0 16 16" aria-hidden="true"><path d="m4 6 4 4 4-4"/></svg>
+                </button>
+                <div class="voice-dropdown-menu" id="voiceDropdownMenu" role="listbox" aria-label="Transcription language" hidden>
+                  <button type="button" role="option" data-language="auto" aria-selected="true"><span>Auto detect</span><small>Urdu and English</small><i>✓</i></button>
+                  <button type="button" role="option" data-language="en" aria-selected="false"><span>English</span><small>English speech</small><i>✓</i></button>
+                  <button type="button" role="option" data-language="ur" aria-selected="false"><span lang="ur" dir="rtl">اردو</span><small>Urdu speech</small><i>✓</i></button>
+                </div>
+              </div>
               <textarea id="chat-input" rows="1" dir="auto" placeholder="Message Zariya…  اردو میں بھی لکھیں" aria-label="Message Zariya"></textarea>
               <button class="composer-btn send" id="sendBtn" type="button" data-mode="send" disabled aria-label="Send message">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
@@ -338,8 +345,9 @@
                 <button class="toggle" id="toggleTTS" type="button" aria-label="Toggle read aloud"><span class="toggle-knob"></span></button>
               </div>
               <div class="voice-typing-note">
-                <strong>English and Urdu voice typing</strong>
-                <p>Choose EN or اردو beside the microphone in Chat, then start speaking. Your browser must support speech recognition and have microphone permission. Zariya does not save voice recordings; audio may be processed by the browser's speech-recognition provider.</p>
+                <strong>English and Urdu voice transcription</strong>
+                <p>Record up to 60 seconds. Zariya transcribes the WAV recording through Vercel AI Gateway using Microsoft MAI-Transcribe 2, with automatic language detection or an English/Urdu hint. Zariya does not save microphone audio. The recording is sent to Vercel AI Gateway and Microsoft Azure for transcription; avoid recording private or sensitive conversations.</p>
+                <p class="voice-cost-note">The listed transcription rate is about $0.10 per audio hour (roughly $0.0017 per minute). Usage is billed to the service owner and can change.</p>
               </div>
             </div>
           </div>
@@ -366,7 +374,7 @@
               </div>
               <div class="hosted-ai-privacy">
                 <strong>About your chat data</strong>
-                <p>Your messages are sent to Vercel AI Gateway and the model provider to generate replies. The selected provider does not advertise zero-data-retention or a no-training guarantee. Voice typing uses your browser's speech-recognition service, whose audio handling depends on that provider. Avoid entering passwords, private records or other sensitive information.</p>
+                <p>Your chat messages are sent to Vercel AI Gateway and the selected model provider. Voice recordings are sent to Vercel AI Gateway and Microsoft Azure for transcription; Zariya does not store the audio. The model provider lists zero-data-retention and no-training flags for transcription, but avoid sending passwords, private records or sensitive conversations.</p>
               </div>
               <p class="hosted-ai-limits">The selected model is listed at $0 per token, but it is a shared service and can be rate-limited or temporarily unavailable. Zariya then falls back to its smaller built-in knowledge mode.</p>
             </div>
@@ -412,7 +420,7 @@
   </form>
 </dialog>
 </div>
-<script src="/static/sse.js?v=20261122-2"></script>
-<script src="/static/app.js?v=20261122-2"></script>
+<script src="/static/sse.js?v=20261122-3"></script>
+<script src="/static/app.js?v=20261122-3"></script>
 </body>
 </html>
