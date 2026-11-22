@@ -6,6 +6,7 @@ model installation is required. If hosted inference is unavailable, selected
 requests fall back to the bundled rule-based knowledge engine.
 """
 import base64
+import hashlib
 import binascii
 import io
 import os
@@ -22,6 +23,7 @@ from flask import Flask, jsonify, redirect, request, session, url_for, render_te
 
 import kb_engine
 import hosted_model
+import supabase_store
 
 load_dotenv()
 
@@ -57,6 +59,14 @@ VERCEL_HOST = os.environ.get("VERCEL_URL", "").strip()
 DEFAULT_BASE_URL = f"https://{VERCEL_HOST}" if VERCEL_HOST else "http://localhost:5000"
 APP_BASE_URL = (os.environ.get("APP_BASE_URL") or DEFAULT_BASE_URL).rstrip("/")
 GITHUB_OAUTH_CONFIGURED = bool(GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET and SESSION_SECRET_CONFIGURED)
+
+# Supabase credentials are server-only. Prefer the new sb_secret_* key; the
+# legacy service-role JWT remains supported for existing projects.
+SUPABASE_STORE = supabase_store.SupabaseWorkspaceStore(
+    os.environ.get("SUPABASE_URL", ""),
+    os.environ.get("SUPABASE_SECRET_KEY", "") or os.environ.get("SUPABASE_SERVICE_ROLE_KEY", ""),
+)
+MAX_WORKSPACE_STATE_BYTES = 2 * 1024 * 1024
 
 DATA_DIR = Path(__file__).parent / "server"
 PUBLIC_DIR = Path(__file__).resolve().parents[1] / "public"
@@ -99,6 +109,42 @@ def _save_store(store):
 
 def _current_user_key():
     return session.get("github_login", "anonymous")
+
+
+def _workspace_owner_id():
+    """Return a stable, pseudonymous workspace key for Supabase rows."""
+    login = session.get("github_login")
+    if isinstance(login, str) and login.strip():
+        subject = "github:" + login.strip().casefold()
+    else:
+        visitor_id = session.get("zariya_visitor_id")
+        if not isinstance(visitor_id, str) or len(visitor_id) < 24:
+            visitor_id = secrets.token_urlsafe(32)
+            session["zariya_visitor_id"] = visitor_id
+        subject = "anonymous:" + visitor_id
+    session.permanent = True
+    return hashlib.sha256(subject.encode("utf-8")).hexdigest()
+
+
+def _normalize_workspace_state(raw):
+    """Validate workspace arrays and enforce an API payload-size ceiling."""
+    if not isinstance(raw, dict):
+        return None, "Workspace data must be an object.", 400
+    limits = {"sessions": 500, "notes": 1000, "decks": 500}
+    state = {}
+    for field, limit in limits.items():
+        items = raw.get(field, [])
+        if not isinstance(items, list):
+            return None, f"{field} must be a list.", 400
+        if len(items) > limit:
+            return None, f"Too many {field} items (max {limit}).", 413
+        if any(not isinstance(item, dict) for item in items):
+            return None, f"Every {field} item must be an object.", 400
+        state[field] = items
+    size = len(json.dumps(state, ensure_ascii=False, separators=(",", ":")).encode("utf-8"))
+    if size > MAX_WORKSPACE_STATE_BYTES:
+        return None, "Workspace data is too large to sync. Export a backup and reduce its size.", 413
+    return state, None, None
 
 def _user_bucket(store):
     key = _current_user_key()
@@ -506,8 +552,16 @@ def web_search():
 # ---------------------------------------------------------------------------
 @app.route("/api/state", methods=["GET"])
 def get_state():
+    if SUPABASE_STORE.configured:
+        try:
+            state = SUPABASE_STORE.get_state(_workspace_owner_id())
+        except Exception:
+            app.logger.exception("Supabase workspace read failed")
+            return jsonify({"error": "Cloud storage could not be reached. Your local browser copy is still available."}), 503
+        return jsonify(state or {"sessions": [], "notes": [], "decks": []})
+
     # Vercel Functions do not provide a durable writable project filesystem.
-    # Hosted chat, notes and flashcards are stored in the visitor's browser.
+    # Without Supabase, the browser remains the safe hosted fallback.
     if HOSTED_MODE:
         return jsonify({"sessions": [], "notes": [], "decks": [], "storage": "browser"})
     store = _load_store()
@@ -518,20 +572,29 @@ def get_state():
         _save_store(store)
     return jsonify(bucket)
 
+
 @app.route("/api/state", methods=["POST"])
 def save_state():
+    body = request.get_json(silent=True)
+    state, error, status = _normalize_workspace_state(body)
+    if error:
+        return jsonify({"error": error}), status
+
+    if SUPABASE_STORE.configured:
+        try:
+            SUPABASE_STORE.save_state(_workspace_owner_id(), state)
+        except Exception:
+            app.logger.exception("Supabase workspace save failed")
+            return jsonify({"error": "Cloud sync failed. Your browser copy has been kept; please retry."}), 503
+        return jsonify({"ok": True, "storage": "supabase"})
+
     if HOSTED_MODE:
-        return jsonify({"ok": False, "error": "Hosted mode uses browser-local storage."}), 409
-    body = request.get_json(silent=True) or {}
+        return jsonify({"ok": False, "error": "Hosted mode uses browser-local storage until Supabase is configured."}), 409
     store = _load_store()
     key = _current_user_key()
-    store["users"][key] = {
-        "sessions": body.get("sessions", []),
-        "notes": body.get("notes", []),
-        "decks": body.get("decks", []),
-    }
+    store["users"][key] = state
     _save_store(store)
-    return jsonify({"ok": True})
+    return jsonify({"ok": True, "storage": "server_file"})
 
 def _tool_model_reply(messages, task_prompt: str):
     """Run a focused tool task through the hosted model, if it is available."""
@@ -659,6 +722,8 @@ def config():
     ai = hosted_model.connection_status(oidc_token=_gateway_oidc_token())
     return jsonify({
         "hostedMode": HOSTED_MODE,
+        "supabaseConfigured": SUPABASE_STORE.configured,
+        "storageMode": "supabase" if SUPABASE_STORE.configured else ("browser" if HOSTED_MODE else "server_file"),
         "aiConfigured": ai["configured"],
         "aiAvailable": ai["available"],
         "aiProvider": ai["provider"],
@@ -676,6 +741,7 @@ def health():
         "ok": True,
         "service": "zariya",
         "mode": "hosted" if HOSTED_MODE else "local",
+        "storageMode": "supabase" if SUPABASE_STORE.configured else ("browser" if HOSTED_MODE else "server_file"),
         "aiConfigured": ai["configured"],
         "aiProvider": ai["provider"],
         "knowledgeEntries": len(kb_engine.KB),

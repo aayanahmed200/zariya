@@ -265,7 +265,7 @@
           <div class="setting-group">
             <div class="setting-heading">
               <span class="setting-icon">◎</span>
-              <div><h3>Account &amp; storage</h3><p class="desc">Your current workspace is stored in this browser.</p></div>
+              <div><h3>Account &amp; storage</h3><p class="desc" id="storageDescription">Your workspace is saved in this browser only.</p></div>
             </div>
             <div class="setting-content">
               <div class="setting-row" id="accountSignedOutRow">
@@ -289,7 +289,7 @@
                 </div>
                 <a class="github-setup-link" href="https://github.com/settings/developers" target="_blank" rel="noopener noreferrer">Open GitHub Developer settings ↗</a>
                 <p class="github-setup-footnote">In Vercel → Project Settings → Environment Variables, add <code>GITHUB_CLIENT_ID</code> and <code>GITHUB_CLIENT_SECRET</code> for Production, Preview and Development. A stable session secret and the callback URL have already been prepared in this project.</p>
-                <p class="github-setup-footnote">GitHub sign-in identifies your profile. Chats, notes and flashcards are still saved on this device; signing in does not sync them across devices.</p>
+                <p class="github-setup-footnote" id="githubStorageNote">GitHub sign-in identifies your profile. Without Supabase, chats, notes and flashcards remain on this device.</p>
               </div>
               <div class="account-auth-status" id="accountAuthStatus" role="status" aria-live="polite" hidden></div>
               <div class="setting-row signed-in-row" id="accountSignedInRow" style="display:none;">
@@ -300,7 +300,7 @@
               <div class="workspace-backup">
                 <div>
                   <strong>Protect your workspace</strong>
-                  <p>Chats, notes and flashcards are saved in this browser only. Export a backup before clearing browser data or moving devices.</p>
+                  <p id="workspaceBackupDescription">Chats, notes and flashcards are saved in this browser only. Export a backup before clearing browser data or moving devices.</p>
                 </div>
                 <div class="workspace-backup-actions">
                   <button class="btn primary" id="exportWorkspaceBtn" type="button">Export backup</button>

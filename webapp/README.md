@@ -6,7 +6,7 @@ A hosted Urdu and English workspace for chat, notes and flashcards. Visitors can
 
 ## Overview
 
-The Flask app provides chat, bilingual voice typing, chat history, notepad, flashcards, deck import/export and browser text-to-speech. Chat is routed server-side through Vercel AI Gateway using the short-lived OIDC token injected into each Function request as `x-vercel-oidc-token`. The default open-weight model is `nvidia/nemotron-3.5-lightning-free`, currently listed at $0 per input/output token. Free provider capacity and rate limits can change; when hosted inference is unavailable, selected requests use the bundled rule-based knowledge engine.
+The Flask app provides chat, bilingual voice typing, chat history, notepad, flashcards, deck import/export and browser text-to-speech. Workspace data syncs across devices when Supabase is configured, with browser-local fallback when it is not. Chat is routed server-side through Vercel AI Gateway using the short-lived OIDC token injected into each Function request as `x-vercel-oidc-token`. The default open-weight model is `nvidia/nemotron-3.5-lightning-free`, currently listed at $0 per input/output token. Free provider capacity and rate limits can change; when hosted inference is unavailable, selected requests use the bundled rule-based knowledge engine.
 
 The current NVIDIA model-provider listing does not advertise zero-data-retention or a no-training guarantee. Chat prompts are transmitted to Vercel AI Gateway and the selected model provider. Voice transcription records up to 60 seconds of mono audio, converts it to WAV and sends it to Vercel AI Gateway using Microsoft MAI-Transcribe 2. Auto detection and English/Urdu language hints are supported. Zariya does not store recordings, but audio is transmitted to Gateway and Microsoft Azure. Users should not record private conversations or enter passwords, private records or other sensitive information.
 
@@ -48,6 +48,8 @@ The default Gateway model is `nvidia/nemotron-3.5-lightning-free`. Its live cata
 
 ## Configuration
 
+- `SUPABASE_URL` — your Supabase project URL.
+- `SUPABASE_SECRET_KEY` — server-only Supabase secret key (`sb_secret_...`). Legacy `SUPABASE_SERVICE_ROLE_KEY` is also supported. Never prefix these with `NEXT_PUBLIC_`.
 - `AI_GATEWAY_MODEL` — optional server-side model override; defaults to `nvidia/nemotron-3.5-lightning-free`.
 - `AI_GATEWAY_API_KEY` — optional for local development only; do not commit it. Vercel deployments use OIDC instead.
 - `GOOGLE_API_KEY` and `GOOGLE_CX` — optional Google Custom Search credentials for the Search web tool.
@@ -62,9 +64,13 @@ pip install -r requirements.txt -r requirements-dev.txt
 pytest tests/
 ```
 
+## Supabase cloud storage
+
+Create a Supabase project, then run `supabase/migrations/202611220001_create_zariya_workspaces.sql` in its SQL Editor. Add `SUPABASE_URL` and the project secret key as Vercel server-side environment variables for Production, Preview and Development. Redeploy after adding them. Zariya stores each workspace as JSONB under a hashed, pseudonymous owner ID derived from the signed Flask session (or the GitHub login when signed in). Row-level security is enabled and no browser roles receive table access; only the server uses the secret/service-role key. Without these variables, the site keeps using browser-local storage. A connected Supabase project is required for actual cross-device cloud sync.
+
 ## Data and limitations
 
-Hosted AI chat prompts are sent to Vercel AI Gateway and NVIDIA's selected model provider. The provider does not currently advertise zero-data-retention or a no-training guarantee; do not send sensitive information. Voice recordings are sent to Vercel AI Gateway and Microsoft Azure solely for transcription; Zariya does not store the audio. Browser chat history, notes and flashcards are kept in the visitor's local storage; they are not synced across devices or accounts, and clearing browser storage removes them. Model output and speech transcripts can be incorrect. The built-in knowledge engine is a limited rule-based fallback rather than a general-purpose AI model.
+Hosted AI chat prompts are sent to Vercel AI Gateway and NVIDIA's selected model provider. The provider does not currently advertise zero-data-retention or a no-training guarantee; do not send sensitive information. Voice recordings are sent to Vercel AI Gateway and Microsoft Azure solely for transcription; Zariya does not store the audio. Without Supabase configured, browser chat history, notes and flashcards are kept in local storage and are not synced across devices; clearing browser storage removes the local copy. When Supabase is configured, the app syncs the workspace server-side and retains a local cache. Model output and speech transcripts can be incorrect. The built-in knowledge engine is a limited rule-based fallback rather than a general-purpose AI model.
 
 ## License
 

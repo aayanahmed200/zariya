@@ -52,7 +52,8 @@ let serverConfig = {
   hostedMode:false, aiConfigured:false, aiAvailable:false,
   aiProvider:'Vercel AI Gateway', aiStatus:'Checking hosted AI…',
   aiModel:'nvidia/nemotron-3.5-lightning-free',
-  searchConfigured:false, githubConfigured:false
+  searchConfigured:false, githubConfigured:false,
+  supabaseConfigured:false, storageMode:'browser'
 };
 function isPureUrdu(text){
   const value = String(text || '');
@@ -212,7 +213,7 @@ async function updateStorageStatus(saved=true, message=''){
   if(!status) return;
   status.classList.toggle('warning',!saved);
   status.textContent=message || (saved
-    ? 'All changes saved on this device.'
+    ? (serverConfig.supabaseConfigured ? 'Synced securely with Supabase.' : 'All changes saved on this device.')
     : 'This browser could not save more data. Export a backup and free up browser storage.');
 }
 function exportWorkspaceBackup(){
@@ -346,36 +347,149 @@ document.getElementById('importWorkspaceFile').addEventListener('change',event=>
   event.target.value='';
 });
 
+let stateBackendAvailable = false;
+let localStateMessage = '';
+
+function localWorkspaceStateKey(){
+  return 'zariya_app_state_v1:' + (me.signedIn && me.login ? me.login : 'guest');
+}
+function emptyWorkspaceState(){
+  return {sessions:[],notes:[],decks:[]};
+}
+function workspaceHasItems(state){
+  return ['sessions','notes','decks'].some(key=>Array.isArray(state && state[key]) && state[key].length>0);
+}
+function mergeWorkspaceState(remote, cached){
+  const merged={};
+  ['sessions','notes','decks'].forEach(key=>{
+    const serverItems=Array.isArray(remote && remote[key])?remote[key]:[];
+    const localItems=Array.isArray(cached && cached[key])?cached[key]:[];
+    const ids=new Set(serverItems.map(item=>item && item.id).filter(Boolean).map(String));
+    merged[key]=serverItems.concat(localItems.filter(item=>!item || !item.id || !ids.has(String(item.id))));
+  });
+  return merged;
+}
+
 async function loadServerState(){
   const results = await Promise.allSettled([apiGet('/api/config'), apiGet('/api/me')]);
   serverConfig = results[0].status === 'fulfilled' ? results[0].value : {
     hostedMode:true, aiConfigured:false, aiAvailable:false, aiProvider:'Vercel AI Gateway',
     aiStatus:'The app server could not be reached. Refresh to retry.',
-    aiModel:'nvidia/nemotron-3.5-lightning-free', searchConfigured:false, githubConfigured:false
+    aiModel:'nvidia/nemotron-3.5-lightning-free', searchConfigured:false, githubConfigured:false,
+    supabaseConfigured:false, storageMode:'browser'
   };
   me = results[1].status === 'fulfilled' ? results[1].value : { signedIn:false, githubConfigured:false };
-  const state = serverConfig.hostedMode
-    ? LS.get('zariya_app_state_v1:' + (me.signedIn && me.login ? me.login : 'guest'), {})
-    : await apiGet('/api/state').catch(()=>LS.get('zariya_app_state_v1:guest', {}));
+
+  const stateKey=localWorkspaceStateKey();
+  const cached=LS.get(stateKey,emptyWorkspaceState());
+  let state=cached;
+  stateBackendAvailable=false;
+  localStateMessage='';
+
+  if(serverConfig.supabaseConfigured || !serverConfig.hostedMode){
+    try{
+      const remote=await apiGet('/api/state');
+      stateBackendAvailable=true;
+      if(serverConfig.supabaseConfigured){
+        state=mergeWorkspaceState(remote,cached);
+        if(JSON.stringify(state)!==JSON.stringify(remote)){
+          try{
+            await apiPost('/api/state',state);
+          }catch(syncError){
+            localStateMessage='Some local changes could not be synced yet. They are still saved in this browser.';
+          }
+        }
+      }else{
+        state=remote;
+      }
+      LS.set(stateKey,state);
+    }catch(error){
+      state=cached;
+      stateBackendAvailable=false;
+      localStateMessage=serverConfig.supabaseConfigured
+        ? 'Cloud sync is unavailable. Your changes are being kept in this browser.'
+        : 'The local server could not be reached. Your changes are being kept in this browser.';
+    }
+  }else{
+    localStateMessage='Saved in this browser only. Connect Supabase to sync across devices.';
+  }
+
   sessions = Array.isArray(state.sessions) ? state.sessions : [];
   notes = Array.isArray(state.notes) ? state.notes : [];
   decks = Array.isArray(state.decks) ? state.decks : [];
   decks.forEach(d=> (Array.isArray(d.cards) ? d.cards : []).forEach(migrateCardForSpacedRepetition));
   currentSessionId = sessions.length ? sessions[0].id : null;
-  const storageDescription = document.getElementById('storageDescription');
-  if(storageDescription) storageDescription.textContent = serverConfig.hostedMode
-    ? 'Saved in this browser. Not synced across devices.'
-    : 'Saved by this local development server.';
+
+  const storageDescription=document.getElementById('storageDescription');
+  if(storageDescription){
+    storageDescription.textContent=serverConfig.supabaseConfigured
+      ? 'Your workspace syncs securely across devices.'
+      : (serverConfig.hostedMode
+        ? 'Your workspace is saved in this browser only.'
+        : 'Your workspace is saved by this local development server.');
+  }
+  const backupDescription=document.getElementById('workspaceBackupDescription');
+  if(backupDescription){
+    backupDescription.textContent=serverConfig.supabaseConfigured
+      ? 'Chats, notes and flashcards sync to your account. You can still export a private backup at any time.'
+      : 'Chats, notes and flashcards are saved in this browser only. Export a backup before clearing browser data or moving devices.';
+  }
+  const githubStorageNote=document.getElementById('githubStorageNote');
+  if(githubStorageNote){
+    githubStorageNote.textContent=serverConfig.supabaseConfigured
+      ? 'With Supabase connected, your workspace syncs across devices for this GitHub account.'
+      : 'GitHub sign-in identifies your profile. Without Supabase, chats, notes and flashcards remain on this device.';
+  }
+  updateStorageStatus((stateBackendAvailable || !serverConfig.hostedMode) && !localStateMessage,
+    localStateMessage || (serverConfig.supabaseConfigured && stateBackendAvailable
+      ? 'Connected to Supabase. Workspace data is synced.'
+      : (serverConfig.hostedMode
+        ? 'Saved in this browser only.'
+        : 'Saved by this local development server.')));
 }
 let saveTimer;
 function saveServerState(){
   clearTimeout(saveTimer);
+  const snapshot={sessions,notes,decks};
+  const stateKey=localWorkspaceStateKey();
+  const saved=LS.set(stateKey,snapshot);
+
+  if(serverConfig.supabaseConfigured){
+    saveTimer=setTimeout(async()=>{
+      try{
+        await apiPost('/api/state',snapshot);
+        stateBackendAvailable=true;
+        localStateMessage='';
+        updateStorageStatus(true,'Synced securely with Supabase.');
+      }catch(error){
+        stateBackendAvailable=false;
+        localStateMessage='Cloud sync failed. Your changes are saved in this browser; retry after reconnecting.';
+        updateStorageStatus(saved,saved
+          ? localStateMessage
+          : 'Cloud sync failed and this browser could not save more data. Export a backup.');
+      }
+    },350);
+    if(!saved) updateStorageStatus(false,'Saving to Supabase. Browser storage is unavailable.');
+    return true;
+  }
+
   if(serverConfig.hostedMode){
-    const saved = LS.set('zariya_app_state_v1:' + (me.signedIn && me.login ? me.login : 'guest'), { sessions, notes, decks });
-    updateStorageStatus(saved);
+    updateStorageStatus(saved,saved
+      ? (localStateMessage || 'Saved in this browser only. Connect Supabase to sync across devices.')
+      : 'This browser could not save more data. Export a backup and free up browser storage.');
     return saved;
   }
-  saveTimer = setTimeout(()=>{ apiPost('/api/state', { sessions, notes, decks }).catch(()=>{}); }, 300);
+
+  saveTimer=setTimeout(async()=>{
+    try{
+      await apiPost('/api/state',snapshot);
+      updateStorageStatus(true,'Saved by this local development server.');
+    }catch(error){
+      updateStorageStatus(saved,saved
+        ? 'The local server could not be reached. Your changes are saved in this browser.'
+        : 'The local server and browser storage could not save your changes. Export a backup.');
+    }
+  },350);
   return true;
 }
 
