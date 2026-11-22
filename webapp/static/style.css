@@ -504,7 +504,9 @@ button{touch-action:manipulation;}
 .code-block-head{font-size:11px;}
 .code-copy-btn{font-family:var(--font-ui);font-size:12px;}
 .msg-meta{font:400 11.5px/1.4 var(--font-ui);font-variant-numeric:tabular-nums;color:var(--text-muted);letter-spacing:0;}
-.msg-actions{gap:5px;margin-top:10px;opacity:1;}
+.msg-actions{gap:5px;margin-top:10px;opacity:0;transition:opacity .15s ease;}
+.msg-row:hover .msg-actions,.msg-row:focus-within .msg-actions{opacity:1;}
+@media(hover:none){.msg-actions{opacity:1;}}
 .ghost-btn{font-size:12px;min-height:30px;border-radius:8px;color:var(--text-dim);}
 .ghost-btn:hover{background:var(--bg-hover);color:var(--accent-strong);}
 .ghost-btn:disabled{opacity:.65;cursor:wait;}
@@ -646,3 +648,7 @@ button:disabled{cursor:not-allowed;}
 @media(prefers-reduced-motion:reduce){
   *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;scroll-behavior:auto!important;transition-duration:.01ms!important;}
 }
+
+.composer-box.is-busy{opacity:.82;}
+#chat-input:disabled{cursor:wait;}
+.composer-hint.save-error{color:var(--danger);font-weight:600;}

@@ -96,10 +96,25 @@ async function loadServerState(){
   currentSessionId = sessions.length ? sessions[0].id : null;
 }
 let saveTimer;
+let saveFeedbackTimer = null;
 function saveServerState(){
   clearTimeout(saveTimer);
-  saveTimer = setTimeout(()=>{
-    apiPost('/api/state', { sessions, notes, decks });
+  saveTimer = setTimeout(async ()=>{
+    const hint = document.getElementById('composerHint');
+    try{
+      await apiPost('/api/state', { sessions, notes, decks });
+      if(hint && hint.dataset.saveError==='true'){
+        hint.textContent = defaultHint;
+        hint.classList.remove('save-error');
+        delete hint.dataset.saveError;
+      }
+    }catch(err){
+      if(hint){
+        hint.textContent = 'Changes could not be saved. Check your connection.';
+        hint.classList.add('save-error');
+        hint.dataset.saveError = 'true';
+      }
+    }
   }, 300);
 }
 
@@ -392,6 +407,7 @@ sendBtn.addEventListener('click', ()=>{ if(sendBtn.dataset.mode==='stop'){ stopG
 syncSendState();
 
 function sendMessage(){
+  if(quickToolBusy || isGenerating) return;
   const text = input.value.trim(); if(!text) return;
   if(!currentSession()) newSession();
   const session = currentSession();
@@ -525,6 +541,9 @@ async function runQuickTool(tool){
   const buttons = [...document.querySelectorAll('.qt-btn')];
   const activeButton = buttons.find(button=>button.dataset.tool===tool);
   quickToolBusy = true;
+  input.disabled = true;
+  sendBtn.disabled = true;
+  composerBox.classList.add('is-busy');
   buttons.forEach(button=>{
     button.disabled = true;
     button.setAttribute('aria-busy',button===activeButton?'true':'false');
@@ -579,6 +598,9 @@ async function runQuickTool(tool){
   }finally{
     removeThinking();
     quickToolBusy = false;
+    input.disabled = false;
+    composerBox.classList.remove('is-busy');
+    syncSendState();
     buttons.forEach(button=>{
       button.disabled = false;
       button.setAttribute('aria-busy','false');
