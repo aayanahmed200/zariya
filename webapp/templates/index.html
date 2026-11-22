@@ -104,7 +104,7 @@
         <svg class="sb-profile-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
       </button>
       <div class="sb-footer-bottom">
-        <span class="storage-caption"><span class="storage-dot"></span> Stored on this device</span>
+        <span class="storage-caption"><span class="storage-dot"></span><span id="storageCaption">Stored on this device</span></span>
         <button class="icon-btn" id="themeToggleBtn" type="button" title="Toggle theme" aria-label="Toggle theme">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v2M12 19v2M3 12h2m14 0h2M5.6 5.6 7 7m10 10 1.4 1.4M18.4 5.6 17 7M7 17l-1.4 1.4"/><circle cx="12" cy="12" r="4"/></svg>
         </button>
@@ -431,7 +431,7 @@
               <div><h3>About Zariya</h3><p class="desc">An Urdu and English workspace for questions, notes and learning.</p></div>
             </div>
             <div class="setting-content about-copy">
-              Zariya connects to a hosted open model through Vercel AI Gateway, so you can start chatting without installing software or adding a personal API key. When the hosted service is unavailable, the app falls back to a smaller built-in knowledge mode. Your chats, notes and flashcards are stored in this browser.
+              Zariya connects to a hosted open model through Vercel AI Gateway, so you can start chatting without installing software or adding a personal API key. When the hosted service is unavailable, the app falls back to a smaller built-in knowledge mode. Your chats, notes and flashcards sync to secure cloud storage when available, with a local browser copy as a fallback.
             </div>
           </div>
         </div>
@@ -455,7 +455,14 @@
   </form>
 </dialog>
 </div>
+<script src="/static/workspace-sync.js?v=20261122-6"></script>
 <script src="/static/sse.js?v=20261122-4"></script>
-<script src="/static/app.js?v=20261122-4"></script>
+<script src="/static/app.js?v=20261122-6"></script>
+<script>
+  window.va = window.va || function () {
+    (window.vaq = window.vaq || []).push(arguments);
+  };
+</script>
+<script defer src="/_vercel/insights/script.js"></script>
 </body>
 </html>

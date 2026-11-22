@@ -208,7 +208,15 @@ async function apiPost(url, body, signal){
   return readApiResponse(await fetch(url, { method:'POST', headers:{'Content-Type':'application/json','Accept':'application/json'}, body:JSON.stringify(body||{}), signal }));
 }
 
+function updateStorageIndicators(){
+  const synced=!!(serverConfig.supabaseConfigured && stateBackendAvailable && !localStateMessage);
+  const profileName=document.getElementById('sbProfileName');
+  const caption=document.getElementById('storageCaption');
+  if(profileName) profileName.textContent=synced ? 'Cloud workspace' : 'Saved in this browser';
+  if(caption) caption.textContent=synced ? 'Synced to cloud' : 'Stored on this device';
+}
 async function updateStorageStatus(saved=true, message=''){
+  updateStorageIndicators();
   const status=document.getElementById('storageStatus');
   if(!status) return;
   status.classList.toggle('warning',!saved);
@@ -354,20 +362,13 @@ function localWorkspaceStateKey(){
   return 'zariya_app_state_v1:' + (me.signedIn && me.login ? me.login : 'guest');
 }
 function emptyWorkspaceState(){
-  return {sessions:[],notes:[],decks:[]};
+  return window.ZariyaWorkspaceSync.empty();
 }
 function workspaceHasItems(state){
   return ['sessions','notes','decks'].some(key=>Array.isArray(state && state[key]) && state[key].length>0);
 }
 function mergeWorkspaceState(remote, cached){
-  const merged={};
-  ['sessions','notes','decks'].forEach(key=>{
-    const serverItems=Array.isArray(remote && remote[key])?remote[key]:[];
-    const localItems=Array.isArray(cached && cached[key])?cached[key]:[];
-    const ids=new Set(serverItems.map(item=>item && item.id).filter(Boolean).map(String));
-    merged[key]=serverItems.concat(localItems.filter(item=>!item || !item.id || !ids.has(String(item.id))));
-  });
-  return merged;
+  return window.ZariyaWorkspaceSync.merge(remote,cached);
 }
 
 async function loadServerState(){
@@ -391,7 +392,7 @@ async function loadServerState(){
       const remote=await apiGet('/api/state');
       stateBackendAvailable=true;
       if(serverConfig.supabaseConfigured){
-        state=mergeWorkspaceState(remote,cached);
+        state=window.ZariyaWorkspaceSync.stamp(mergeWorkspaceState(remote,cached),remote);
         if(JSON.stringify(state)!==JSON.stringify(remote)){
           try{
             await apiPost('/api/state',state);
@@ -448,16 +449,26 @@ async function loadServerState(){
         : 'Saved by this local development server.')));
 }
 let saveTimer;
+let cloudSaveQueue=Promise.resolve();
+function saveCloudSnapshot(snapshot){
+  const pending=cloudSaveQueue.catch(()=>{}).then(()=>apiPost('/api/state',snapshot));
+  cloudSaveQueue=pending.then(()=>undefined,()=>undefined);
+  return pending;
+}
 function saveServerState(){
   clearTimeout(saveTimer);
-  const snapshot={sessions,notes,decks};
   const stateKey=localWorkspaceStateKey();
+  const previous=LS.get(stateKey,emptyWorkspaceState());
+  const snapshot=window.ZariyaWorkspaceSync.stamp({sessions,notes,decks,_deleted:previous._deleted},previous);
+  sessions=snapshot.sessions;
+  notes=snapshot.notes;
+  decks=snapshot.decks;
   const saved=LS.set(stateKey,snapshot);
 
   if(serverConfig.supabaseConfigured){
     saveTimer=setTimeout(async()=>{
       try{
-        await apiPost('/api/state',snapshot);
+        await saveCloudSnapshot(snapshot);
         stateBackendAvailable=true;
         localStateMessage='';
         updateStorageStatus(true,'Synced securely with Supabase.');
