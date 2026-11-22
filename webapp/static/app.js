@@ -1289,8 +1289,10 @@ if(importWorkspaceBtn && importWorkspaceFile){
     event.target.value='';
     if(!file) return;
     const note=document.getElementById('workspaceBackupNote');
-    if(file.size>4*1024*1024){
-      if(note) note.textContent='That backup is larger than 4 MB. Export a smaller workspace backup first.';
+    const sizeLimit = stateBackendAvailable ? 4*1024*1024 : 2*1024*1024;
+    if(file.size>sizeLimit){
+      const limitLabel = stateBackendAvailable ? '4 MB' : '2 MB';
+      if(note) note.textContent='That backup is larger than '+limitLabel+'. This deployment saves in this browser, so a smaller backup is needed.';
       return;
     }
     importWorkspaceBtn.disabled=true;
@@ -1301,6 +1303,10 @@ if(importWorkspaceBtn && importWorkspaceFile){
       const restored=validateWorkspaceBackup(raw);
       const summary=restored.sessions.length+' chats, '+restored.notes.length+' notes and '+restored.decks.length+' decks';
       if(!confirm('Replace this browser’s current Zariya workspace with '+summary+' from the selected backup?')) return;
+      const restoredSnapshot={sessions:restored.sessions,notes:restored.notes,decks:restored.decks};
+      if(!stateBackendAvailable && !LS.set(localStateKey,restoredSnapshot)){
+        throw new Error('This browser’s storage is full or blocked. Your current workspace has been left unchanged.');
+      }
       sessions=restored.sessions;
       notes=restored.notes;
       decks=restored.decks;
