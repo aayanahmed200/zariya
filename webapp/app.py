@@ -5,9 +5,13 @@ OIDC authenticates the server-to-server request; no browser API key or local
 model installation is required. If hosted inference is unavailable, selected
 requests fall back to the bundled rule-based knowledge engine.
 """
+import base64
+import binascii
+import io
 import os
 import secrets
 import time
+import wave
 import json
 from pathlib import Path
 from urllib.parse import urlencode
@@ -109,7 +113,7 @@ def _user_bucket(store):
 # Basic request-size guards, consistent with the systemPrompt cap below: an
 # unbounded messages array or unbounded combined content length is an easy way
 # for a misbehaving client (or a deliberately abusive one) to force huge
-# memory/CPU use or excessive outbound payloads to the configured Ollama endpoint.
+# memory/CPU use or excessive outbound payloads to the hosted AI Gateway.
 MAX_MESSAGES = 200
 MAX_TOTAL_CONTENT_CHARS = 200_000
 
@@ -249,6 +253,85 @@ def _gateway_oidc_token() -> str | None:
 # Chat: Vercel AI Gateway hosted open model -> curated knowledge fallback.
 # Gateway authentication is server-side Vercel OIDC; no visitor key is required.
 # ---------------------------------------------------------------------------
+
+_TRANSCRIPTION_REQUESTS: dict[str, list[float]] = {}
+MAX_TRANSCRIPTION_SECONDS = 60
+MAX_TRANSCRIPTION_B64_CHARS = 3_400_000
+MAX_TRANSCRIPTION_BYTES = 2_500_000
+
+
+def _transcription_rate_limited(client_ip: str) -> bool:
+    """Small per-function guard against accidental rapid repeat recordings."""
+    now = time.monotonic()
+    recent = [stamp for stamp in _TRANSCRIPTION_REQUESTS.get(client_ip, []) if now - stamp < 60]
+    if len(recent) >= 8:
+        _TRANSCRIPTION_REQUESTS[client_ip] = recent
+        return True
+    recent.append(now)
+    if len(_TRANSCRIPTION_REQUESTS) > 512:
+        oldest = min(_TRANSCRIPTION_REQUESTS, key=lambda key: max(_TRANSCRIPTION_REQUESTS[key] or [0]))
+        _TRANSCRIPTION_REQUESTS.pop(oldest, None)
+    _TRANSCRIPTION_REQUESTS[client_ip] = recent
+    return False
+
+
+@app.route("/api/transcribe", methods=["POST"])
+def transcribe():
+    body = request.get_json(silent=True)
+    if not isinstance(body, dict):
+        return jsonify({"error": "A recording was not received. Please try again."}), 400
+    encoded_audio = body.get("audio")
+    if not isinstance(encoded_audio, str) or not encoded_audio:
+        return jsonify({"error": "No microphone audio was received."}), 400
+    if len(encoded_audio) > MAX_TRANSCRIPTION_B64_CHARS:
+        return jsonify({"error": "That recording is too large. Keep voice notes under 60 seconds."}), 413
+    language = body.get("language", "auto")
+    if language not in ("auto", "en", "ur"):
+        return jsonify({"error": "Choose Auto, English or Urdu before recording."}), 400
+
+    try:
+        audio_bytes = base64.b64decode(encoded_audio, validate=True)
+    except (binascii.Error, ValueError):
+        return jsonify({"error": "The audio data was incomplete. Please record again."}), 400
+    if not audio_bytes or len(audio_bytes) > MAX_TRANSCRIPTION_BYTES:
+        return jsonify({"error": "That recording is too large or empty. Please record again."}), 413
+
+    try:
+        with wave.open(io.BytesIO(audio_bytes), "rb") as wav_file:
+            channels = wav_file.getnchannels()
+            sample_width = wav_file.getsampwidth()
+            sample_rate = wav_file.getframerate()
+            frame_count = wav_file.getnframes()
+            duration = frame_count / float(sample_rate or 1)
+            if channels != 1 or sample_width != 2 or sample_rate != 16000:
+                return jsonify({"error": "The microphone audio format was not supported. Please refresh and try again."}), 400
+            if frame_count < 4000 or duration > MAX_TRANSCRIPTION_SECONDS + 1:
+                return jsonify({"error": "Record between a quarter of a second and 60 seconds of speech."}), 400
+    except (wave.Error, EOFError, OSError):
+        return jsonify({"error": "The audio recording was not a valid WAV file. Please record again."}), 400
+
+    client_ip = request.headers.get("x-forwarded-for", request.remote_addr or "unknown").split(",")[0].strip()
+    if _transcription_rate_limited(client_ip):
+        return jsonify({"error": "Too many voice recordings in a short time. Please try again in a minute."}), 429
+
+    try:
+        result = hosted_model.transcribe_audio(
+            audio_bytes,
+            media_type="audio/wav",
+            language=None if language == "auto" else language,
+            oidc_token=_gateway_oidc_token(),
+        )
+    except hosted_model.GatewayError as exc:
+        app.logger.info("Voice transcription failed: %s", exc)
+        return jsonify({"error": str(exc)}), 503
+
+    return jsonify({
+        "text": result["text"],
+        "language": result.get("language"),
+        "durationInSeconds": result.get("durationInSeconds") or duration,
+    })
+
+
 @app.route("/api/chat", methods=["POST"])
 def chat():
     body = request.get_json(silent=True) or {}
