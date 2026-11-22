@@ -1044,7 +1044,7 @@ button:disabled,.btn:disabled,.qt-btn:disabled,.deck-action-btn:disabled{cursor:
 .response-preset-trigger svg{width:13px;height:13px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;transition:transform .15s}
 .response-preset-dropdown.open .response-preset-trigger{background:var(--accent-soft);border-color:var(--accent);color:var(--accent-strong);box-shadow:0 0 0 3px var(--accent-soft)}
 .response-preset-dropdown.open .response-preset-trigger svg{transform:rotate(180deg)}
-.response-preset-menu{position:absolute;right:0;top:calc(100% + 8px);width:252px;padding:6px;display:grid;gap:3px;background:var(--surface);border:1px solid var(--border-strong);border-radius:13px;box-shadow:0 16px 38px rgba(37,34,27,.16);z-index:100}
+.response-preset-menu{position:absolute;right:0;top:auto;bottom:calc(100% + 8px);width:252px;padding:6px;display:grid;gap:3px;background:var(--surface);border:1px solid var(--border-strong);border-radius:13px;box-shadow:0 16px 38px rgba(37,34,27,.16);z-index:100}
 .response-preset-menu[hidden]{display:none!important}
 .response-preset-menu button{width:100%;min-height:48px;padding:7px 10px;display:grid;grid-template-columns:1fr auto;grid-template-rows:auto auto;align-items:center;gap:1px 10px;background:transparent;border:0;border-radius:9px;color:var(--text);text-align:left;cursor:pointer;transition:background .13s,color .13s}
 .response-preset-menu button span{font-size:11px;font-weight:700}
@@ -1059,3 +1059,13 @@ button:disabled,.btn:disabled,.qt-btn:disabled,.deck-action-btn:disabled{cursor:
   .response-preset-dropdown,.response-preset-trigger{width:100%}
   .response-preset-menu{right:0;left:0;width:100%}
 }
+
+
+
+/* Keep Urdu text legible in deck creation and custom instructions */
+#personaInput.input-urdu,.deck-front.input-urdu,.deck-back.input-urdu{
+  font-family:var(--urdu)!important;
+  font-size:16px;
+  line-height:1.85;
+}
+.deck-form-card input[dir="rtl"],.deck-form-card textarea[dir="rtl"]{text-align:right}
