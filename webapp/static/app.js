@@ -452,7 +452,7 @@ function saveServerState(){
   clearTimeout(saveTimer);
   const snapshot={sessions,notes,decks};
   const stateKey=localWorkspaceStateKey();
-  const localSaved=LS.set(stateKey,snapshot);
+  const saved=LS.set(stateKey,snapshot);
 
   if(serverConfig.supabaseConfigured){
     saveTimer=setTimeout(async()=>{
@@ -464,20 +464,20 @@ function saveServerState(){
       }catch(error){
         stateBackendAvailable=false;
         localStateMessage='Cloud sync failed. Your changes are saved in this browser; retry after reconnecting.';
-        updateStorageStatus(localSaved,localSaved
+        updateStorageStatus(saved,saved
           ? localStateMessage
           : 'Cloud sync failed and this browser could not save more data. Export a backup.');
       }
     },350);
-    if(!localSaved) updateStorageStatus(false,'Saving to Supabase. Browser storage is unavailable.');
+    if(!saved) updateStorageStatus(false,'Saving to Supabase. Browser storage is unavailable.');
     return true;
   }
 
   if(serverConfig.hostedMode){
-    updateStorageStatus(localSaved,localSaved
+    updateStorageStatus(saved,saved
       ? (localStateMessage || 'Saved in this browser only. Connect Supabase to sync across devices.')
       : 'This browser could not save more data. Export a backup and free up browser storage.');
-    return localSaved;
+    return saved;
   }
 
   saveTimer=setTimeout(async()=>{
@@ -485,7 +485,7 @@ function saveServerState(){
       await apiPost('/api/state',snapshot);
       updateStorageStatus(true,'Saved by this local development server.');
     }catch(error){
-      updateStorageStatus(localSaved,localSaved
+      updateStorageStatus(saved,saved
         ? 'The local server could not be reached. Your changes are saved in this browser.'
         : 'The local server and browser storage could not save your changes. Export a backup.');
     }
