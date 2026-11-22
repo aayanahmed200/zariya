@@ -9,6 +9,7 @@ import base64
 import hashlib
 import binascii
 import io
+import math
 import os
 import secrets
 import time
@@ -141,6 +142,31 @@ def _normalize_workspace_state(raw):
         if any(not isinstance(item, dict) for item in items):
             return None, f"Every {field} item must be an object.", 400
         state[field] = items
+    raw_deleted = raw.get("_deleted", {})
+    if not isinstance(raw_deleted, dict):
+        return None, "_deleted must be an object.", 400
+    deleted_state = {}
+    for field in limits:
+        items = raw_deleted.get(field, [])
+        if not isinstance(items, list):
+            return None, f"Deleted {field} must be a list.", 400
+        if len(items) > 10000:
+            return None, f"Too many deleted {field} (max 10000).", 413
+        unique = {}
+        for item in items:
+            if not isinstance(item, dict):
+                return None, f"Every deleted {field} item must be an object.", 400
+            item_id, deleted_at = item.get("id"), item.get("deletedAt")
+            if (not isinstance(item_id, str) or not item_id.strip() or len(item_id)>128
+                or isinstance(deleted_at, bool) or not isinstance(deleted_at, (int,float))
+                or not math.isfinite(deleted_at) or deleted_at<=0):
+                return None, f"Invalid deleted {field} item.", 400
+            previous = unique.get(item_id)
+            if previous is None or deleted_at > previous["deletedAt"]:
+                unique[item_id] = {"id":item_id,"deletedAt":deleted_at}
+        deleted_state[field] = sorted(unique.values(), key=lambda x:x["deletedAt"], reverse=True)
+    state["_deleted"] = deleted_state
+
     size = len(json.dumps(state, ensure_ascii=False, separators=(",", ":")).encode("utf-8"))
     if size > MAX_WORKSPACE_STATE_BYTES:
         return None, "Workspace data is too large to sync. Export a backup and reduce its size.", 413

@@ -23,11 +23,15 @@ jobs:
           node --check public/static/app.js
           node --check webapp/static/sse.js
           node --check public/static/sse.js
+          node --check webapp/static/workspace-sync.js
+          node --check public/static/workspace-sync.js
           node tests/test_sse.cjs
+          node tests/test_workspace_sync.cjs
       - name: Verify deployable and source assets match
         run: |
           cmp webapp/static/app.js public/static/app.js
           cmp webapp/static/sse.js public/static/sse.js
+          cmp webapp/static/workspace-sync.js public/static/workspace-sync.js
           cmp webapp/static/style.css public/static/style.css
       - name: Run backend and route tests
         run: python -m pytest tests/ -q
