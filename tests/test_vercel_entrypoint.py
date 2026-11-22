@@ -601,3 +601,4 @@ def test_note_editor_displays_automatic_save_feedback():
     assert "Unsaved changes" in source
     assert "Saved just now" in source
     assert "Could not save" in source
+    assert "return saved;" in source
