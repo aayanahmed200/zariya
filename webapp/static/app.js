@@ -1233,7 +1233,6 @@ function syncNoteEditorState(){
     document.getElementById('note-title-input').value=note.title||'';
     document.getElementById('note-body-input').value=note.body||'';
     document.getElementById('note-tags-input').value=(note.tags||[]).join(', ');
-    setNoteSaveStatus('Saved on this device');
   }else{
     document.getElementById('note-title-input').value='';
     document.getElementById('note-body-input').value='';
@@ -1254,10 +1253,14 @@ function renderNotesList(){
     div.addEventListener('click', ()=>openNote(n.id));
     wrap.appendChild(div);
   });
+  const previousNoteId=currentNoteId;
   if(!visibleNotes.some(n=>n.id===currentNoteId)){
     currentNoteId=visibleNotes.length ? visibleNotes[0].id : null;
   }
   syncNoteEditorState();
+  if(previousNoteId!==currentNoteId){
+    setNoteSaveStatus(currentNoteId?'Saved on this device':'');
+  }
   updateNoteActionState();
 }
   function renderNoteTagFilterRow(){
@@ -1277,8 +1280,10 @@ function renderNotesList(){
       });
   }
 function openNote(id){
+  const changed=currentNoteId!==id;
   currentNoteId = id;
   const n = notes.find(n=>n.id===id);
+  if(changed) setNoteSaveStatus('Saved on this device');
   document.getElementById('note-title-input').value = n? n.title : '';
   document.getElementById('note-body-input').value = n? n.body : '';
   document.getElementById('note-tags-input').value = n && n.tags ? n.tags.join(', ') : '';  
