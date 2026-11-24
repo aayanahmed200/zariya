@@ -2,7 +2,7 @@
 
 > A bilingual Urdu-English assistant and workspace combining hosted AI chat, voice transcription, notes, and flashcards, with a curated fallback when hosted inference is unavailable.
 
-**Live application:** [zariyas.vercel.app](https://zariyas.vercel.app/)
+**Live application:** [zariyas.vercel.app](https://zariya.vercel.app/)
 
 [![Python](https://img.shields.io/badge/python-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/) [![Flask](https://img.shields.io/badge/flask-000000?style=for-the-badge&logo=flask&logoColor=white)](https://flask.palletsprojects.com/) [![JavaScript](https://img.shields.io/badge/javascript-F7DF1E?style=for-the-badge&logo=javascript&logoColor=111)](https://developer.mozilla.org/en-US/docs/Web/JavaScript) [![Vercel](https://img.shields.io/badge/vercel-000000?style=for-the-badge&logo=vercel&logoColor=white)](https://vercel.com/) [![Supabase](https://img.shields.io/badge/supabase-3FCF8E?style=for-the-badge&logo=supabase&logoColor=white)](https://supabase.com/)
 
