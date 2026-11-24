@@ -1,44 +1,69 @@
 # Zariya
 
-**Live:** [zariyas.vercel.app](https://zariyas.vercel.app/)
+> A bilingual Urdu-English assistant and workspace combining hosted AI chat, voice transcription, notes, and flashcards, with a curated fallback when hosted inference is unavailable.
 
-[![Python](https://img.shields.io/badge/python-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/) [![Flask](https://img.shields.io/badge/flask-000000?style=for-the-badge&logo=flask&logoColor=white)](https://flask.palletsprojects.com/) [![JavaScript](https://img.shields.io/badge/JavaScript-F7DF1E?style=for-the-badge&logo=javascript&logoColor=111)](https://developer.mozilla.org/en-US/docs/Web/JavaScript) [![Vercel](https://img.shields.io/badge/vercel-000000?style=for-the-badge&logo=vercel&logoColor=white)](https://vercel.com/) [![Supabase](https://img.shields.io/badge/supabase-3FCF8E?style=for-the-badge&logo=supabase&logoColor=white)](https://supabase.com/)
+**Live application:** [zariyas.vercel.app](https://zariyas.vercel.app/)
 
-A bilingual Urdu and English workspace for AI chat, voice typing, notes and flashcards.
+[![Python](https://img.shields.io/badge/python-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/) [![Flask](https://img.shields.io/badge/flask-000000?style=for-the-badge&logo=flask&logoColor=white)](https://flask.palletsprojects.com/) [![JavaScript](https://img.shields.io/badge/javascript-F7DF1E?style=for-the-badge&logo=javascript&logoColor=111)](https://developer.mozilla.org/en-US/docs/Web/JavaScript) [![Vercel](https://img.shields.io/badge/vercel-000000?style=for-the-badge&logo=vercel&logoColor=white)](https://vercel.com/) [![Supabase](https://img.shields.io/badge/supabase-3FCF8E?style=for-the-badge&logo=supabase&logoColor=white)](https://supabase.com/)
 
 ## Overview
 
-The workspace combines chat, notepad and flashcard views with quick actions for summaries, key points, translation and flashcard creation. Chat runs on an open-weight language model through Vercel AI Gateway, so visitors do not need to install Ollama or bring an API key, and the app falls back to a built-in knowledge engine when hosted inference is unavailable. Urdu is rendered with a dedicated Noto Sans Arabic typeface, including Urdu phrases embedded in English answers, and response-style presets sit alongside optional custom instructions.
+Zariya provides an Urdu-English interface for asking questions, working with notes, and building flashcards. The hosted Flask application sends chat requests to an open-weight model through Vercel AI Gateway. On Vercel, server-side OIDC credentials authenticate those requests; visitors do not need to install Ollama, download a model, or provide a personal model API key to use the hosted app. When hosted inference is unavailable, selected requests can use the bundled knowledge engine.
 
-Notes, flashcards and chat history live in the browser, with JSON backup export and restore, and flashcard decks can be edited without resetting their spaced-repetition history. The older Streamlit app remains available for local experimentation with a separate GGUF model workflow.
+The workspace also includes voice typing, response-style presets, and quick actions for tasks such as summaries, key points, translation, and flashcard creation. The repository retains an earlier local Streamlit interface as a separate experimentation path.
 
-## How it was made
+## Key features
 
-Zariya started as a local Streamlit and GGUF experiment in `app/` and `core/`, and the hosted product is a Flask rewrite in `webapp/` deployed to Vercel through `index.py`. Chat requests go from the Flask server to Vercel AI Gateway using the short-lived OIDC token Vercel injects into each Function request as `x-vercel-oidc-token`, so no provider key ships to the browser and the model can be changed with an environment variable. The default model is `nvidia/nemotron-3.5-lightning-free`; when it is rate-limited or unavailable, the bundled knowledge engine answers instead.
+- Urdu and English interface with direction-aware text and a dedicated Urdu typeface.
+- Hosted chat through Vercel AI Gateway, with a curated knowledge-engine fallback.
+- Browser microphone capture and server-side transcription with language selection.
+- Notes and flashcards, including spaced-repetition support and JSON backup/restore.
+- Response-style presets, optional custom instructions, and task-specific quick actions.
+- Optional Supabase workspace storage and GitHub sign-in integration.
+- Legacy local Streamlit interface for experimenting with a local GGUF model.
 
-The composer records microphone audio in the browser and posts a short WAV to a server-side transcription route, which Gateway routes to Microsoft MAI-Transcribe 2 with automatic language detection or explicit English/Urdu selection. That path was chosen over the browser's experimental Web Speech Recognition API. An optional Supabase migration adds synced workspaces, and the tests cover the hosted app, streaming, Gateway integration and SEO, run by a GitHub Actions workflow.
+## Implementation
 
-## Highlights
+The deployed web application is a Flask rewrite in `webapp/`, served through the Vercel entry point `index.py`. The hosted-model adapter uses Vercel's request-scoped OIDC token for server-to-server AI Gateway calls; the credential is not exposed to browser code. The fallback knowledge engine is bundled with the application.
 
-- Bilingual Urdu and English interface with a purpose-set typeface for Urdu.
-- Chat on a hosted open-weight model through AI Gateway, with a local knowledge engine as fallback.
-- Voice typing through a server-side transcription route rather than the browser speech API.
-- Notepad and flashcard views with spaced repetition, inline editing and JSON backup and restore.
-- Response-style presets, quick actions, and optional Google Search when enabled.
+The browser records voice input and sends audio to a server-side transcription route. The older Streamlit prototype and its local model helpers remain in `app/` and `core/`. Optional Supabase migrations and storage code support a synced-workspace configuration.
 
-## Repository contents
+## Repository structure
 
-- `index.py` — Vercel entry point for the Flask app.
-- `webapp/` — Flask routes, hosted AI Gateway adapter, bilingual knowledge engine, templates and browser interface.
-- `public/` — favicon, web manifest, robots policy, sitemap and static browser assets.
-- `app/` and `core/` — local Streamlit interface and model helpers.
-- `supabase/migrations/` — the optional synced-workspace schema.
-- `tests/` — automated checks for the hosted app, streaming, Gateway integration and SEO.
+- `index.py` — Vercel entry point for the hosted Flask app.
+- `webapp/` — hosted Flask routes, AI Gateway adapter, knowledge engine, templates, and browser interface.
+- `public/` — static browser assets, favicon, manifest, robots policy, and sitemap.
+- `app/` and `core/` — earlier Streamlit interface and local-model helpers.
+- `models/` — location for a local GGUF model used by the Streamlit prototype; model weights are not included.
+- `supabase/migrations/` — optional synced-workspace database schema.
+- `tests/` — automated tests for the hosted application and related integrations.
+- `requirements.txt` and `requirements-streamlit.txt` — dependencies for the hosted Flask app and the legacy Streamlit path.
 
-## Notes and limitations
+## Run locally
 
-Chats, notes and flashcards are stored in the visitor's browser local storage; they are not synced across devices or accounts, and clearing browser storage removes them. Chat message content is transmitted to Vercel AI Gateway and the selected model provider, whose current listing does not claim zero data retention or a no-training guarantee, so passwords, private records and other sensitive information should stay out of chat. Voice recordings are transmitted to Vercel AI Gateway and Microsoft Azure for transcription and are not saved by Zariya. Generated answers and transcripts can be inaccurate and need reviewing before they are relied on. The built-in knowledge engine supports selected calculations, translations and curated entries; it is not a general-purpose language model. Free-model capacity and rate limits can change, and the optional Google Search sends search terms to Google when it is enabled.
+For the hosted Flask application:
+
+```bash
+python -m venv .venv
+python -m pip install -r requirements.txt
+flask --app index run
+```
+
+The deployed Vercel environment supplies the OIDC credential used for hosted AI Gateway calls. Outside Vercel, hosted inference requires compatible server-side authentication; without it, the bundled fallback remains available for supported requests.
+
+To run the older Streamlit prototype instead:
+
+```bash
+python -m pip install -r requirements-streamlit.txt
+python run.py
+```
+
+That prototype requires a compatible GGUF model at `models/model.gguf`. This is separate from using the deployed web app and is not required by visitors to the hosted site.
+
+## Status and limitations
+
+The built-in knowledge engine covers selected calculations, translations, and curated entries; it is not a general-purpose language model. Generated answers and transcripts can be inaccurate and should be checked. Chat and voice content is sent to the configured inference/transcription providers when those features are used; do not submit passwords, private records, or other sensitive information. Free model availability and provider limits can change. Supabase workspace syncing and GitHub sign-in depend on the corresponding server-side configuration.
 
 ## License
 
-This project is licensed under the MIT License. See [LICENSE](LICENSE) for the full text.
+MIT. See [LICENSE](LICENSE).
