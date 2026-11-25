@@ -602,12 +602,15 @@ function renderAccountUI(){
   if(serverConfig.githubConfigured){
     configNote.textContent='Connect your GitHub profile. Your workspace data remains saved on this device.';
     signInButton.disabled=false;
+    signInButton.removeAttribute('aria-disabled');
     signInButton.querySelector('span').textContent='Sign in with GitHub';
     if(setupPanel) setupPanel.hidden=true;
   }else{
-    configNote.textContent='One-time setup is needed before GitHub sign-in can be used. Select the button for the exact setup details.';
-    signInButton.disabled=false;
-    signInButton.querySelector('span').textContent='Set up GitHub sign-in';
+    configNote.textContent='GitHub sign-in is not configured on this deployment. Everything else works without an account; the setup steps are below.';
+    signInButton.disabled=true;
+    signInButton.setAttribute('aria-disabled','true');
+    signInButton.querySelector('span').textContent='Sign-in unavailable';
+    if(setupPanel) setupPanel.hidden=false;
   }
 
   const modelStatus=document.getElementById('aiModelStatusText');
@@ -641,15 +644,8 @@ function renderAccountUI(){
   if(onboardingDismissBtn) onboardingDismissBtn.addEventListener('click', ()=>{ LS.set(ONBOARDING_DISMISS_KEY, true); updateOnboardingBanner(); });
 document.getElementById('sbProfileRow').addEventListener('click', ()=>switchView('settings'));
 document.getElementById('githubSignInBtn').addEventListener('click', ()=>{
-  if(serverConfig.githubConfigured){
-    window.location.href = '/auth/github/login';
-    return;
-  }
-  const setupPanel=document.getElementById('githubSetupPanel');
-  if(setupPanel){
-    setupPanel.hidden=false;
-    setupPanel.scrollIntoView({behavior:'smooth',block:'nearest'});
-  }
+  if(!serverConfig.githubConfigured) return;
+  window.location.href = '/auth/github/login';
 });
 document.getElementById('copyGithubCallbackBtn').addEventListener('click', async ()=>{
   const status=document.getElementById('accountAuthStatus');

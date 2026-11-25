@@ -1,4 +1,5 @@
 import os
+import re
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -737,17 +738,21 @@ def test_transparent_favicon_is_used_by_page_and_manifest():
     assert manifest["icons"][0]["type"] == "image/png"
 
 
-def test_github_sign_in_is_visible_with_setup_instructions_when_not_configured():
+def test_github_sign_in_is_disabled_with_setup_instructions_when_not_configured():
     html = (ROOT / "webapp" / "templates" / "index.html").read_text(encoding="utf-8")
     source = (ROOT / "webapp" / "static" / "app.js").read_text(encoding="utf-8")
-    assert 'id="githubSignInBtn"' in html
+    button = re.search(r'<button[^>]*id="githubSignInBtn"[^>]*>', html).group(0)
+    assert "disabled" in button
+    assert 'aria-disabled="true"' in button
     assert 'id="githubSetupPanel"' in html
     assert "https://zariyas.vercel.app/auth/github/callback" in html
     assert "GITHUB_CLIENT_ID" in html
     assert "GITHUB_CLIENT_SECRET" in html
+    assert "GitHub sign-in is not configured on this deployment" in html
+    assert "signInButton.disabled=true" in source
+    assert "signInButton.removeAttribute('aria-disabled')" in source
+    assert "Set up GitHub sign-in" not in source
     assert "serverConfig.githubConfigured ? 'flex' : 'none'" not in source
-    assert "Set up GitHub sign-in" in source
-    assert "GitHub sign-in identifies your profile" in html
 
 
 def test_github_login_uses_canonical_callback_and_signed_oauth_state(monkeypatch):
