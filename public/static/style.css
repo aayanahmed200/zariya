@@ -1092,6 +1092,8 @@ button:disabled,.btn:disabled,.qt-btn:disabled,.deck-action-btn:disabled{cursor:
   --code:#f2f2ed;
   --shadow:0 14px 38px rgba(31,48,37,.07);
   --shadow-soft:0 2px 9px rgba(31,48,37,.045);
+  --on-accent:#fff;
+  --on-accent-soft:rgba(255,255,255,.78);
 }
 [data-theme="dark"]{
   --bg:#171d19;
@@ -1113,6 +1115,8 @@ button:disabled,.btn:disabled,.qt-btn:disabled,.deck-action-btn:disabled{cursor:
   --code:#1c261f;
   --shadow:0 14px 38px rgba(0,0,0,.23);
   --shadow-soft:0 2px 9px rgba(0,0,0,.14);
+  --on-accent:#13231a;
+  --on-accent-soft:rgba(19,35,26,.7);
 }
 #sidebar{width:254px;min-width:254px;background:var(--sidebar);border-right-color:var(--border)}
 .sb-header{padding:22px 21px 16px}
@@ -1190,14 +1194,7 @@ button:disabled,.btn:disabled,.qt-btn:disabled,.deck-action-btn:disabled{cursor:
   .composer-enter{display:none}
   .bubble-col.user-col{max-width:88%}
 }
-@media(prefers-reduced-motion:reduce){
-  .view.active,.msg-row{animation:none!important}
-}
-
-
-/* Final polish pass — readable accent buttons in both themes, an aligned hero, and quieter message rows. */
-:root{--on-accent:#fff;--on-accent-soft:rgba(255,255,255,.78)}
-[data-theme="dark"]{--on-accent:#13231a;--on-accent-soft:rgba(19,35,26,.7)}
+/* Accent buttons, hero and message rows */
 
 /* Text drawn on the accent colour must stay readable when the accent is light (dark theme). */
 .new-chat-btn,.btn.primary,.composer-btn.send,.composer-btn.mic.active{color:var(--on-accent)}
@@ -1231,11 +1228,15 @@ button:disabled,.btn:disabled,.qt-btn:disabled,.deck-action-btn:disabled{cursor:
 /* Give the last message room above the composer. */
 #chat-inner{padding-bottom:34px}
 
-/* Narrow phones: give the message box room and keep the composer footer on one line. */
+/* Narrow phones: composer sizing */
 @media(max-width:560px){
   .composer-box{gap:7px;padding:7px 8px}
   .composer-btn{width:34px;height:34px}
   .voice-dropdown-trigger{min-width:52px;height:32px;padding-inline:6px}
   #chat-input{min-height:34px}
   .composer-hint{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+}
+
+@media(prefers-reduced-motion:reduce){
+  .view.active,.msg-row{animation:none!important}
 }
