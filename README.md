@@ -39,30 +39,9 @@ The browser records voice input and sends audio to a server-side transcription r
 - `tests/` — automated tests for the hosted application and related integrations.
 - `requirements.txt` and `requirements-streamlit.txt` — dependencies for the hosted Flask app and the legacy Streamlit path.
 
-## Run locally
-
-For the hosted Flask application:
-
-```bash
-python -m venv .venv
-python -m pip install -r requirements.txt
-flask --app index run
-```
-
-The deployed Vercel environment supplies the OIDC credential used for hosted AI Gateway calls. Outside Vercel, hosted inference requires compatible server-side authentication; without it, the bundled fallback remains available for supported requests.
-
-To run the older Streamlit prototype instead:
-
-```bash
-python -m pip install -r requirements-streamlit.txt
-python run.py
-```
-
-That prototype requires a compatible GGUF model at `models/model.gguf`. This is separate from using the deployed web app and is not required by visitors to the hosted site.
-
 ## Status and limitations
 
-The built-in knowledge engine covers selected calculations, translations, and curated entries; it is not a general-purpose language model. Generated answers and transcripts can be inaccurate and should be checked. Chat and voice content is sent to the configured inference/transcription providers when those features are used; do not submit passwords, private records, or other sensitive information. Free model availability and provider limits can change. Supabase workspace syncing and GitHub sign-in depend on the corresponding server-side configuration.
+The built-in knowledge engine covers selected calculations, translations, and curated entries; it is not a general-purpose language model. Generated answers and transcripts can be inaccurate and should be checked. Chat and voice content is sent to the configured inference/transcription providers when those features are used; do not submit passwords, private records, or other sensitive information. Free model availability and provider limits can change. Supabase workspace syncing and GitHub sign-in depend on the corresponding server-side configuration. The deployed Vercel environment supplies the OIDC credential used for hosted AI Gateway calls; hosted inference anywhere else needs equivalent server-side authentication, and without it the bundled fallback answers the requests it supports. A separate Streamlit prototype in the repository needs a local GGUF model and is unrelated to the hosted site.
 
 ## License
 
