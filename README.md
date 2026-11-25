@@ -12,7 +12,7 @@ Zariya provides an Urdu-English interface for asking questions, working with not
 
 The workspace also includes voice typing, response-style presets, and quick actions for tasks such as summaries, key points, translation, and flashcard creation. The repository retains an earlier local Streamlit interface as a separate experimentation path.
 
-## Key features
+## Highlights
 
 - Urdu and English interface with direction-aware text and a dedicated Urdu typeface.
 - Hosted chat through Vercel AI Gateway, with a curated knowledge-engine fallback.
