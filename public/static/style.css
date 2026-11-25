@@ -1193,3 +1193,49 @@ button:disabled,.btn:disabled,.qt-btn:disabled,.deck-action-btn:disabled{cursor:
 @media(prefers-reduced-motion:reduce){
   .view.active,.msg-row{animation:none!important}
 }
+
+
+/* Final polish pass — readable accent buttons in both themes, an aligned hero, and quieter message rows. */
+:root{--on-accent:#fff;--on-accent-soft:rgba(255,255,255,.78)}
+[data-theme="dark"]{--on-accent:#13231a;--on-accent-soft:rgba(19,35,26,.7)}
+
+/* Text drawn on the accent colour must stay readable when the accent is light (dark theme). */
+.new-chat-btn,.btn.primary,.composer-btn.send,.composer-btn.mic.active{color:var(--on-accent)}
+.new-chat-btn:hover,.btn.primary:hover,.composer-btn.send:hover{color:var(--on-accent)}
+.new-chat-shortcut{color:var(--on-accent-soft)}
+
+/* Hero: keep the Urdu line with the headline instead of floating to the far edge. */
+.empty-hero h1{max-width:660px;text-wrap:balance}
+.empty-hero .urdu-line{margin:10px 0 6px;font-size:clamp(21px,2.3vw,25px);text-align:left}
+
+/* Suggestions read as choices rather than empty inputs. */
+.suggest-card{background:var(--surface)}
+.suggest-card:hover{border-color:var(--accent);background:var(--accent-tint);transform:translateY(-1px)}
+.suggest-card::before{transition:transform .16s}
+.suggest-card:hover::before{transform:translate(1px,-1px)}
+
+/* Messages: comfortable measure, quieter action row that appears on hover or keyboard focus. */
+.bubble-col.assistant-col{max-width:min(100%,74ch)}
+.msg-actions{gap:2px;margin-top:9px}
+.ghost-btn{padding:5px 8px;border-radius:7px;color:var(--text-soft)}
+.ghost-btn:hover{background:var(--accent-soft);color:var(--accent-strong)}
+.msg-meta{margin-top:6px;font-size:10px}
+@media (hover:hover) and (pointer:fine){
+  .msg-actions{opacity:0}
+  .msg-row:hover .msg-actions,.msg-actions:focus-within{opacity:1}
+}
+
+/* Session rows are reachable by keyboard now. */
+.sess-item:focus-visible{outline:2px solid var(--accent);outline-offset:-1px}
+
+/* Give the last message room above the composer. */
+#chat-inner{padding-bottom:34px}
+
+/* Narrow phones: give the message box room and keep the composer footer on one line. */
+@media(max-width:560px){
+  .composer-box{gap:7px;padding:7px 8px}
+  .composer-btn{width:34px;height:34px}
+  .voice-dropdown-trigger{min-width:52px;height:32px;padding-inline:6px}
+  #chat-input{min-height:34px}
+  .composer-hint{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+}

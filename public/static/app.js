@@ -6,7 +6,8 @@ const LS = {
   get(k, d){ try{ const v = localStorage.getItem(k); return v===null? d : JSON.parse(v); }catch(e){ return d; } },
   set(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); return true; }catch(e){ return false; } }
 };
-let uiPrefs = LS.get('zariya_ui_prefs', { theme:'light', fontSize:15, showTimestamps:true, ttsEnabled:false });
+const prefersDarkScheme = !!(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+let uiPrefs = LS.get('zariya_ui_prefs', { theme: prefersDarkScheme?'dark':'light', fontSize:15, showTimestamps:true, ttsEnabled:false });
 let genPrefs = LS.get('zariya_gen_prefs', { persona:'', temperature:0.5, responseStyle:'balanced' });
 const responseStylePresets = {
   balanced:{
@@ -508,6 +509,8 @@ function saveServerState(){
 /* ============ THEME / UI PREFS ============ */
 function applyUiPrefs(){
   document.documentElement.setAttribute('data-theme', uiPrefs.theme);
+  const themeColorMeta = document.querySelector('meta[name="theme-color"]');
+  if(themeColorMeta) themeColorMeta.setAttribute('content', uiPrefs.theme==='dark' ? '#171d19' : '#faf9f6');
   document.querySelectorAll('[data-theme-opt]').forEach(el=>{
     const active=el.dataset.themeOpt===uiPrefs.theme;
     el.classList.toggle('active',active);
@@ -758,6 +761,9 @@ function renderSessionList(){
   filtered.forEach(s=>{
     const div = document.createElement('div');
     div.className = 'sess-item' + (s.id===currentSessionId?' active':'');
+    div.tabIndex = 0;
+    div.setAttribute('role','button');
+    div.setAttribute('aria-current', s.id===currentSessionId ? 'true' : 'false');
     div.innerHTML = '<span class="sess-title">'+escapeHtml(s.title)+'</span><button class="sess-del" title="Delete chat" aria-label="Delete chat"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0-1 14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2L4 6"/></svg></button>';
     div.addEventListener('click', ()=>{
       if(isGenerating && currentSessionId!==s.id) stopGenerating();
@@ -766,6 +772,10 @@ function renderSessionList(){
       switchView('chat');
       renderSessionList();
       renderChat();
+    });
+    div.addEventListener('keydown', (e)=>{
+      if(e.target !== div) return;
+      if(e.key==='Enter' || e.key===' '){ e.preventDefault(); div.click(); }
     });
     div.querySelector('.sess-del').addEventListener('click', (e)=>deleteSession(s.id, e));
     wrap.appendChild(div);
@@ -918,6 +928,12 @@ function saveEdit(idx){
 
 /* ============ SEND / RESPOND ============ */
 const input = document.getElementById('chat-input');
+const COMPOSER_PLACEHOLDER = 'Message Zariya…  اردو میں بھی لکھیں';
+const COMPOSER_PLACEHOLDER_NARROW = 'Message Zariya…';
+const narrowComposerQuery = window.matchMedia('(max-width: 560px)');
+function syncComposerPlaceholder(){ input.placeholder = narrowComposerQuery.matches ? COMPOSER_PLACEHOLDER_NARROW : COMPOSER_PLACEHOLDER; }
+syncComposerPlaceholder();
+if(narrowComposerQuery.addEventListener) narrowComposerQuery.addEventListener('change', syncComposerPlaceholder);
 const sendBtn = document.getElementById('sendBtn');
 const SEND_ICON = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M12 19V5M5 12l7-7 7 7"/></svg>';
 const STOP_ICON = '<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><rect x="5" y="5" width="14" height="14" rx="2"/></svg>';
