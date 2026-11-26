@@ -873,5 +873,33 @@ def test_new_design_has_explicit_responsive_navigation_and_control_contrast():
     assert "::-webkit-slider-runnable-track" in css
     assert "::-moz-range-track" in css
     assert "min-width:0;flex:1 1 0" in css
-    assert 'href="/static/style.css?v=20261126-11"' in html
+    assert 'href="/static/style.css?v=20261126-12"' in html
 
+
+
+def test_sidebar_search_follows_workspace_navigation_and_loading_skeletons_are_wired():
+    root = ROOT
+    html = (root / "webapp" / "templates" / "index.html").read_text(encoding="utf-8")
+    source_js = (root / "webapp" / "static" / "app.js").read_text(encoding="utf-8")
+    public_js = (root / "public" / "static" / "app.js").read_text(encoding="utf-8")
+    css = (root / "webapp" / "static" / "style.css").read_text(encoding="utf-8")
+    public_css = (root / "public" / "static" / "style.css").read_text(encoding="utf-8")
+
+    sidebar = html[html.index('<aside id="sidebar"'):html.index("</aside>")]
+    assert sidebar.index("</nav>") < sidebar.index('<label class="sb-search"')
+    assert '<body class="app-loading">' in html
+    assert "sidebar-session-skeleton" in html
+    assert "chat-initial-skeleton" in html
+    assert "notes-loading-skeleton" in html
+    assert "note-editor-loading-skeleton" in html
+    assert "deck-loading-skeleton" in html
+    assert "settings-loading-skeleton" in html
+    assert "document.body.classList.remove('app-loading')" in source_js
+    assert "thinking-bars" in source_js
+    assert "body.app-loading .chat-initial-skeleton" in css
+    assert "body.app-loading .deck-loading-skeleton" in css
+    assert "prefers-reduced-motion:reduce" in css
+    assert source_js == public_js
+    assert css == public_css
+    assert 'href="/static/style.css?v=20261126-12"' in html
+    assert 'src="/static/app.js?v=20261126-4"' in html

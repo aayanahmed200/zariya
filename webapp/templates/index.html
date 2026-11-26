@@ -30,7 +30,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Lora:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/static/style.css?v=20261126-11">
+<link rel="stylesheet" href="/static/style.css?v=20261126-12">
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
@@ -51,7 +51,7 @@
 }
 </script>
 </head>
-<body>
+<body class="app-loading">
 <div id="app">
   <div class="sb-scrim" id="sbScrim"></div>
 
@@ -69,11 +69,6 @@
       <span class="new-chat-shortcut">Ctrl K</span>
     </button>
 
-    <label class="sb-search" for="sessSearch">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7.5"/><path d="m16.5 16.5 4 4"/></svg>
-      <input id="sessSearch" type="search" placeholder="Search conversations" autocomplete="off">
-    </label>
-
     <nav class="nav">
       <button class="nav-item active" type="button" data-view="chat">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11.5a7.5 7.5 0 0 1-7.5 7.5H6l-3 2v-6.5A7.5 7.5 0 0 1 10.5 7H12.5A7.5 7.5 0 0 1 20 14.5z"/><path d="M8 12h8M8 15h5"/></svg>
@@ -89,8 +84,18 @@
       </button>
     </nav>
 
+    <label class="sb-search" for="sessSearch">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7.5"/><path d="m16.5 16.5 4 4"/></svg>
+      <input id="sessSearch" type="search" placeholder="Search conversations" autocomplete="off">
+    </label>
+
     <div class="sb-sessions" id="sessList">
       <div class="sb-sessions-label">Chats</div>
+      <div class="sidebar-session-skeleton" aria-hidden="true">
+        <span class="skeleton skeleton-session"></span>
+        <span class="skeleton skeleton-session"></span>
+        <span class="skeleton skeleton-session"></span>
+      </div>
     </div>
 
     <div class="sb-footer">
@@ -134,10 +139,16 @@
     <section class="view active" id="view-chat" aria-label="Chat">
       <div id="chat-scroll">
         <div id="chat-inner" class="empty-mode">
-          <div class="empty-hero">
-            <h1>What can I help with?</h1>
-            <div class="urdu-line" lang="ur" dir="rtl">آئیے کچھ نیا سیکھتے ہیں</div>
-            <p>Ask anything in English or Urdu. Chats, notes and flashcards stay together.</p>
+          <div class="chat-initial-skeleton" aria-hidden="true">
+            <span class="skeleton skeleton-hero-title"></span>
+            <span class="skeleton skeleton-hero-urdu"></span>
+            <span class="skeleton skeleton-hero-copy"></span>
+            <div class="skeleton-suggestion-grid">
+              <span class="skeleton skeleton-suggestion"></span>
+              <span class="skeleton skeleton-suggestion"></span>
+              <span class="skeleton skeleton-suggestion"></span>
+              <span class="skeleton skeleton-suggestion"></span>
+            </div>
           </div>
         </div>
       </div>
@@ -202,9 +213,25 @@
         <div class="notes-list-wrap">
           <div class="notes-list-head">Your notes</div>
           <div class="tag-filter-row" id="noteTagFilterRow"></div>
-          <div class="notes-list" id="notesList"></div>
+          <div class="notes-list" id="notesList">
+            <div class="notes-loading-skeleton" aria-hidden="true">
+              <span class="skeleton skeleton-note-title"></span>
+              <span class="skeleton skeleton-note-copy"></span>
+              <span class="skeleton skeleton-note-title"></span>
+              <span class="skeleton skeleton-note-copy"></span>
+              <span class="skeleton skeleton-note-title"></span>
+              <span class="skeleton skeleton-note-copy"></span>
+            </div>
+          </div>
         </div>
         <div class="note-editor is-empty">
+          <div class="note-editor-loading-skeleton" aria-hidden="true">
+            <span class="skeleton skeleton-editor-title"></span>
+            <span class="skeleton skeleton-editor-meta"></span>
+            <span class="skeleton skeleton-editor-line"></span>
+            <span class="skeleton skeleton-editor-line"></span>
+            <span class="skeleton skeleton-editor-line short"></span>
+          </div>
           <div class="note-toolbar">
             <div class="note-toolbar-left"><span class="note-editor-label">EDITOR</span><span class="note-save-status" id="noteSaveStatus" role="status" aria-live="polite">Saved on this device</span></div>
             <div class="note-toolbar-actions">
@@ -241,7 +268,13 @@
       </div>
       <div id="fc-body">
         <div class="tag-filter-row" id="deckTagFilterRow"></div>
-        <div class="deck-grid" id="deckGrid"></div>
+        <div class="deck-grid" id="deckGrid">
+          <div class="deck-loading-skeleton" aria-hidden="true">
+            <div class="skeleton-deck-card"><span class="skeleton skeleton-deck-title"></span><span class="skeleton skeleton-deck-copy"></span><span class="skeleton skeleton-deck-meter"></span></div>
+            <div class="skeleton-deck-card"><span class="skeleton skeleton-deck-title"></span><span class="skeleton skeleton-deck-copy"></span><span class="skeleton skeleton-deck-meter"></span></div>
+            <div class="skeleton-deck-card"><span class="skeleton skeleton-deck-title"></span><span class="skeleton skeleton-deck-copy"></span><span class="skeleton skeleton-deck-meter"></span></div>
+          </div>
+        </div>
         <div class="study-area" id="studyArea" style="display:none;"></div>
         <div class="study-area" id="quizArea" style="display:none;"></div>
       </div>
@@ -255,6 +288,11 @@
         </div>
       </div>
       <div id="settings-body">
+        <div class="settings-loading-skeleton" aria-hidden="true">
+          <div class="skeleton-settings-card"><span class="skeleton skeleton-settings-heading"></span><span class="skeleton skeleton-settings-row"></span><span class="skeleton skeleton-settings-row"></span></div>
+          <div class="skeleton-settings-card"><span class="skeleton skeleton-settings-heading"></span><span class="skeleton skeleton-settings-row"></span><span class="skeleton skeleton-settings-row"></span><span class="skeleton skeleton-settings-row"></span></div>
+          <div class="skeleton-settings-card"><span class="skeleton skeleton-settings-heading"></span><span class="skeleton skeleton-settings-row"></span><span class="skeleton skeleton-settings-row"></span></div>
+        </div>
         <div class="settings-layout">
           <div class="setting-group">
             <div class="setting-heading">
@@ -441,9 +479,19 @@
   </form>
 </dialog>
 </div>
+<script>
+(function(){
+  var name=(window.location.hash||'').replace('#','');
+  if(!['chat','notepad','flashcards','settings'].includes(name)||name==='chat') return;
+  var view=document.getElementById('view-'+name);
+  if(!view) return;
+  document.querySelectorAll('.view').forEach(function(item){item.classList.remove('active');});
+  view.classList.add('active');
+})();
+</script>
 <script src="/static/workspace-sync.js?v=20261122-6"></script>
 <script src="/static/sse.js?v=20261122-4"></script>
-<script src="/static/app.js?v=20261126-3"></script>
+<script src="/static/app.js?v=20261126-4"></script>
 <script>
   window.va = window.va || function () {
     (window.vaq = window.vaq || []).push(arguments);
