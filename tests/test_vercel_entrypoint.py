@@ -874,7 +874,7 @@ def test_new_design_has_explicit_responsive_navigation_and_control_contrast():
     assert "::-webkit-slider-runnable-track" in css
     assert "::-moz-range-track" in css
     assert "min-width:0;flex:1 1 0" in css
-    assert 'href="/static/style.css?v=20261126-15"' in html
+    assert 'href="/static/style.css?v=20261126-16"' in html
 
 
 
@@ -902,8 +902,8 @@ def test_sidebar_search_follows_workspace_navigation_and_loading_skeletons_are_w
     assert "prefers-reduced-motion:reduce" in css
     assert source_js == public_js
     assert css == public_css
-    assert 'href="/static/style.css?v=20261126-15"' in html
-    assert 'src="/static/app.js?v=20261126-9"' in html
+    assert 'href="/static/style.css?v=20261126-16"' in html
+    assert 'src="/static/app.js?v=20261126-10"' in html
 
 
 def test_workspace_search_covers_note_text_tags_and_flashcard_sides():
@@ -929,7 +929,7 @@ def test_workspace_search_covers_note_text_tags_and_flashcard_sides():
     assert "workspace-search:focus-within" in css
     assert "workspace-search-empty-clear" in css
     assert 'src="/static/workspace-search.js?v=20261126-1"' in html
-    assert 'src="/static/app.js?v=20261126-9"' in html
+    assert 'src="/static/app.js?v=20261126-10"' in html
 
 
 
@@ -968,3 +968,17 @@ def test_supabase_auth_sessions_use_encrypted_http_only_cookies_and_user_rls():
     assert "store_session" in auth_source
     assert "SUPABASE_SECRET_KEY" not in auth_source
     assert "revoke execute on function public.rls_auto_enable() from PUBLIC, anon, authenticated" in migration
+
+
+def test_chat_shell_uses_quiet_tools_menu_and_native_chat_geometry():
+    html = (ROOT / "webapp" / "templates" / "index.html").read_text(encoding="utf-8")
+    source_js = (ROOT / "webapp" / "static" / "app.js").read_text(encoding="utf-8")
+    css = (ROOT / "webapp" / "static" / "style.css").read_text(encoding="utf-8")
+
+    assert '<details class="tools-disclosure" id="toolsDisclosure">' in html
+    assert 'id="quickTools"' in html
+    assert "toolsDisclosure.hidden=name!=='chat'" in source_js
+    assert "menu.open=false; runQuickTool(btn.dataset.tool)" in source_js
+    assert "--sidebar:#f7f7f8" in css
+    assert ".bubble.user{" in css and "border-radius:19px" in css
+    assert "#view-chat.empty-chat .empty-hero p{display:none}" in css
