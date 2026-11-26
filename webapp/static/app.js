@@ -1909,6 +1909,8 @@ function renderDeckGrid(){
   document.getElementById('quizArea').style.display='none';
   const grid = document.getElementById('deckGrid'); grid.style.display='grid'; grid.innerHTML='';
   document.getElementById('deckTagFilterRow').style.display='';
+  const searchBar=document.getElementById('deckWorkspaceSearch');
+  if(searchBar) searchBar.hidden=false;
   decks.forEach(d=>{ if(!d.tags) d.tags = []; });
   renderDeckTagFilterRow();
   const searchInput=document.getElementById('deckSearchInput');
@@ -2061,6 +2063,8 @@ function openDeck(id){
   studyQueue = cardsDue(deck.cards); studyIndex=0; studyFlipped=false;
   document.getElementById('deckGrid').style.display='none';
   document.getElementById('deckTagFilterRow').style.display='none';
+  document.getElementById('deckWorkspaceSearch').hidden=true;
+  document.getElementById('deckSearchMeta').hidden=true;
   document.getElementById('studyArea').style.display='block';
   renderStudy();
 }
@@ -2221,6 +2225,8 @@ function startQuiz(deckId){
   quizQueue = buildQuizQuestions(deck); quizIndex=0; quizScore=0; quizAnswered=false;
   document.getElementById('deckGrid').style.display='none';
   document.getElementById('deckTagFilterRow').style.display='none';
+  document.getElementById('deckWorkspaceSearch').hidden=true;
+  document.getElementById('deckSearchMeta').hidden=true;
   document.getElementById('quizArea').style.display='block';
   renderQuiz();
 }
