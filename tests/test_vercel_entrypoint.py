@@ -873,7 +873,7 @@ def test_new_design_has_explicit_responsive_navigation_and_control_contrast():
     assert "::-webkit-slider-runnable-track" in css
     assert "::-moz-range-track" in css
     assert "min-width:0;flex:1 1 0" in css
-    assert 'href="/static/style.css?v=20261126-14"' in html
+    assert 'href="/static/style.css?v=20261126-15"' in html
 
 
 
@@ -901,8 +901,8 @@ def test_sidebar_search_follows_workspace_navigation_and_loading_skeletons_are_w
     assert "prefers-reduced-motion:reduce" in css
     assert source_js == public_js
     assert css == public_css
-    assert 'href="/static/style.css?v=20261126-14"' in html
-    assert 'src="/static/app.js?v=20261126-4"' in html
+    assert 'href="/static/style.css?v=20261126-15"' in html
+    assert 'src="/static/app.js?v=20261126-8"' in html
 
 
 def test_workspace_search_covers_note_text_tags_and_flashcard_sides():
@@ -928,5 +928,42 @@ def test_workspace_search_covers_note_text_tags_and_flashcard_sides():
     assert "workspace-search:focus-within" in css
     assert "workspace-search-empty-clear" in css
     assert 'src="/static/workspace-search.js?v=20261126-1"' in html
-    assert 'src="/static/app.js?v=20261126-7"' in html
+    assert 'src="/static/app.js?v=20261126-8"' in html
 
+
+
+def test_chatgpt_style_orange_auth_and_model_identity_are_wired():
+    html = (ROOT / "webapp" / "templates" / "index.html").read_text(encoding="utf-8")
+    js = (ROOT / "webapp" / "static" / "app.js").read_text(encoding="utf-8")
+    css = (ROOT / "webapp" / "static" / "style.css").read_text(encoding="utf-8")
+    from webapp import app as webapp_module
+
+    assert 'id="modelPickerButton"' in html
+    assert "Custom Zariya Model" in html
+    assert 'id="emailAuthForm"' in html
+    assert 'data-auth-mode="signin"' in html and 'data-auth-mode="signup"' in html
+    assert 'data-settings-target="accountSettings"' in html
+    assert 'data-settings-target="modelSettings"' in html
+    assert "completeSupabaseAuthRedirect" in js
+    assert "api/auth/signup" in js and "api/auth/login" in js
+    assert "modelPickerButton" in js and "settings-nav-item" in js
+    assert "--accent:#f4772b" in css
+    assert "--accent:#ff843f" in css
+    assert "auth-mode-tabs" in css and "settings-nav" in css
+    assert "I'm the Custom Zariya Model from Zariya." in webapp_module.SYSTEM_PROMPT
+
+
+def test_supabase_auth_sessions_use_encrypted_http_only_cookies_and_user_rls():
+    from webapp import app as webapp_module
+    auth_source = (ROOT / "webapp" / "auth_sessions.py").read_text(encoding="utf-8")
+    migration = (
+        ROOT / "supabase" / "migrations"
+        / "20261126145849_revoke_public_execute_on_rls_auto_enable.sql"
+    ).read_text(encoding="utf-8")
+    assert webapp_module.app.config["SESSION_COOKIE_HTTPONLY"] is True
+    assert webapp_module.app.config["SESSION_COOKIE_SAMESITE"] == "Lax"
+    assert "Fernet" in auth_source
+    assert "SUPABASE_PUBLISHABLE_KEY" in auth_source
+    assert "store_session" in auth_source
+    assert "SUPABASE_SECRET_KEY" not in auth_source
+    assert "revoke execute on function public.rls_auto_enable() from PUBLIC, anon, authenticated" in migration
