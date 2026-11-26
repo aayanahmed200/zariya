@@ -873,7 +873,7 @@ def test_new_design_has_explicit_responsive_navigation_and_control_contrast():
     assert "::-webkit-slider-runnable-track" in css
     assert "::-moz-range-track" in css
     assert "min-width:0;flex:1 1 0" in css
-    assert 'href="/static/style.css?v=20261126-11"' in html
+    assert 'href="/static/style.css?v=20261126-12"' in html
 
 
 
