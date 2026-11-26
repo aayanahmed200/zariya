@@ -252,7 +252,7 @@ def _supabase_auth_context():
 
 
 def _auth_redirect_error(message: str):
-    return redirect("/?" + urlencode({"authError": message, "view": "settings"}))
+    return redirect("/?" + urlencode({"authError": message}) + "#settings")
 
 
 def _auth_credentials():
