@@ -88,6 +88,16 @@ def _user_from_response(response: Any) -> Any:
     return _value(data, "user")
 
 
+def store_auth_response(flask_session: MutableMapping[str, Any], response: Any) -> bool:
+    """Store a Supabase AuthResponse when both verified user and session exist."""
+    auth_session = _session_from_response(response)
+    user = _user_from_response(response)
+    if auth_session is None or user is None:
+        return False
+    store_session(flask_session, user, auth_session)
+    return True
+
+
 def store_session(
     flask_session: MutableMapping[str, Any],
     user: Any,
