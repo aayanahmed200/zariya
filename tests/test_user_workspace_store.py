@@ -101,3 +101,13 @@ def test_postgres_migration_has_owner_scoped_row_level_security():
     assert migration.lower().count("(select auth.uid()) = user_id") == 4
     assert "with check" in migration.lower()
     assert "to anon" not in migration.lower()
+
+    least_privilege = (
+        Path(__file__).resolve().parents[1]
+        / "supabase"
+        / "migrations"
+        / "20261126151531_restrict_authenticated_workspace_table_grants.sql"
+    ).read_text(encoding="utf-8").lower()
+    assert "revoke all on table public.zariya_user_workspaces from public, anon, authenticated" in least_privilege
+    assert "grant select, insert, update on table public.zariya_user_workspaces to authenticated" in least_privilege
+    assert "truncate" not in least_privilege
