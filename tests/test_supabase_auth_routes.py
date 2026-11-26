@@ -1,3 +1,7 @@
+import os
+os.environ.setdefault("VERCEL", "1")
+os.environ.setdefault("FLASK_SECRET_KEY", "test-only-zariya-secret-which-is-long-enough")
+
 from types import SimpleNamespace
 from unittest.mock import Mock
 
