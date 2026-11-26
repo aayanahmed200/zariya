@@ -11,6 +11,10 @@ from webapp import auth_sessions
 USER_ID = "5c5f5c75-9e2e-4ad5-a18b-0bb85fce6d6b"
 
 
+class FakeFlaskSession(dict):
+    permanent = False
+
+
 class FakeAuth:
     def __init__(self, user, session):
         self.user = user
@@ -55,7 +59,7 @@ def test_session_cookie_encrypts_tokens_and_refreshes_them(monkeypatch):
     user = SimpleNamespace(id=USER_ID, email="student@example.com")
     session_v1 = SimpleNamespace(access_token="access_token_original_123456789", refresh_token="refresh_token_original_123456789")
     session_v2 = SimpleNamespace(access_token="access_token_rotated_123456789", refresh_token="refresh_token_rotated_123456789")
-    flask_session = {}
+    flask_session = FakeFlaskSession()
 
     auth_sessions.store_session(flask_session, user, session_v1)
     encrypted_cookie_value = flask_session[auth_sessions.SESSION_FIELD]
