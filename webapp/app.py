@@ -348,7 +348,16 @@ def supabase_email_confirm():
     email = request.args.get("email", "").strip().lower()
     otp_type = request.args.get("type", "email")
     allowed_types = {"email", "signup", "recovery", "invite", "magiclink", "email_change"}
-    if not SUPABASE_AUTH_CONFIGURED or not token_hash or len(token_hash) > 4096 or otp_type not in allowed_types:
+    if not SUPABASE_AUTH_CONFIGURED:
+        return _auth_redirect_error("Email confirmation is not configured on this deployment.")
+    if not token_hash:
+        # Supabase's default confirmation email redirects with tokens in the
+        # URL fragment. Fragments are not sent to the server, so render the app
+        # at this path and let its client exchange the tokens once.
+        response = app.make_response(render_template("index.html"))
+        response.headers["Cache-Control"] = "no-store"
+        return response
+    if len(token_hash) > 4096 or otp_type not in allowed_types:
         return _auth_redirect_error("That confirmation link is invalid. Please request a new email.")
     try:
         client = auth_sessions.create_auth_client()
@@ -358,7 +367,7 @@ def supabase_email_confirm():
         response = client.auth.verify_otp(payload)
         if not auth_sessions.store_auth_response(session, response):
             return _auth_redirect_error("Your email was verified. Please sign in to continue.")
-        return redirect("/?authSuccess=" + urlencode({"message": "Email verified. You're signed in."})[8:])
+        return redirect("/?" + urlencode({"authSuccess": "Email verified. You're signed in."}))
     except Exception:
         app.logger.info("Supabase email confirmation could not be verified.")
         return _auth_redirect_error("That confirmation link is invalid or has expired. Request a new one.")
