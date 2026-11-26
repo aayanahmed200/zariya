@@ -25,6 +25,7 @@ from flask import Flask, jsonify, redirect, request, session, url_for, render_te
 import kb_engine
 import hosted_model
 import supabase_store
+import auth_sessions
 import security
 
 load_dotenv()
@@ -51,6 +52,7 @@ HOSTED_MODE = bool(os.environ.get("VERCEL"))
 # stale session cookie doesn't stay valid forever.
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 app.config["SESSION_COOKIE_SECURE"] = HOSTED_MODE or not DEBUG_MODE
+app.config["SESSION_COOKIE_HTTPONLY"] = True
 app.config["PERMANENT_SESSION_LIFETIME"] = 60 * 60 * 24 * 7  # 7 days
 
 # Request size ceiling, security headers, same-origin CORS policy and sanitised
@@ -72,6 +74,8 @@ SUPABASE_STORE = supabase_store.SupabaseWorkspaceStore(
     os.environ.get("SUPABASE_URL", ""),
     os.environ.get("SUPABASE_SECRET_KEY", "") or os.environ.get("SUPABASE_SERVICE_ROLE_KEY", ""),
 )
+SUPABASE_USER_WORKSPACE_STORE = supabase_store.SupabaseUserWorkspaceStore()
+SUPABASE_AUTH_CONFIGURED = auth_sessions.configured()
 MAX_WORKSPACE_STATE_BYTES = 2 * 1024 * 1024
 
 DATA_DIR = Path(__file__).parent / "server"
@@ -79,7 +83,9 @@ PUBLIC_DIR = Path(__file__).resolve().parents[1] / "public"
 STORE_PATH = DATA_DIR / "store.json"
 
 SYSTEM_PROMPT = (
-    "You are Zariya, a clear, capable bilingual assistant for Urdu and English. "
+    "You are Zariya's Custom Zariya Model, a clear, capable bilingual assistant for Urdu and English. "
+    "If asked which model you are, reply exactly: I'm the Custom Zariya Model from Zariya. "
+    "Do not claim that Zariya independently trained the underlying base model. If asked how it is supplied, explain that it is Zariya's hosted assistant. "
     "Reply in the language the user uses. If the user writes in English, reply in "
     "natural, correctly written English. If the user writes in Urdu, reply in Urdu "
     "script. If they mix languages, mirror that mix naturally. Keep every English "
