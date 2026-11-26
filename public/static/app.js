@@ -420,7 +420,6 @@ async function loadServerState(){
   decks.forEach(d=> (Array.isArray(d.cards) ? d.cards : []).forEach(migrateCardForSpacedRepetition));
   currentSessionId = sessions.length ? sessions[0].id : null;
 
-  const userAuthCloud=!!(serverConfig.supabaseAuthConfigured && me.signedIn && me.authProvider==='supabase');
   const storageCopy = (serverConfig.supabaseConfigured || userAuthCloud)
     ? 'Your workspace syncs securely across devices.'
     : (serverConfig.hostedMode
