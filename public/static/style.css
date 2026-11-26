@@ -1671,3 +1671,15 @@ body{background:var(--bg);color:var(--text);font:14px/1.6 var(--font);-webkit-fo
 
 /* Icon buttons keep a clear keyboard focus ring; only sidebar pages drop it. */
 .icon-btn:focus-visible,.topbar-settings:focus-visible,.hamburger:focus-visible,.dialog-close:focus-visible,.composer-btn:focus-visible,.sess-del:focus-visible{outline:2px solid var(--text);outline-offset:2px}
+
+/* Short screens: centre with auto margins so the block scrolls instead of clipping. */
+#view-chat.empty-chat{justify-content:flex-start;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain}
+#view-chat.empty-chat #chat-scroll{margin-top:auto}
+#view-chat.empty-chat .chat-dock{margin-bottom:auto}
+@media(max-height:680px){
+  #view-chat.empty-chat .empty-hero h1{font-size:24px;margin-bottom:10px}
+  #view-chat.empty-chat .empty-hero .urdu-line{font-size:17px;margin-bottom:6px}
+  #view-chat.empty-chat .empty-hero p{margin-bottom:14px;font-size:13px}
+  #view-chat.empty-chat .home-suggestions{margin-top:10px;gap:8px}
+  #view-chat.empty-chat .suggest-card{min-height:40px}
+}
