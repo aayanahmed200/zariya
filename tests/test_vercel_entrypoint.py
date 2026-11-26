@@ -873,7 +873,7 @@ def test_new_design_has_explicit_responsive_navigation_and_control_contrast():
     assert "::-webkit-slider-runnable-track" in css
     assert "::-moz-range-track" in css
     assert "min-width:0;flex:1 1 0" in css
-    assert 'href="/static/style.css?v=20261126-12"' in html
+    assert 'href="/static/style.css?v=20261126-13"' in html
 
 
 
@@ -901,7 +901,7 @@ def test_sidebar_search_follows_workspace_navigation_and_loading_skeletons_are_w
     assert "prefers-reduced-motion:reduce" in css
     assert source_js == public_js
     assert css == public_css
-    assert 'href="/static/style.css?v=20261126-12"' in html
+    assert 'href="/static/style.css?v=20261126-13"' in html
     assert 'src="/static/app.js?v=20261126-4"' in html
 
 
