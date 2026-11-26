@@ -1657,11 +1657,9 @@ function renderNotesList(){
   const searchInput=document.getElementById('noteSearchInput');
   const query=(searchInput ? searchInput.value : '').trim().toLocaleLowerCase();
   const taggedNotes=activeNoteTagFilter ? notes.filter(n=>(n.tags||[]).includes(activeNoteTagFilter)) : notes;
-  const visibleNotes=taggedNotes.filter(n=>{
-    if(!query) return true;
-    const searchable=[n.title,n.body,...(n.tags||[])].map(value=>String(value||'').toLocaleLowerCase());
-    return searchable.some(value=>value.includes(query));
-  });
+  const visibleNotes=taggedNotes.filter(n=>
+    window.ZariyaWorkspaceSearch.matchesAny([n.title,n.body,...(n.tags||[])],query)
+  );
   const clearSearch=document.getElementById('noteSearchClearBtn');
   const searchMeta=document.getElementById('noteSearchMeta');
   if(clearSearch) clearSearch.hidden=!query;
@@ -1917,11 +1915,11 @@ function renderDeckGrid(){
   const query=(searchInput ? searchInput.value : '').trim().toLocaleLowerCase();
   const taggedDecks=activeDeckTagFilter ? decks.filter(d=>(d.tags||[]).includes(activeDeckTagFilter)) : decks;
   const visibleDecks=taggedDecks.filter(deck=>{
-    if(!query) return true;
     const cards=Array.isArray(deck.cards) ? deck.cards : [];
-    const searchable=[deck.name,...(deck.tags||[]),...cards.flatMap(card=>[card.front,card.back])]
-      .map(value=>String(value||'').toLocaleLowerCase());
-    return searchable.some(value=>value.includes(query));
+    return window.ZariyaWorkspaceSearch.matchesAny(
+      [deck.name,...(deck.tags||[]),...cards.flatMap(card=>[card.front,card.back])],
+      query
+    );
   });
   const clearSearch=document.getElementById('deckSearchClearBtn');
   const searchMeta=document.getElementById('deckSearchMeta');
