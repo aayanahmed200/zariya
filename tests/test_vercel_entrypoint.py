@@ -903,3 +903,30 @@ def test_sidebar_search_follows_workspace_navigation_and_loading_skeletons_are_w
     assert css == public_css
     assert 'href="/static/style.css?v=20261126-12"' in html
     assert 'src="/static/app.js?v=20261126-4"' in html
+
+
+def test_workspace_search_covers_note_text_tags_and_flashcard_sides():
+    html = (ROOT / "webapp" / "templates" / "index.html").read_text(encoding="utf-8")
+    source = (ROOT / "webapp" / "static" / "app.js").read_text(encoding="utf-8")
+    public = (ROOT / "public" / "static" / "app.js").read_text(encoding="utf-8")
+    css = (ROOT / "webapp" / "static" / "style.css").read_text(encoding="utf-8")
+    public_css = (ROOT / "public" / "static" / "style.css").read_text(encoding="utf-8")
+    helper = (ROOT / "webapp" / "static" / "workspace-search.js").read_text(encoding="utf-8")
+    public_helper = (ROOT / "public" / "static" / "workspace-search.js").read_text(encoding="utf-8")
+
+    assert source == public
+    assert css == public_css
+    assert helper == public_helper
+    assert 'id="noteSearchInput"' in html and 'aria-label="Search notes"' in html
+    assert 'id="deckSearchInput"' in html and 'aria-label="Search decks and flashcards"' in html
+    assert 'id="noteSearchClearBtn"' in html and 'id="deckSearchClearBtn"' in html
+    assert "window.ZariyaWorkspaceSearch.matchesAny([n.title,n.body,...(n.tags||[])],query)" in source
+    assert "[deck.name,...(deck.tags||[]),...cards.flatMap(card=>[card.front,card.back])]" in source
+    assert "const selectedNoteStillExists=query && notes.some(n=>n.id===currentNoteId);" in source
+    assert "document.getElementById('deckWorkspaceSearch').hidden=true" in source
+    assert "if(searchBar) searchBar.hidden=false" in source
+    assert "workspace-search:focus-within" in css
+    assert "workspace-search-empty-clear" in css
+    assert 'src="/static/workspace-search.js?v=20261126-1"' in html
+    assert 'src="/static/app.js?v=20261126-6"' in html
+
