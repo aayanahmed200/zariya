@@ -30,7 +30,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Lora:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/static/style.css?v=20261126-1">
+<link rel="stylesheet" href="/static/style.css?v=20261126-2">
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
@@ -74,7 +74,6 @@
       <input id="sessSearch" type="search" placeholder="Search conversations" autocomplete="off">
     </label>
 
-    <div class="nav-label">Workspace</div>
     <nav class="nav">
       <button class="nav-item active" type="button" data-view="chat">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11.5a7.5 7.5 0 0 1-7.5 7.5H6l-3 2v-6.5A7.5 7.5 0 0 1 10.5 7H12.5A7.5 7.5 0 0 1 20 14.5z"/><path d="M8 12h8M8 15h5"/></svg>
@@ -91,7 +90,7 @@
     </nav>
 
     <div class="sb-sessions" id="sessList">
-      <div class="sb-sessions-label">Recent chats</div>
+      <div class="sb-sessions-label">Chats</div>
     </div>
 
     <div class="sb-footer">
@@ -126,28 +125,19 @@
         <span class="topbar-section" id="topbarSection">Chat</span>
       </div>
       <div class="topbar-right">
-        <span class="status-pill" role="status" aria-live="polite" title="Hosted model status"><span class="status-dot off" id="statusDot"></span><span id="statusText">Checking hosted AI…</span></span>
         <button class="topbar-settings" type="button" data-view="settings" aria-label="Open settings" title="Settings">
           <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1-1.8 1.8-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5v.2h-2.6v-.2a1.7 1.7 0 0 0-1-1.5 1.7 1.7 0 0 0-1.9.3l-.1.1-1.8-1.8.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H4v-2.6h.2a1.7 1.7 0 0 0 1.5-1 1.7 1.7 0 0 0-.3-1.9l-.1-.1 1.8-1.8.1.1a1.7 1.7 0 0 0 1.9.3 1.7 1.7 0 0 0 1-1.5V4h2.6v.2a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1 1.8 1.8-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.5 1h.2v2.6h-.2a1.7 1.7 0 0 0-1.5 1Z"/></svg>
         </button>
       </div>
     </header>
 
-    <div class="onboarding-banner" id="onboardingBanner" style="display:none;">
-      <span class="ob-icon">i</span>
-      <span class="ob-text">Hosted AI is ready to use. No installation required.</span>
-      <button class="ob-settings-link" type="button" data-view="settings">Open settings</button>
-      <button class="ob-dismiss" id="onboardingDismissBtn" type="button" aria-label="Dismiss">&times;</button>
-    </div>
-
     <section class="view active" id="view-chat" aria-label="Chat">
       <div id="chat-scroll">
         <div id="chat-inner" class="empty-mode">
           <div class="empty-hero">
-            <div class="hero-kicker">URDU · ENGLISH · MORE</div>
-            <h1>What would you like to work on?</h1>
+            <h1>What can I help with?</h1>
             <div class="urdu-line" lang="ur" dir="rtl">آئیے کچھ نیا سیکھتے ہیں</div>
-            <p>Ask a question, explore an idea, or practise something you are learning.</p>
+            <p>Ask anything in English or Urdu. Chats, notes and flashcards stay together.</p>
           </div>
         </div>
       </div>
@@ -200,7 +190,6 @@
     <section class="view" id="view-notepad" aria-label="Notepad">
       <div class="page-head">
         <div>
-          <div class="page-eyebrow">YOUR WORKSPACE</div>
           <h2>Notepad</h2>
           <p id="storageDescription">Saved in this browser. Not synced across devices.</p>
         </div>
@@ -241,9 +230,8 @@
     <section class="view" id="view-flashcards" aria-label="Flashcards">
       <div class="page-head">
         <div>
-          <div class="page-eyebrow">LEARN BY REVIEWING</div>
           <h2>Flashcards</h2>
-          <p>Small reviews make knowledge easier to remember.</p>
+          <p>Review what you are learning.</p>
         </div>
         <div class="page-head-actions">
           <button class="btn" id="importDeckBtn" type="button">Import deck</button>
@@ -262,9 +250,8 @@
     <section class="view" id="view-settings" aria-label="Settings">
       <div class="page-head">
         <div>
-          <div class="page-eyebrow">MAKE IT YOURS</div>
           <h2>Settings</h2>
-          <p>Adjust your workspace, replies and voice tools.</p>
+          <p>Workspace, replies and voice.</p>
         </div>
       </div>
       <div id="settings-body">
@@ -388,8 +375,7 @@
               </div>
               <div class="voice-typing-note">
                 <strong>English and Urdu voice transcription</strong>
-                <p>Record up to 60 seconds. Zariya transcribes the WAV recording through Vercel AI Gateway using Microsoft MAI-Transcribe 2, with automatic language detection or an English/Urdu hint. Zariya does not save microphone audio. The recording is sent to Vercel AI Gateway and Microsoft Azure for transcription; avoid recording private or sensitive conversations.</p>
-                <p class="voice-cost-note">The listed transcription rate is about $0.10 per audio hour (roughly $0.0017 per minute). Usage is billed to the service owner and can change.</p>
+                <p>Record up to 60 seconds. The recording is sent to the hosted speech service for transcription and is not stored by Zariya. Avoid recording private conversations.</p>
               </div>
             </div>
           </div>
@@ -402,23 +388,16 @@
             <div class="setting-content">
               <div class="hosted-ai-summary">
                 <div class="hosted-ai-model-copy">
-                  <span class="hosted-ai-overline">ACTIVE MODEL</span>
-                  <strong id="aiModelName">Kilo Auto Free model pool</strong>
+                  <strong id="aiModelName">Hosted model</strong>
                   <span class="sub" id="aiModelStatusText">Checking hosted model…</span>
                 </div>
                 <span class="hosted-ai-status-mark" id="aiStatusMark"></span>
               </div>
               <p class="hosted-ai-note" id="aiProviderNote">Hosted AI is being checked.</p>
-              <div class="hosted-ai-benefits">
-                <span><i>✓</i> No Windows or Mac install</span>
-                <span><i>✓</i> No personal API key</span>
-                <span><i>✓</i> No model downloads</span>
-              </div>
               <div class="hosted-ai-privacy">
                 <strong>About your chat data</strong>
-                <p>Chat messages are sent through Kilo AI Gateway to a rotating free upstream model. Kilo warns that upstream providers may log prompts and use them to improve their services. Do not send passwords, private records, contact details, or other sensitive information. Voice transcription uses a separate service and sends recorded audio to its transcription provider.</p>
+                <p>Messages are sent to a hosted model provider, which may log prompts. Do not send passwords, private records or other sensitive information.</p>
               </div>
-              <p class="hosted-ai-limits">The free pool requires no API key, but it is shared and rate-limited (Kilo documents 200 requests per hour per IP for free models). Providers can be busy or unavailable. Zariya now shows a real service error instead of presenting a canned answer as AI.</p>
             </div>
           </div>
 
@@ -438,7 +417,7 @@
               <div><h3>About Zariya</h3><p class="desc">An Urdu and English workspace for questions, notes and learning.</p></div>
             </div>
             <div class="setting-content about-copy">
-              Zariya uses Kilo AI Gateway's anonymous free-model pool for hosted chat, so you can start without installing software, creating a provider account, or adding a personal API key. Shared model limits apply, and upstream providers may handle prompts under their own data policies. Your chats, notes and flashcards sync to secure cloud storage when available, with a local browser copy as a fallback.
+              Zariya is an Urdu and English workspace for chat, notes and flashcards. Your workspace syncs to secure cloud storage when available, with a copy in this browser as a fallback.
             </div>
           </div>
         </div>
@@ -448,7 +427,7 @@
 <dialog class="app-dialog" id="newDeckDialog" aria-labelledby="newDeckTitle">
   <form id="newDeckForm">
     <div class="dialog-head">
-      <div><div class="page-eyebrow">FLASHCARDS</div><h2 id="newDeckTitle">Create a deck</h2><p>Write a question on the front and its answer on the back.</p></div>
+      <div><h2 id="newDeckTitle">Create a deck</h2><p>Write a question on the front and its answer on the back.</p></div>
       <button class="dialog-close" type="button" id="newDeckCancelBtn" aria-label="Close">×</button>
     </div>
     <label class="dialog-field">Deck name<input id="newDeckName" required maxlength="80" placeholder="e.g. Biology — cell structure"></label>
@@ -464,7 +443,7 @@
 </div>
 <script src="/static/workspace-sync.js?v=20261122-6"></script>
 <script src="/static/sse.js?v=20261122-4"></script>
-<script src="/static/app.js?v=20261126-1"></script>
+<script src="/static/app.js?v=20261126-2"></script>
 <script>
   window.va = window.va || function () {
     (window.vaq = window.vaq || []).push(arguments);
