@@ -5,7 +5,7 @@ os.environ.setdefault("FLASK_SECRET_KEY", "test-only-zariya-secret-which-is-long
 from types import SimpleNamespace
 from unittest.mock import Mock
 
-import index
+from webapp import app as webapp_module
 from webapp import auth_sessions, security
 
 
@@ -15,7 +15,7 @@ STATE = {"sessions": [], "notes": [], "decks": []}
 
 def client():
     security.reset_rate_limits()
-    return index.app.test_client()
+    return webapp_module.app.test_client()
 
 
 class FakeAuth:
@@ -152,8 +152,8 @@ def test_workspace_reads_and_writes_use_verified_supabase_user_id(monkeypatch):
     def fake_save_state(user_id, state, auth_client):
         write_calls.append((user_id, state, auth_client))
 
-    monkeypatch.setattr(index.SUPABASE_USER_WORKSPACE_STORE, "get_state", fake_get_state)
-    monkeypatch.setattr(index.SUPABASE_USER_WORKSPACE_STORE, "save_state", fake_save_state)
+    monkeypatch.setattr(webapp_module.SUPABASE_USER_WORKSPACE_STORE, "get_state", fake_get_state)
+    monkeypatch.setattr(webapp_module.SUPABASE_USER_WORKSPACE_STORE, "save_state", fake_save_state)
 
     c = client()
     with c.session_transaction() as flask_session:
@@ -176,7 +176,7 @@ def test_workspace_reads_and_writes_use_verified_supabase_user_id(monkeypatch):
 
 def test_me_only_reports_supabase_user_after_provider_verification(monkeypatch):
     user = SimpleNamespace(id=USER_ID, email="student@example.com")
-    monkeypatch.setattr(index, "_supabase_auth_context", lambda: (FakeClient(FakeAuth()), user, object()))
+    monkeypatch.setattr(webapp_module, "_supabase_auth_context", lambda: (FakeClient(FakeAuth()), user, object()))
     c = client()
     with c.session_transaction() as flask_session:
         flask_session[auth_sessions.SESSION_FIELD] = "opaque-encrypted-cookie-value"
@@ -192,7 +192,7 @@ def test_me_only_reports_supabase_user_after_provider_verification(monkeypatch):
 def test_logout_revokes_provider_session_and_clears_cookie(monkeypatch):
     fake_auth = FakeAuth()
     fake_client = FakeClient(fake_auth)
-    monkeypatch.setattr(index, "_supabase_auth_context", lambda: (fake_client, SimpleNamespace(id=USER_ID), object()))
+    monkeypatch.setattr(webapp_module, "_supabase_auth_context", lambda: (fake_client, SimpleNamespace(id=USER_ID), object()))
     c = client()
     with c.session_transaction() as flask_session:
         flask_session[auth_sessions.SESSION_FIELD] = "opaque-encrypted-cookie-value"
