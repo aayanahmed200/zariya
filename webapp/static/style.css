@@ -1645,3 +1645,5 @@ body{background:var(--bg);color:var(--text);font:14px/1.6 var(--font);-webkit-fo
 .voice-dropdown-menu button{border-radius:8px;padding:9px 10px;font-size:13px}
 .voice-dropdown-menu button:hover{background:var(--hover)}
 @media(max-width:700px){#fc-body{padding:8px 16px 28px}.deck-grid{grid-template-columns:minmax(0,1fr)}}
+.bubble-col.assistant-col{max-width:100%;flex:1}
+.bubble-col.user-col{max-width:72%}
