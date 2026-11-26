@@ -86,3 +86,50 @@ class SupabaseWorkspaceStore:
             )
             .execute()
         )
+
+
+class SupabaseUserWorkspaceStore:
+    """RLS-protected persistence using the signed-in user's own Supabase JWT."""
+
+    TABLE = "zariya_user_workspaces"
+
+    @staticmethod
+    def _validate_user_id(user_id: str) -> None:
+        import uuid
+        try:
+            if str(uuid.UUID(str(user_id))) != str(user_id).lower():
+                raise ValueError
+        except (ValueError, TypeError, AttributeError):
+            raise ValueError("Invalid Supabase user id.")
+
+    def get_state(self, user_id: str, auth_client: Any) -> dict[str, Any] | None:
+        self._validate_user_id(user_id)
+        response = (
+            auth_client.table(self.TABLE)
+            .select("state")
+            .eq("user_id", user_id)
+            .limit(1)
+            .execute()
+        )
+        rows = getattr(response, "data", None)
+        if not isinstance(rows, list) or not rows:
+            return None
+        state = rows[0].get("state") if isinstance(rows[0], dict) else None
+        return state if isinstance(state, dict) else None
+
+    def save_state(self, user_id: str, state: dict[str, Any], auth_client: Any) -> None:
+        self._validate_user_id(user_id)
+        if not isinstance(state, dict):
+            raise ValueError("Workspace state must be an object.")
+        (
+            auth_client.table(self.TABLE)
+            .upsert(
+                {
+                    "user_id": user_id,
+                    "state": state,
+                    "updated_at": datetime.now(timezone.utc).isoformat(),
+                },
+                on_conflict="user_id",
+            )
+            .execute()
+        )
