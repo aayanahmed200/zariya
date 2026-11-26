@@ -1933,7 +1933,10 @@ function renderDeckGrid(){
     empty.className='empty-mini deck-empty';
     if(!decks.length){
       empty.innerHTML='<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="2" y="6" width="16" height="12" rx="2"/><path d="M6 2h16v12"/></svg><strong>Your first deck starts here</strong><span>Create a deck yourself, or ask Zariya to turn a chat into flashcards.</span><button class="btn primary" type="button">Create first deck</button>';
-      empty.querySelector('button').addEventListener('click',()=>document.getElementById('newDeckBtn').click());
+      const createDeck=empty.querySelector('button');
+      createDeck.addEventListener('click',()=>{
+        document.getElementById('newDeckBtn').click();
+      });
     }else{
       const message=document.createElement('span');
       message.textContent=query ? 'No decks or cards match “'+searchInput.value.trim()+'”' : 'No decks with this tag';
