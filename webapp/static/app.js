@@ -883,6 +883,7 @@ function renderChat(){
   inner.innerHTML = '';
   if(!session || !session.messages.length){
     scroll.classList.add('empty-mode'); inner.classList.add('empty-mode');
+    document.getElementById('view-chat').classList.add('empty-chat');
     const hero = document.createElement('div');
     hero.className = 'empty-hero';
     hero.innerHTML = '<h1>What can I help with?</h1><div class="urdu-line" lang="ur" dir="rtl">آئیے کچھ نیا سیکھتے ہیں</div><p>Ask anything in English or Urdu. Chats, notes and flashcards stay together.</p>';
@@ -903,6 +904,7 @@ function renderChat(){
     return;
   }
   scroll.classList.remove('empty-mode'); inner.classList.remove('empty-mode');
+  document.getElementById('view-chat').classList.remove('empty-chat');
   session.messages.forEach((m, idx)=>renderBubble(m, idx, idx===session.messages.length-1 && m.role==='assistant'));
   scroll.scrollTop = 999999;
   syncJumpLatest();
@@ -1176,6 +1178,7 @@ function appendStreamingBubble(){
   const inner = document.getElementById('chat-inner');
   const scroll = document.getElementById('chat-scroll');
   scroll.classList.remove('empty-mode'); inner.classList.remove('empty-mode');
+  document.getElementById('view-chat').classList.remove('empty-chat');
   const row = document.createElement('div');
   row.className = 'msg-row assistant';
   row.innerHTML = '<img class="avatar-logo" src="/static/logo.png" alt=""><div class="bubble-col assistant-col"><div class="bubble assistant" id="streamingBubbleContent" dir="auto"></div></div>';
