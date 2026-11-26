@@ -867,7 +867,8 @@ function switchView(name, opts){
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.toggle('active', n.dataset.view===name));
   const title=document.getElementById('topbarSection');
   if(title) title.textContent = ({chat:'Chat',notepad:'Notepad',flashcards:'Flashcards',settings:'Settings'})[name] || 'Workspace';
-  document.getElementById('quickTools').style.display = name==='chat' ? '' : 'none';
+  const toolsDisclosure=document.getElementById('toolsDisclosure');
+  if(toolsDisclosure){ toolsDisclosure.hidden=name!=='chat'; toolsDisclosure.open=false; }
   closeSidebarMobile();
   if(name==='notepad') renderNotesList();
   if(name==='flashcards') renderDeckGrid();
@@ -1057,7 +1058,7 @@ function renderChat(){
     document.getElementById('view-chat').classList.add('empty-chat');
     const hero = document.createElement('div');
     hero.className = 'empty-hero';
-    hero.innerHTML = '<h1>What can I help with?</h1><div class="urdu-line" lang="ur" dir="rtl">آئیے کچھ نیا سیکھتے ہیں</div><p>Ask anything in English or Urdu. Chats, notes and flashcards stay together.</p>';
+    hero.innerHTML = '<h1>What can I help with?</h1><div class="urdu-line" lang="ur" dir="rtl">آئیے کچھ نیا سیکھتے ہیں</div>';
     const suggestions = document.createElement('div');
     suggestions.className = 'home-suggestions';
     ['Explain a difficult topic in simple words','Translate a sentence into Urdu','Help me revise for an exam','Summarise these notes'].forEach(label=>{
@@ -1389,7 +1390,7 @@ function regenerateLast(){
 }
 
 /* ============ QUICK TOOLS ============ */
-document.querySelectorAll('.qt-btn').forEach(btn=> btn.addEventListener('click', ()=>runQuickTool(btn.dataset.tool)));
+document.querySelectorAll('.qt-btn').forEach(btn=> btn.addEventListener('click', ()=>{ const menu=btn.closest('details'); if(menu) menu.open=false; runQuickTool(btn.dataset.tool); }));
 function updateQuickToolsState(){
   const session=currentSession();
   const ready=!!(session && session.messages.length) && !isGenerating && !isQuickToolBusy;
