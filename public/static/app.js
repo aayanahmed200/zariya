@@ -1654,9 +1654,41 @@ function syncNoteEditorState(){
 function renderNotesList(){
   const wrap = document.getElementById('notesList'); wrap.innerHTML='';
   renderNoteTagFilterRow();
-  const visibleNotes = activeNoteTagFilter ? notes.filter(n=>(n.tags||[]).includes(activeNoteTagFilter)) : notes;
+  const searchInput=document.getElementById('noteSearchInput');
+  const query=(searchInput ? searchInput.value : '').trim().toLocaleLowerCase();
+  const taggedNotes=activeNoteTagFilter ? notes.filter(n=>(n.tags||[]).includes(activeNoteTagFilter)) : notes;
+  const visibleNotes=taggedNotes.filter(n=>{
+    if(!query) return true;
+    const searchable=[n.title,n.body,...(n.tags||[])].map(value=>String(value||'').toLocaleLowerCase());
+    return searchable.some(value=>value.includes(query));
+  });
+  const clearSearch=document.getElementById('noteSearchClearBtn');
+  const searchMeta=document.getElementById('noteSearchMeta');
+  if(clearSearch) clearSearch.hidden=!query;
+  if(searchMeta){
+    searchMeta.hidden=!query;
+    searchMeta.textContent=query ? visibleNotes.length+' of '+notes.length+' notes' : '';
+  }
   if(!visibleNotes.length){
-    wrap.innerHTML = '<div class="empty-mini"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg><span>'+(activeNoteTagFilter?'No notes with this tag':'No notes yet')+'</span></div>';
+    const empty=document.createElement('div');
+    empty.className='empty-mini';
+    const message=document.createElement('span');
+    message.textContent=query ? 'No notes match “'+(searchInput.value.trim())+'”' : (activeNoteTagFilter ? 'No notes with this tag' : 'No notes yet');
+    empty.appendChild(message);
+    if(query || activeNoteTagFilter){
+      const clearFilters=document.createElement('button');
+      clearFilters.type='button';
+      clearFilters.className='workspace-search-empty-clear';
+      clearFilters.textContent='Clear filters';
+      clearFilters.addEventListener('click',()=>{
+        if(searchInput) searchInput.value='';
+        activeNoteTagFilter=null;
+        renderNotesList();
+        if(searchInput) searchInput.focus();
+      });
+      empty.appendChild(clearFilters);
+    }
+    wrap.appendChild(empty);
   }
   visibleNotes.forEach(n=>{
     const div = document.createElement('div');
@@ -1667,7 +1699,8 @@ function renderNotesList(){
   });
   const previousNoteId=currentNoteId;
   if(!visibleNotes.some(n=>n.id===currentNoteId)){
-    currentNoteId=visibleNotes.length ? visibleNotes[0].id : null;
+    const selectedNoteStillExists=query && notes.some(n=>n.id===currentNoteId);
+    if(!selectedNoteStillExists) currentNoteId=visibleNotes.length ? visibleNotes[0].id : null;
   }
   syncNoteEditorState();
   if(previousNoteId!==currentNoteId){
@@ -1675,6 +1708,14 @@ function renderNotesList(){
   }
   updateNoteActionState();
 }
+const noteSearchInput=document.getElementById('noteSearchInput');
+const noteSearchClearBtn=document.getElementById('noteSearchClearBtn');
+if(noteSearchInput) noteSearchInput.addEventListener('input',renderNotesList);
+if(noteSearchClearBtn) noteSearchClearBtn.addEventListener('click',()=>{
+  noteSearchInput.value='';
+  renderNotesList();
+  noteSearchInput.focus();
+});
   function renderNoteTagFilterRow(){
       const row = document.getElementById('noteTagFilterRow');
       if(!row) return;
@@ -1709,6 +1750,8 @@ document.getElementById('newNoteBtn').addEventListener('click', ()=>{
   notes.unshift(n);
   currentNoteId=null;
   activeNoteTagFilter=null;
+  const noteSearch=document.getElementById('noteSearchInput');
+  if(noteSearch) noteSearch.value='';
   saveServerState();
   openNote(n.id);
   document.getElementById('note-title-input').focus();
@@ -1866,23 +1909,46 @@ function renderDeckGrid(){
   document.getElementById('quizArea').style.display='none';
   const grid = document.getElementById('deckGrid'); grid.style.display='grid'; grid.innerHTML='';
   document.getElementById('deckTagFilterRow').style.display='';
-    decks.forEach(d=>{ if(!d.tags) d.tags = []; });
-    renderDeckTagFilterRow();
-    const visibleDecks = activeDeckTagFilter ? decks.filter(d=>(d.tags||[]).includes(activeDeckTagFilter)) : decks;
+  decks.forEach(d=>{ if(!d.tags) d.tags = []; });
+  renderDeckTagFilterRow();
+  const searchInput=document.getElementById('deckSearchInput');
+  const query=(searchInput ? searchInput.value : '').trim().toLocaleLowerCase();
+  const taggedDecks=activeDeckTagFilter ? decks.filter(d=>(d.tags||[]).includes(activeDeckTagFilter)) : decks;
+  const visibleDecks=taggedDecks.filter(deck=>{
+    if(!query) return true;
+    const cards=Array.isArray(deck.cards) ? deck.cards : [];
+    const searchable=[deck.name,...(deck.tags||[]),...cards.flatMap(card=>[card.front,card.back])]
+      .map(value=>String(value||'').toLocaleLowerCase());
+    return searchable.some(value=>value.includes(query));
+  });
+  const clearSearch=document.getElementById('deckSearchClearBtn');
+  const searchMeta=document.getElementById('deckSearchMeta');
+  if(clearSearch) clearSearch.hidden=!query;
+  if(searchMeta){
+    searchMeta.hidden=!query;
+    searchMeta.textContent=query ? visibleDecks.length+' of '+decks.length+' decks' : '';
+  }
   if(!visibleDecks.length){
     const empty=document.createElement('div');
     empty.className='empty-mini deck-empty';
-    empty.innerHTML='<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="2" y="6" width="16" height="12" rx="2"/><path d="M6 2h16v12"/></svg><strong>Your first deck starts here</strong><span>Create a deck yourself, or ask Zariya to turn a chat into flashcards.</span><button class="btn primary" type="button">Create first deck</button>';
-    const action=empty.querySelector('button');
-    action.addEventListener('click',()=>{
-      if(activeDeckTagFilter){
+    if(!decks.length){
+      empty.innerHTML='<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="2" y="6" width="16" height="12" rx="2"/><path d="M6 2h16v12"/></svg><strong>Your first deck starts here</strong><span>Create a deck yourself, or ask Zariya to turn a chat into flashcards.</span><button class="btn primary" type="button">Create first deck</button>';
+      empty.querySelector('button').addEventListener('click',()=>document.getElementById('newDeckBtn').click());
+    }else{
+      const message=document.createElement('span');
+      message.textContent=query ? 'No decks or cards match “'+searchInput.value.trim()+'”' : 'No decks with this tag';
+      const clearFilters=document.createElement('button');
+      clearFilters.type='button';
+      clearFilters.className='btn';
+      clearFilters.textContent='Clear filters';
+      clearFilters.addEventListener('click',()=>{
+        if(searchInput) searchInput.value='';
         activeDeckTagFilter=null;
         renderDeckGrid();
-      }else{
-        document.getElementById('newDeckBtn').click();
-      }
-    });
-    if(activeDeckTagFilter) action.textContent='Clear filter';
+        if(searchInput) searchInput.focus();
+      });
+      empty.append(message,clearFilters);
+    }
     grid.appendChild(empty);
     return;
   }
@@ -1906,6 +1972,14 @@ function renderDeckGrid(){
     grid.appendChild(card);
   });
 }
+const deckSearchInput=document.getElementById('deckSearchInput');
+const deckSearchClearBtn=document.getElementById('deckSearchClearBtn');
+if(deckSearchInput) deckSearchInput.addEventListener('input',renderDeckGrid);
+if(deckSearchClearBtn) deckSearchClearBtn.addEventListener('click',()=>{
+  deckSearchInput.value='';
+  renderDeckGrid();
+  deckSearchInput.focus();
+});
 function editDeck(id){
   const deck = decks.find(d=>d.id===id);
   if(!deck) return;
@@ -2099,6 +2173,9 @@ document.getElementById('newDeckForm').addEventListener('submit',e=>{
     existingDeck.tags=tags;
     existingDeck.cards=cards;
   }else{
+    activeDeckTagFilter=null;
+    const deckSearch=document.getElementById('deckSearchInput');
+    if(deckSearch) deckSearch.value='';
     decks.unshift({id:uid(),name,tags,cards,createdAt:Date.now()});
   }
   editingDeckId=null;
