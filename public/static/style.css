@@ -1647,3 +1647,5 @@ body{background:var(--bg);color:var(--text);font:14px/1.6 var(--font);-webkit-fo
 @media(max-width:700px){#fc-body{padding:8px 16px 28px}.deck-grid{grid-template-columns:minmax(0,1fr)}}
 .bubble-col.assistant-col{max-width:100%;flex:1}
 .bubble-col.user-col{max-width:72%}
+.msg-actions{flex-wrap:wrap;gap:4px;row-gap:2px}
+.ghost-btn{white-space:nowrap}
