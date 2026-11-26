@@ -2219,3 +2219,176 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
 @media(prefers-reduced-motion:reduce){
   *,*::before,*::after{scroll-behavior:auto!important;transition:none!important;animation:none!important}
 }
+
+
+/* Final refinement: responsive navigation and accessible control boundaries. */
+:root{
+  --control-border:#958678;
+  --control-border-strong:#89776a;
+}
+[data-theme="dark"]{
+  --control-border:#6f797f;
+  --control-border-strong:#859097;
+}
+
+/* Keep desktop and mobile navigation mutually exclusive. */
+.hamburger{display:none}
+.mobile-brand{display:none}
+@media(min-width:921px){
+  .sidebar-toggle{display:inline-flex!important}
+  .hamburger{display:none!important}
+  .mobile-brand{display:none!important}
+}
+@media(max-width:920px){
+  .sidebar-toggle{display:none!important}
+  .hamburger{display:inline-flex!important}
+  .mobile-brand{display:flex!important;min-width:0}
+  .topbar-section{display:none!important}
+}
+
+/* Stronger component boundaries for secondary actions and form controls. */
+.btn:not(.primary):not(.danger),
+.deck-action-btn:not(.danger),
+.sc-btn,
+.study-back,
+.tag-chip{
+  border-color:var(--control-border);
+}
+.btn:not(.primary):not(.danger):hover:not(:disabled),
+.deck-action-btn:not(.danger):hover:not(:disabled),
+.sc-btn:hover:not(:disabled),
+.study-back:hover:not(:disabled),
+.tag-chip:hover,
+.tag-chip.active{
+  border-color:var(--accent);
+}
+.sb-search input,
+.setting-row select,
+#personaInput,
+#note-tags-input,
+.dialog-field input,
+.dialog-field textarea,
+.deck-form-card input,
+.deck-form-card textarea,
+.response-preset-trigger,
+.theme-row{
+  border-color:var(--control-border);
+}
+.sb-search input:focus,
+.setting-row select:focus,
+#note-tags-input:focus,
+.dialog-field input:focus,
+.dialog-field textarea:focus,
+.deck-form-card input:focus,
+.deck-form-card textarea:focus{
+  border-color:var(--accent);
+  outline:none;
+  box-shadow:0 0 0 3px var(--accent-soft);
+}
+.theme-row{border-width:1px}
+.toggle{
+  border:1px solid var(--control-border);
+  background:var(--surface-muted);
+}
+.toggle.on{border-color:var(--accent);background:var(--accent)}
+.response-preset-trigger{
+  border-color:var(--control-border);
+  background:var(--surface-soft);
+}
+.voice-dropdown-trigger{
+  min-height:34px;
+  height:34px;
+  padding:0 9px;
+  border:1px solid var(--control-border);
+  border-radius:9px;
+  background:var(--surface-soft);
+  color:var(--text-soft);
+}
+.voice-dropdown-trigger:hover{
+  border-color:var(--accent);
+  background:var(--accent-tint);
+  color:var(--text);
+}
+
+/* Native range controls receive a visible track and a high-contrast thumb. */
+.setting-row input[type="range"],.slider{
+  appearance:none;
+  -webkit-appearance:none;
+  height:28px;
+  padding:0;
+  background:transparent;
+  accent-color:var(--accent);
+  cursor:pointer;
+}
+.setting-row input[type="range"]::-webkit-slider-runnable-track,
+.slider::-webkit-slider-runnable-track{
+  height:7px;
+  border:1px solid var(--control-border);
+  border-radius:999px;
+  background:var(--surface-muted);
+}
+.setting-row input[type="range"]::-webkit-slider-thumb,
+.slider::-webkit-slider-thumb{
+  width:18px;height:18px;margin-top:-6px;
+  appearance:none;-webkit-appearance:none;
+  border:2px solid var(--accent);
+  border-radius:50%;
+  background:var(--surface);
+  box-shadow:0 1px 3px rgba(0,0,0,.16);
+}
+.setting-row input[type="range"]::-moz-range-track,
+.slider::-moz-range-track{
+  height:7px;
+  border:1px solid var(--control-border);
+  border-radius:999px;
+  background:var(--surface-muted);
+}
+.setting-row input[type="range"]::-moz-range-thumb,
+.slider::-moz-range-thumb{
+  width:14px;height:14px;
+  border:2px solid var(--accent);
+  border-radius:50%;
+  background:var(--surface);
+  box-shadow:0 1px 3px rgba(0,0,0,.16);
+}
+.setting-row input[type="range"]:focus-visible,
+.slider:focus-visible{
+  outline:2px solid var(--accent);
+  outline-offset:4px;
+}
+
+/* Avoid flex children forcing a phone-sized page wider than the viewport. */
+html,body,#app,#main,.view{min-width:0;max-width:100%}
+#app,#main,.view{overflow-x:clip}
+.topbar{width:100%;min-width:0;gap:8px}
+.topbar-left{min-width:0;flex:1 1 auto;overflow:hidden}
+.topbar-right{min-width:38px;flex:0 0 auto;margin-left:auto}
+.mobile-brand{flex:0 0 auto}
+.composer-inner,#composer,.chat-dock,.composer-box{width:100%;min-width:0;max-width:100%}
+.composer-box>*{min-width:0}
+.voice-dropdown{flex:0 0 auto;min-width:0}
+#chat-input{width:100%;min-width:0;flex:1 1 0}
+.composer-footer{min-width:0;flex-wrap:wrap}
+.composer-hint{min-width:0;max-width:100%}
+@media(max-width:920px){
+  .topbar{padding-inline:14px}
+  .topbar-left,.topbar-right{gap:8px}
+  .composer-dock,.chat-dock{min-width:0;max-width:100%}
+}
+@media(max-width:480px){
+  .topbar{padding-inline:10px}
+  .topbar-left,.topbar-right{gap:5px}
+  .composer-box{gap:5px;padding:6px}
+  .composer-btn{width:34px;height:34px;min-width:34px;flex:0 0 34px}
+  .voice-dropdown-trigger{min-width:43px;padding-inline:4px}
+  .composer-enter{display:none!important}
+  .composer-hint{font-size:9.5px}
+  .setting-row input[type="range"],.slider{width:100%;max-width:none}
+}
+@media(max-width:360px){
+  .mobile-brand{gap:5px;font-size:13px}
+  .mobile-brand img{width:19px;height:19px}
+  .composer-btn{width:32px;height:32px;min-width:32px;flex-basis:32px}
+  .voice-dropdown-trigger{min-width:40px;font-size:9.5px}
+  .composer-box{gap:3px;padding:5px}
+}
