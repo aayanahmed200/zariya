@@ -30,7 +30,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Lora:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/static/style.css?v=20261125-4">
+<link rel="stylesheet" href="/static/style.css?v=20261125-6">
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
@@ -115,6 +115,9 @@
   <main id="main">
     <header class="topbar">
       <div class="topbar-left">
+        <button class="icon-btn sidebar-toggle" id="sidebarToggleBtn" type="button" aria-label="Collapse sidebar" aria-pressed="false" title="Collapse sidebar">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M9.5 4.5v15"/></svg>
+        </button>
         <button class="hamburger" id="hamburgerBtn" type="button" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
         </button>
@@ -148,6 +151,10 @@
           </div>
         </div>
       </div>
+
+      <button class="jump-latest" id="jumpLatestBtn" type="button" hidden aria-label="Jump to the latest message" title="Jump to latest">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M6 13l6 6 6-6"/></svg>
+      </button>
 
       <div class="chat-dock">
         <div class="quick-tools" id="quickTools">
@@ -457,7 +464,7 @@
 </div>
 <script src="/static/workspace-sync.js?v=20261122-6"></script>
 <script src="/static/sse.js?v=20261122-4"></script>
-<script src="/static/app.js?v=20261125-4"></script>
+<script src="/static/app.js?v=20261125-6"></script>
 <script>
   window.va = window.va || function () {
     (window.vaq = window.vaq || []).push(arguments);
