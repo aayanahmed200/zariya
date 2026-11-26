@@ -902,7 +902,7 @@ def test_sidebar_search_follows_workspace_navigation_and_loading_skeletons_are_w
     assert source_js == public_js
     assert css == public_css
     assert 'href="/static/style.css?v=20261126-15"' in html
-    assert 'src="/static/app.js?v=20261126-8"' in html
+    assert 'src="/static/app.js?v=20261126-9"' in html
 
 
 def test_workspace_search_covers_note_text_tags_and_flashcard_sides():
@@ -928,7 +928,7 @@ def test_workspace_search_covers_note_text_tags_and_flashcard_sides():
     assert "workspace-search:focus-within" in css
     assert "workspace-search-empty-clear" in css
     assert 'src="/static/workspace-search.js?v=20261126-1"' in html
-    assert 'src="/static/app.js?v=20261126-8"' in html
+    assert 'src="/static/app.js?v=20261126-9"' in html
 
 
 
