@@ -1657,11 +1657,9 @@ function renderNotesList(){
   const searchInput=document.getElementById('noteSearchInput');
   const query=(searchInput ? searchInput.value : '').trim().toLocaleLowerCase();
   const taggedNotes=activeNoteTagFilter ? notes.filter(n=>(n.tags||[]).includes(activeNoteTagFilter)) : notes;
-  const visibleNotes=taggedNotes.filter(n=>{
-    if(!query) return true;
-    const searchable=[n.title,n.body,...(n.tags||[])].map(value=>String(value||'').toLocaleLowerCase());
-    return searchable.some(value=>value.includes(query));
-  });
+  const visibleNotes=taggedNotes.filter(n=>
+    window.ZariyaWorkspaceSearch.matchesAny([n.title,n.body,...(n.tags||[])],query)
+  );
   const clearSearch=document.getElementById('noteSearchClearBtn');
   const searchMeta=document.getElementById('noteSearchMeta');
   if(clearSearch) clearSearch.hidden=!query;
@@ -1909,17 +1907,19 @@ function renderDeckGrid(){
   document.getElementById('quizArea').style.display='none';
   const grid = document.getElementById('deckGrid'); grid.style.display='grid'; grid.innerHTML='';
   document.getElementById('deckTagFilterRow').style.display='';
+  const searchBar=document.getElementById('deckWorkspaceSearch');
+  if(searchBar) searchBar.hidden=false;
   decks.forEach(d=>{ if(!d.tags) d.tags = []; });
   renderDeckTagFilterRow();
   const searchInput=document.getElementById('deckSearchInput');
   const query=(searchInput ? searchInput.value : '').trim().toLocaleLowerCase();
   const taggedDecks=activeDeckTagFilter ? decks.filter(d=>(d.tags||[]).includes(activeDeckTagFilter)) : decks;
   const visibleDecks=taggedDecks.filter(deck=>{
-    if(!query) return true;
     const cards=Array.isArray(deck.cards) ? deck.cards : [];
-    const searchable=[deck.name,...(deck.tags||[]),...cards.flatMap(card=>[card.front,card.back])]
-      .map(value=>String(value||'').toLocaleLowerCase());
-    return searchable.some(value=>value.includes(query));
+    return window.ZariyaWorkspaceSearch.matchesAny(
+      [deck.name,...(deck.tags||[]),...cards.flatMap(card=>[card.front,card.back])],
+      query
+    );
   });
   const clearSearch=document.getElementById('deckSearchClearBtn');
   const searchMeta=document.getElementById('deckSearchMeta');
@@ -2061,6 +2061,8 @@ function openDeck(id){
   studyQueue = cardsDue(deck.cards); studyIndex=0; studyFlipped=false;
   document.getElementById('deckGrid').style.display='none';
   document.getElementById('deckTagFilterRow').style.display='none';
+  document.getElementById('deckWorkspaceSearch').hidden=true;
+  document.getElementById('deckSearchMeta').hidden=true;
   document.getElementById('studyArea').style.display='block';
   renderStudy();
 }
@@ -2221,6 +2223,8 @@ function startQuiz(deckId){
   quizQueue = buildQuizQuestions(deck); quizIndex=0; quizScore=0; quizAnswered=false;
   document.getElementById('deckGrid').style.display='none';
   document.getElementById('deckTagFilterRow').style.display='none';
+  document.getElementById('deckWorkspaceSearch').hidden=true;
+  document.getElementById('deckSearchMeta').hidden=true;
   document.getElementById('quizArea').style.display='block';
   renderQuiz();
 }
