@@ -30,7 +30,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Lora:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/static/style.css?v=20261126-11">
+<link rel="stylesheet" href="/static/style.css?v=20261126-12">
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
@@ -479,9 +479,19 @@
   </form>
 </dialog>
 </div>
+<script>
+(function(){
+  var name=(window.location.hash||'').replace('#','');
+  if(!['chat','notepad','flashcards','settings'].includes(name)||name==='chat') return;
+  var view=document.getElementById('view-'+name);
+  if(!view) return;
+  document.querySelectorAll('.view').forEach(function(item){item.classList.remove('active');});
+  view.classList.add('active');
+})();
+</script>
 <script src="/static/workspace-sync.js?v=20261122-6"></script>
 <script src="/static/sse.js?v=20261122-4"></script>
-<script src="/static/app.js?v=20261126-3"></script>
+<script src="/static/app.js?v=20261126-4"></script>
 <script>
   window.va = window.va || function () {
     (window.vaq = window.vaq || []).push(arguments);
