@@ -92,7 +92,7 @@ def test_postgres_migration_has_owner_scoped_row_level_security():
         Path(__file__).resolve().parents[1]
         / "supabase"
         / "migrations"
-        / "20261126150000_create_rls_protected_authenticated_workspaces.sql"
+        / "20261126150211_create_rls_protected_authenticated_workspaces.sql"
     ).read_text(encoding="utf-8")
     assert "enable row level security" in migration.lower()
     assert "references auth.users(id) on delete cascade" in migration.lower()
