@@ -212,6 +212,12 @@
       <div id="notepad-body">
         <div class="notes-list-wrap">
           <div class="notes-list-head">Your notes</div>
+          <div class="workspace-search" role="search">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7.5"/><path d="m16.5 16.5 4 4"/></svg>
+            <input id="noteSearchInput" type="search" placeholder="Search notes" aria-label="Search notes" autocomplete="off">
+            <button class="workspace-search-clear" id="noteSearchClearBtn" type="button" aria-label="Clear note search" title="Clear search" hidden>×</button>
+          </div>
+          <div class="workspace-search-meta" id="noteSearchMeta" aria-live="polite" hidden></div>
           <div class="tag-filter-row" id="noteTagFilterRow"></div>
           <div class="notes-list" id="notesList">
             <div class="notes-loading-skeleton" aria-hidden="true">
@@ -267,6 +273,12 @@
         </div>
       </div>
       <div id="fc-body">
+        <div class="workspace-search deck-workspace-search" role="search">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7.5"/><path d="m16.5 16.5 4 4"/></svg>
+          <input id="deckSearchInput" type="search" placeholder="Search decks and cards" aria-label="Search decks and flashcards" autocomplete="off">
+          <button class="workspace-search-clear" id="deckSearchClearBtn" type="button" aria-label="Clear flashcard search" title="Clear search" hidden>×</button>
+        </div>
+        <div class="workspace-search-meta" id="deckSearchMeta" aria-live="polite" hidden></div>
         <div class="tag-filter-row" id="deckTagFilterRow"></div>
         <div class="deck-grid" id="deckGrid">
           <div class="deck-loading-skeleton" aria-hidden="true">
