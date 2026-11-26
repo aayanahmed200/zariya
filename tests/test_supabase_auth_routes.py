@@ -6,7 +6,11 @@ from types import SimpleNamespace
 from unittest.mock import Mock
 
 from webapp import app as webapp_module
-from webapp import auth_sessions, security
+
+# The app imports these modules as top-level names after index.py adds webapp/
+# to sys.path. Patch those exact module objects used by the registered routes.
+auth_sessions = webapp_module.auth_sessions
+security = webapp_module.security
 
 
 USER_ID = "5c5f5c75-9e2e-4ad5-a18b-0bb85fce6d6b"
