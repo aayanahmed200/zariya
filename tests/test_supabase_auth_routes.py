@@ -48,7 +48,7 @@ class FakeClient:
 
 
 def test_signup_uses_supabase_auth_confirmation_and_never_returns_tokens(monkeypatch):
-    monkeypatch.setattr(index, "SUPABASE_AUTH_CONFIGURED", True)
+    monkeypatch.setattr(webapp_module, "SUPABASE_AUTH_CONFIGURED", True)
     fake_auth = FakeAuth(result=SimpleNamespace(user=SimpleNamespace(id=USER_ID), session=None))
     monkeypatch.setattr(auth_sessions, "create_auth_client", lambda: FakeClient(fake_auth))
     monkeypatch.setattr(auth_sessions, "store_auth_response", lambda flask_session, response: False)
@@ -69,7 +69,7 @@ def test_signup_uses_supabase_auth_confirmation_and_never_returns_tokens(monkeyp
 
 
 def test_signin_stores_supabase_session_server_side(monkeypatch):
-    monkeypatch.setattr(index, "SUPABASE_AUTH_CONFIGURED", True)
+    monkeypatch.setattr(webapp_module, "SUPABASE_AUTH_CONFIGURED", True)
     fake_auth = FakeAuth(result=SimpleNamespace(user=SimpleNamespace(id=USER_ID), session=object()))
     monkeypatch.setattr(auth_sessions, "create_auth_client", lambda: FakeClient(fake_auth))
     monkeypatch.setattr(auth_sessions, "store_auth_response", lambda flask_session, response: True)
@@ -89,7 +89,7 @@ def test_signin_stores_supabase_session_server_side(monkeypatch):
 
 
 def test_signin_error_is_generic_and_does_not_leak_provider_details(monkeypatch):
-    monkeypatch.setattr(index, "SUPABASE_AUTH_CONFIGURED", True)
+    monkeypatch.setattr(webapp_module, "SUPABASE_AUTH_CONFIGURED", True)
     fake_auth = FakeAuth(error=RuntimeError("secret internal provider response with token"))
     monkeypatch.setattr(auth_sessions, "create_auth_client", lambda: FakeClient(fake_auth))
 
@@ -105,7 +105,7 @@ def test_signin_error_is_generic_and_does_not_leak_provider_details(monkeypatch)
 
 
 def test_auth_rejects_short_password_before_calling_provider(monkeypatch):
-    monkeypatch.setattr(index, "SUPABASE_AUTH_CONFIGURED", True)
+    monkeypatch.setattr(webapp_module, "SUPABASE_AUTH_CONFIGURED", True)
     create_client = Mock()
     monkeypatch.setattr(auth_sessions, "create_auth_client", create_client)
 
@@ -121,7 +121,7 @@ def test_auth_rejects_short_password_before_calling_provider(monkeypatch):
 
 
 def test_auth_routes_reject_cross_site_posts(monkeypatch):
-    monkeypatch.setattr(index, "SUPABASE_AUTH_CONFIGURED", True)
+    monkeypatch.setattr(webapp_module, "SUPABASE_AUTH_CONFIGURED", True)
     create_client = Mock()
     monkeypatch.setattr(auth_sessions, "create_auth_client", create_client)
 
@@ -138,7 +138,7 @@ def test_auth_routes_reject_cross_site_posts(monkeypatch):
 def test_workspace_reads_and_writes_use_verified_supabase_user_id(monkeypatch):
     fake_client = FakeClient(FakeAuth())
     monkeypatch.setattr(
-        index,
+        webapp_module,
         "_supabase_auth_context",
         lambda: (fake_client, SimpleNamespace(id=USER_ID, email="student@example.com"), object()),
     )
