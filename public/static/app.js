@@ -378,7 +378,7 @@ async function loadServerState(){
     hostedMode:true, aiConfigured:false, aiAvailable:false, aiProvider:'Kilo AI Gateway',
     aiStatus:'The app server could not be reached. Refresh to retry.',
     aiModel:'kilo-auto/free', searchConfigured:false, githubConfigured:false,
-    supabaseConfigured:false, storageMode:'browser'
+    supabaseConfigured:false, supabaseAuthConfigured:false, storageMode:'browser'
   };
   me = results[1].status === 'fulfilled' ? results[1].value : { signedIn:false, githubConfigured:false };
 
@@ -388,32 +388,30 @@ async function loadServerState(){
   stateBackendAvailable=false;
   localStateMessage='';
 
-  if(serverConfig.supabaseConfigured || !serverConfig.hostedMode){
+  const userAuthCloud=!!(serverConfig.supabaseAuthConfigured && me.signedIn && me.authProvider==='supabase');
+  const cloudStorage=!!serverConfig.supabaseConfigured || userAuthCloud;
+  if(cloudStorage || !serverConfig.hostedMode){
     try{
       const remote=await apiGet('/api/state');
       stateBackendAvailable=true;
-      if(serverConfig.supabaseConfigured){
-        state=window.ZariyaWorkspaceSync.stamp(mergeWorkspaceState(remote,cached),remote);
-        if(JSON.stringify(state)!==JSON.stringify(remote)){
-          try{
-            await apiPost('/api/state',state);
-          }catch(syncError){
-            localStateMessage='Some local changes could not be synced yet. They are still saved in this browser.';
-          }
+      state=window.ZariyaWorkspaceSync.stamp(mergeWorkspaceState(remote,cached),remote);
+      if(JSON.stringify(state)!==JSON.stringify(remote)){
+        try{
+          await apiPost('/api/state',state);
+        }catch(syncError){
+          localStateMessage='Some local changes could not be synced yet. They are still saved in this browser.';
         }
-      }else{
-        state=remote;
       }
       LS.set(stateKey,state);
     }catch(error){
       state=cached;
       stateBackendAvailable=false;
-      localStateMessage=serverConfig.supabaseConfigured
+      localStateMessage=cloudStorage
         ? 'Cloud sync is unavailable. Your changes are being kept in this browser.'
         : 'The local server could not be reached. Your changes are being kept in this browser.';
     }
   }else{
-    localStateMessage='Saved in this browser only. Connect Supabase to sync across devices.';
+    localStateMessage='Saved in this browser only. Sign in to sync across devices.';
   }
 
   sessions = Array.isArray(state.sessions) ? state.sessions : [];
@@ -422,7 +420,8 @@ async function loadServerState(){
   decks.forEach(d=> (Array.isArray(d.cards) ? d.cards : []).forEach(migrateCardForSpacedRepetition));
   currentSessionId = sessions.length ? sessions[0].id : null;
 
-  const storageCopy = serverConfig.supabaseConfigured
+  const userAuthCloud=!!(serverConfig.supabaseAuthConfigured && me.signedIn && me.authProvider==='supabase');
+  const storageCopy = (serverConfig.supabaseConfigured || userAuthCloud)
     ? 'Your workspace syncs securely across devices.'
     : (serverConfig.hostedMode
       ? 'Your workspace is saved in this browser only.'
@@ -433,19 +432,19 @@ async function loadServerState(){
   });
   const backupDescription=document.getElementById('workspaceBackupDescription');
   if(backupDescription){
-    backupDescription.textContent=serverConfig.supabaseConfigured
-      ? 'Chats, notes and flashcards sync to your account. You can still export a private backup at any time.'
+    backupDescription.textContent=(serverConfig.supabaseConfigured || userAuthCloud)
+      ? 'Chats, notes and flashcards sync securely to your signed-in account. You can still export a private backup at any time.'
       : 'Chats, notes and flashcards are saved in this browser only. Export a backup before clearing browser data or moving devices.';
   }
   const githubStorageNote=document.getElementById('githubStorageNote');
   if(githubStorageNote){
-    githubStorageNote.textContent=serverConfig.supabaseConfigured
-      ? 'With Supabase connected, your workspace syncs across devices for this GitHub account.'
-      : 'GitHub sign-in identifies your profile. Without Supabase, chats, notes and flashcards remain on this device.';
+    githubStorageNote.textContent=(serverConfig.supabaseConfigured || userAuthCloud)
+      ? 'Your signed-in account uses row-level security so only you can access your workspace.'
+      : 'Guest workspaces are stored locally in this browser until you sign in.';
   }
   updateStorageStatus((stateBackendAvailable || !serverConfig.hostedMode) && !localStateMessage,
-    localStateMessage || (serverConfig.supabaseConfigured && stateBackendAvailable
-      ? 'Connected to Supabase. Workspace data is synced.'
+    localStateMessage || (cloudStorage && stateBackendAvailable
+      ? 'Connected securely. Workspace data is synced to your account.'
       : (serverConfig.hostedMode
         ? 'Saved in this browser only.'
         : 'Saved by this local development server.')));
@@ -467,13 +466,14 @@ function saveServerState(){
   decks=snapshot.decks;
   const saved=LS.set(stateKey,snapshot);
 
-  if(serverConfig.supabaseConfigured){
+  const userAuthCloud=!!(serverConfig.supabaseAuthConfigured && me.signedIn && me.authProvider==='supabase');
+  if(serverConfig.supabaseConfigured || userAuthCloud){
     saveTimer=setTimeout(async()=>{
       try{
         await saveCloudSnapshot(snapshot);
         stateBackendAvailable=true;
         localStateMessage='';
-        updateStorageStatus(true,'Synced securely with Supabase.');
+        updateStorageStatus(true,'Synced securely to your account.');
       }catch(error){
         stateBackendAvailable=false;
         localStateMessage='Cloud sync failed. Your changes are saved in this browser; retry after reconnecting.';
@@ -482,7 +482,7 @@ function saveServerState(){
           : 'Cloud sync failed and this browser could not save more data. Export a backup.');
       }
     },350);
-    if(!saved) updateStorageStatus(false,'Saving to Supabase. Browser storage is unavailable.');
+    if(!saved) updateStorageStatus(false,'Saving securely. Browser storage is unavailable.');
     return true;
   }
 
@@ -583,45 +583,54 @@ function renderAccountUI(){
   const signedOutRow=document.getElementById('accountSignedOutRow');
   const signedInRow=document.getElementById('accountSignedInRow');
   const configNote=document.getElementById('githubConfigNote');
+  const emailForm=document.getElementById('emailAuthForm');
+  const authTabs=document.querySelector('.auth-mode-tabs');
+  const githubButton=document.getElementById('githubSignInBtn');
+  const githubDivider=document.querySelector('.auth-divider');
+  const setupPanel=document.getElementById('githubSetupPanel');
 
   if(me.signedIn){
-    sbName.textContent=me.name || me.login;
-    sbAvatar.innerHTML='<img src="'+escapeHtml(me.avatar||'/static/logo.png')+'" alt="">';
-    signedOutRow.style.display='none';
+    sbName.textContent=me.name || me.login || 'Account';
+    sbAvatar.innerHTML=me.avatar
+      ? '<img src="'+escapeHtml(me.avatar)+'" alt="">'
+      : '<span aria-hidden="true">Z</span>';
+    signedOutRow.hidden=true;
     signedInRow.style.display='flex';
-    document.getElementById('accountAvatar').src=me.avatar || '/static/logo.png';
-    document.getElementById('accountName').textContent=me.name || me.login;
-    document.getElementById('accountBio').textContent=me.bio || '';
+    const avatar=document.getElementById('accountAvatar');
+    if(avatar) avatar.src=me.avatar || '/static/logo.png';
+    document.getElementById('accountName').textContent=me.name || me.login || me.email || '';
+    document.getElementById('accountBio').textContent=me.authProvider==='supabase'
+      ? 'Signed in with email · Synced workspace'
+      : (me.bio || 'Signed in with GitHub');
   }else{
-    sbName.textContent=serverConfig.githubConfigured ? 'Sign in with GitHub' : 'Guest workspace';
-    sbAvatar.textContent='Z';
-    signedOutRow.style.display='flex';
+    sbName.textContent='Guest workspace';
+    sbAvatar.innerHTML='<span aria-hidden="true">Z</span>';
+    signedOutRow.hidden=false;
     signedInRow.style.display='none';
   }
-  const setupPanel=document.getElementById('githubSetupPanel');
-  const signInButton=document.getElementById('githubSignInBtn');
-  if(serverConfig.githubConfigured){
-    configNote.textContent='Connect your GitHub profile. Your workspace data remains saved on this device.';
-    signInButton.disabled=false;
-    signInButton.removeAttribute('aria-disabled');
-    signInButton.querySelector('span').textContent='Sign in with GitHub';
-    if(setupPanel) setupPanel.hidden=true;
-  }else{
-    configNote.textContent='GitHub sign-in is not configured on this deployment. Everything else works without an account.';
-    signInButton.disabled=true;
-    signInButton.setAttribute('aria-disabled','true');
-    signInButton.querySelector('span').textContent='Sign-in unavailable';
-    if(setupPanel) setupPanel.hidden=false;
+
+  const emailEnabled=!!serverConfig.supabaseAuthConfigured;
+  if(emailForm) emailForm.hidden=!emailEnabled;
+  if(authTabs) authTabs.hidden=!emailEnabled;
+  if(configNote) configNote.textContent=emailEnabled
+    ? 'Sign in or create an account to sync your workspace across devices.'
+    : 'Email sign-in is not configured. Your guest workspace remains available in this browser.';
+  if(githubButton){
+    githubButton.hidden=!serverConfig.githubConfigured;
+    githubButton.disabled=!serverConfig.githubConfigured;
+    githubButton.setAttribute('aria-disabled',String(!serverConfig.githubConfigured));
   }
+  if(githubDivider) githubDivider.hidden=!serverConfig.githubConfigured;
+  if(setupPanel) setupPanel.hidden=true;
 
   const modelStatus=document.getElementById('aiModelStatusText');
   if(modelStatus) modelStatus.textContent=serverConfig.aiStatus || 'Checking hosted model…';
   const modelName=document.getElementById('aiModelName');
-  if(modelName) modelName.textContent='Hosted model';
+  if(modelName) modelName.textContent='Custom Zariya Model';
   const providerNote=document.getElementById('aiProviderNote');
   if(providerNote) providerNote.textContent=serverConfig.aiAvailable
-    ? 'Connected to the hosted model. Shared limits apply.'
-    : 'The hosted model is not responding right now. Zariya reports the error instead of inventing an answer.';
+    ? 'Custom Zariya Model is ready. Hosted inference uses shared service limits.'
+    : 'Custom Zariya Model is temporarily unavailable. Zariya reports the issue rather than inventing an answer.';
   const statusMark=document.getElementById('aiStatusMark');
   if(statusMark) statusMark.style.background=serverConfig.aiAvailable ? 'var(--success)' : 'var(--muted)';
 
@@ -629,6 +638,11 @@ function renderAccountUI(){
   if(searchStatus) searchStatus.textContent=serverConfig.searchConfigured ? 'Available' : 'Not configured';
   const searchTool=document.querySelector('[data-tool="websearch"]');
   if(searchTool) searchTool.hidden=!serverConfig.searchConfigured;
+
+  const cloudStorage=!!serverConfig.supabaseConfigured ||
+    (!!serverConfig.supabaseAuthConfigured && me.signedIn && me.authProvider==='supabase');
+  const statusCopy=document.getElementById('storageCaption');
+  if(statusCopy) statusCopy.textContent=cloudStorage?'Synced to cloud':'Saved on this device';
   updateOnboardingBanner();
 }
   const ONBOARDING_DISMISS_KEY = 'zariya_onboarding_dismissed';
@@ -661,6 +675,171 @@ document.getElementById('copyGithubCallbackBtn').addEventListener('click', async
     status.hidden=false;
   }
 });
+
+
+const modelPickerButton=document.getElementById('modelPickerButton');
+const modelPickerMenu=document.getElementById('modelPickerMenu');
+if(modelPickerButton && modelPickerMenu){
+  modelPickerButton.addEventListener('click',()=>{
+    const open=modelPickerMenu.hidden;
+    modelPickerMenu.hidden=!open;
+    modelPickerButton.setAttribute('aria-expanded',String(open));
+  });
+  modelPickerMenu.querySelectorAll('[data-model]').forEach(option=>{
+    option.addEventListener('click',()=>{
+      modelPickerMenu.querySelectorAll('[data-model]').forEach(item=>{
+        item.classList.toggle('selected',item===option);
+        item.setAttribute('aria-selected',String(item===option));
+      });
+      modelPickerMenu.hidden=true;
+      modelPickerButton.setAttribute('aria-expanded','false');
+    });
+  });
+  document.addEventListener('click',event=>{
+    if(!event.target.closest('#modelPicker')){
+      modelPickerMenu.hidden=true;
+      modelPickerButton.setAttribute('aria-expanded','false');
+    }
+  });
+  document.addEventListener('keydown',event=>{
+    if(event.key==='Escape'){
+      modelPickerMenu.hidden=true;
+      modelPickerButton.setAttribute('aria-expanded','false');
+    }
+  });
+}
+
+document.querySelectorAll('[data-settings-target]').forEach(button=>{
+  button.addEventListener('click',()=>{
+    const target=document.getElementById(button.dataset.settingsTarget);
+    if(!target) return;
+    document.querySelectorAll('.settings-nav-item').forEach(item=>
+      item.classList.toggle('active',item===button)
+    );
+    target.scrollIntoView({behavior:window.matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth',block:'start'});
+  });
+});
+
+let authMode='signin';
+let pendingAuthMessage='';
+
+function setAuthMode(mode){
+  authMode=mode==='signup'?'signup':'signin';
+  const signIn=document.getElementById('authModeSignIn');
+  const signUp=document.getElementById('authModeSignUp');
+  const confirmWrap=document.getElementById('authConfirmWrap');
+  const confirmInput=document.getElementById('authPasswordConfirm');
+  const password=document.getElementById('authPassword');
+  const submitLabel=document.getElementById('emailAuthSubmitLabel');
+  const hint=document.getElementById('authFormHint');
+  signIn.classList.toggle('active',authMode==='signin');
+  signUp.classList.toggle('active',authMode==='signup');
+  signIn.setAttribute('aria-selected',String(authMode==='signin'));
+  signUp.setAttribute('aria-selected',String(authMode==='signup'));
+  confirmWrap.hidden=authMode!=='signup';
+  confirmInput.required=authMode==='signup';
+  password.autocomplete=authMode==='signup'?'new-password':'current-password';
+  submitLabel.textContent=authMode==='signup'?'Create account':'Continue with email';
+  hint.textContent=authMode==='signup'
+    ? 'Use at least 8 characters. We will send a confirmation email.'
+    : 'Your account is protected by Supabase Auth.';
+}
+document.querySelectorAll('[data-auth-mode]').forEach(button=>{
+  button.addEventListener('click',()=>setAuthMode(button.dataset.authMode));
+});
+setAuthMode('signin');
+
+function showAccountAuthMessage(message,isError=false){
+  const status=document.getElementById('accountAuthStatus');
+  if(!status) return;
+  status.textContent=message;
+  status.hidden=!message;
+  status.classList.toggle('is-error',!!isError);
+}
+document.getElementById('emailAuthForm').addEventListener('submit',async event=>{
+  event.preventDefault();
+  if(!serverConfig.supabaseAuthConfigured){
+    showAccountAuthMessage('Email sign-in is not configured on this deployment.',true);
+    return;
+  }
+  const email=document.getElementById('authEmail').value.trim();
+  const password=document.getElementById('authPassword').value;
+  const confirmation=document.getElementById('authPasswordConfirm').value;
+  if(!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){
+    showAccountAuthMessage('Enter a valid email address.',true);
+    return;
+  }
+  if(password.length<8 || password.length>128){
+    showAccountAuthMessage('Your password must be between 8 and 128 characters.',true);
+    return;
+  }
+  if(authMode==='signup' && password!==confirmation){
+    showAccountAuthMessage('The passwords do not match.',true);
+    return;
+  }
+  const button=document.getElementById('emailAuthSubmit');
+  button.disabled=true;
+  showAccountAuthMessage(authMode==='signup'?'Creating your account…':'Signing in…');
+  try{
+    const response=await fetch(authMode==='signup'?'/api/auth/signup':'/api/auth/login',{
+      method:'POST',
+      credentials:'same-origin',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({email,password})
+    });
+    const result=await response.json().catch(()=>({}));
+    if(!response.ok) throw new Error(result.error||'Authentication could not be completed.');
+    document.getElementById('authPassword').value='';
+    document.getElementById('authPasswordConfirm').value='';
+    if(authMode==='signup' && result.confirmationRequired){
+      setAuthMode('signin');
+      showAccountAuthMessage(result.message||'Check your inbox for a confirmation email. Then sign in here.');
+      return;
+    }
+    me=await apiGet('/api/me');
+    await loadServerState();
+    renderAccountUI();
+    renderSessionList();
+    renderChat();
+    showAccountAuthMessage(result.message||'You are signed in.');
+  }catch(error){
+    showAccountAuthMessage(error.message||'Authentication could not be completed. Try again.',true);
+  }finally{
+    button.disabled=false;
+  }
+});
+
+document.getElementById('githubSignInBtn').addEventListener('click',()=>{
+  if(serverConfig.githubConfigured) window.location.assign('/auth/github/login');
+});
+
+async function completeSupabaseAuthRedirect(){
+  const raw=(window.location.hash||'').replace(/^#/,'');
+  if(!raw) return;
+  const params=new URLSearchParams(raw);
+  const accessToken=params.get('access_token');
+  const refreshToken=params.get('refresh_token');
+  const authError=params.get('error_description') || params.get('error');
+  if(authError){
+    pendingAuthMessage='Email confirmation failed. Request a new confirmation email and try again.';
+    return;
+  }
+  if(!accessToken || !refreshToken) return;
+  const type=params.get('type')||'signup';
+  if(!['signup','recovery','magiclink','invite','email_change'].includes(type)) return;
+  const response=await fetch('/api/auth/session',{
+    method:'POST',
+    credentials:'same-origin',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({access_token:accessToken,refresh_token:refreshToken})
+  });
+  const result=await response.json().catch(()=>({}));
+  if(!response.ok) throw new Error(result.error||'Email confirmation could not be completed.');
+  pendingAuthMessage='Email verified. You are signed in to Zariya.';
+  const cleanPath=window.location.pathname==='/auth/confirm'?'/':window.location.pathname;
+  window.history.replaceState({},'',cleanPath);
+}
+
 document.getElementById('githubSignOutBtn').addEventListener('click', async ()=>{
   const button=document.getElementById('githubSignOutBtn');
   button.disabled=true;
@@ -678,14 +857,7 @@ document.getElementById('githubSignOutBtn').addEventListener('click', async ()=>
     button.disabled=false;
   }
 });
-const authError=new URLSearchParams(window.location.search).get('authError');
-if(authError){
-  const status=document.getElementById('accountAuthStatus');
-  status.textContent=authError;
-  status.hidden=false;
-  window.history.replaceState({},'',window.location.pathname+window.location.hash);
-  document.getElementById('githubSetupPanel').hidden=!serverConfig.githubConfigured;
-}
+
 
 /* ============ VIEW SWITCHING ============ */
 let currentViewName = 'chat';
@@ -2356,6 +2528,7 @@ function downloadFile(filename, content, type='text/plain;charset=utf-8'){
 /* ============ INIT ============ */
 (async function init(){
   try{
+    await completeSupabaseAuthRedirect();
     await loadServerState();
     applyUiPrefs();
     applyGenPrefs();
@@ -2365,6 +2538,17 @@ function downloadFile(filename, content, type='text/plain;charset=utf-8'){
     renderChat();
     const initialView=(window.location.hash||'').replace('#','');
     if(initialView && initialView!=='chat') switchView(initialView, {fromHistory:true});
+    const query=new URLSearchParams(window.location.search);
+    const authMessage=pendingAuthMessage ||
+      query.get('authSuccess') ||
+      query.get('authError');
+    if(authMessage){
+      const status=document.getElementById('accountAuthStatus');
+      status.textContent=authMessage;
+      status.hidden=false;
+      const cleanUrl=window.location.pathname+window.location.hash;
+      window.history.replaceState({},'',cleanUrl);
+    }
   }catch(error){
     console.error('Zariya could not finish loading the workspace.',error);
     renderSessionList();
