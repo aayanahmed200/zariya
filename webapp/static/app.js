@@ -566,18 +566,15 @@ function updateCreativityLabel(pct){
 function updateStatusPill(){
   const dot=document.getElementById('statusDot');
   const text=document.getElementById('statusText');
-  if(serverConfig.aiAvailable){
-    dot.classList.remove('off');
-    text.textContent='Free AI';
-  }else{
-    dot.classList.add('off');
-    text.textContent='AI unavailable';
+  if(dot && text){
+    dot.classList.toggle('off', !serverConfig.aiAvailable);
+    text.textContent=serverConfig.aiAvailable ? 'Ready' : 'Unavailable';
   }
   const hint=document.getElementById('composerHint');
   if(hint && !isGenerating){
     hint.textContent=serverConfig.aiAvailable
-      ? 'Free hosted AI · no install, account, or personal API key. Shared usage limits apply.'
-      : 'Free AI is temporarily unavailable. Your saved chats are still here; try again shortly.';
+      ? 'AI can make mistakes. Check important information.'
+      : 'The assistant is unavailable right now. Your saved chats are still here.';
   }
 }
 function renderAccountUI(){
@@ -610,7 +607,7 @@ function renderAccountUI(){
     signInButton.querySelector('span').textContent='Sign in with GitHub';
     if(setupPanel) setupPanel.hidden=true;
   }else{
-    configNote.textContent='GitHub sign-in is not configured on this deployment. Everything else works without an account; the setup steps are below.';
+    configNote.textContent='GitHub sign-in is not configured on this deployment. Everything else works without an account.';
     signInButton.disabled=true;
     signInButton.setAttribute('aria-disabled','true');
     signInButton.querySelector('span').textContent='Sign-in unavailable';
@@ -620,11 +617,11 @@ function renderAccountUI(){
   const modelStatus=document.getElementById('aiModelStatusText');
   if(modelStatus) modelStatus.textContent=serverConfig.aiStatus || 'Checking hosted model…';
   const modelName=document.getElementById('aiModelName');
-  if(modelName) modelName.textContent=serverConfig.aiModel || 'Hosted open model';
+  if(modelName) modelName.textContent='Hosted model';
   const providerNote=document.getElementById('aiProviderNote');
   if(providerNote) providerNote.textContent=serverConfig.aiAvailable
-    ? 'Connected to Kilo’s anonymous free-model pool. No account or personal API key is needed; shared limits apply.'
-    : 'The free model pool is not responding right now. Zariya will show a clear service error rather than invent an AI answer.';
+    ? 'Connected to the hosted model. Shared limits apply.'
+    : 'The hosted model is not responding right now. Zariya reports the error instead of inventing an answer.';
   const statusMark=document.getElementById('aiStatusMark');
   if(statusMark) statusMark.style.background=serverConfig.aiAvailable ? 'var(--success)' : 'var(--muted)';
 
@@ -691,7 +688,9 @@ if(authError){
 }
 
 /* ============ VIEW SWITCHING ============ */
-function switchView(name){
+let currentViewName = 'chat';
+function switchView(name, opts){
+  if(!{chat:1,notepad:1,flashcards:1,settings:1}[name]) name = 'chat';
   document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
   document.getElementById('view-'+name).classList.add('active');
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.toggle('active', n.dataset.view===name));
@@ -702,8 +701,18 @@ function switchView(name){
   if(name==='notepad') renderNotesList();
   if(name==='flashcards') renderDeckGrid();
   if(name==='settings') renderAccountUI();
+  // Keep the URL in step so Back, Forward, refresh and shared links reopen
+  // the same view instead of always dropping the visitor into chat.
+  if(!(opts && opts.fromHistory) && name !== currentViewName){
+    try{ window.history.pushState({view:name}, '', '#'+name); }catch(error){}
+  }
+  currentViewName = name;
 }
 document.querySelectorAll('[data-view]').forEach(n=> n.addEventListener('click', ()=>switchView(n.dataset.view)));
+window.addEventListener('popstate', ()=>{
+  const name=(window.location.hash||'').replace('#','');
+  switchView(name || 'chat', {fromHistory:true});
+});
 
 function openSidebarMobile(){
   document.getElementById('sidebar').classList.add('open');
@@ -755,7 +764,7 @@ function sessionGroupLabel(timestamp){
 function renderSessionList(){
   const wrap = document.getElementById('sessList');
   const q = document.getElementById('sessSearch').value.trim().toLowerCase();
-  wrap.innerHTML = '<div class="sb-sessions-label">Recents</div>';
+  wrap.innerHTML = '<div class="sb-sessions-label">Chats</div>';
   const filtered = sessions
     .filter(s=> !q || s.title.toLowerCase().includes(q) || s.messages.some(m=>m.content.toLowerCase().includes(q)))
     .slice()
@@ -876,7 +885,7 @@ function renderChat(){
     scroll.classList.add('empty-mode'); inner.classList.add('empty-mode');
     const hero = document.createElement('div');
     hero.className = 'empty-hero';
-    hero.innerHTML = '<div class="hero-kicker">URDU · ENGLISH · MORE</div><h1>What would you like to work on?</h1><div class="urdu-line" lang="ur" dir="rtl">آئیے کچھ نیا سیکھتے ہیں</div><p>Ask a question, explore an idea, or practise something you are learning.</p>';
+    hero.innerHTML = '<h1>What can I help with?</h1><div class="urdu-line" lang="ur" dir="rtl">آئیے کچھ نیا سیکھتے ہیں</div><p>Ask anything in English or Urdu. Chats, notes and flashcards stay together.</p>';
     const suggestions = document.createElement('div');
     suggestions.className = 'home-suggestions';
     ['Explain a difficult topic in simple words','Translate a sentence into Urdu','Help me revise for an exam','Summarise these notes'].forEach(label=>{
@@ -1145,9 +1154,9 @@ async function respondTo(session){
     if(reply.trim()){
       reply += '\n\n---\n\n*The connection stopped before the full answer arrived. This is the partial response received so far.*';
     }else{
-      reply='Free AI is temporarily unavailable: '+(error.message || 'Please try again shortly.');
+      reply='The assistant is unavailable right now. '+(error.message || 'Please try again shortly.');
       const hint=document.getElementById('composerHint');
-      if(hint) hint.textContent='Free AI is busy or unavailable. Your message is saved; try again shortly.';
+      if(hint) hint.textContent='The assistant is busy right now. Your message is saved; try again shortly.';
     }
   }
   if(generation.stopped) return;
@@ -2265,6 +2274,8 @@ function downloadFile(filename, content, type='text/plain;charset=utf-8'){
   renderAccountUI();
   renderSessionList();
   renderChat();
+  const initialView=(window.location.hash||'').replace('#','');
+  if(initialView && initialView!=='chat') switchView(initialView, {fromHistory:true});
 })();
 
 

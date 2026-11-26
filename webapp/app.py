@@ -25,6 +25,7 @@ from flask import Flask, jsonify, redirect, request, session, url_for, render_te
 import kb_engine
 import hosted_model
 import supabase_store
+import security
 
 load_dotenv()
 
@@ -51,6 +52,10 @@ HOSTED_MODE = bool(os.environ.get("VERCEL"))
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 app.config["SESSION_COOKIE_SECURE"] = HOSTED_MODE or not DEBUG_MODE
 app.config["PERMANENT_SESSION_LIFETIME"] = 60 * 60 * 24 * 7  # 7 days
+
+# Request size ceiling, security headers, same-origin CORS policy and sanitised
+# error responses are installed in one place (see webapp/security.py).
+security.install(app)
 
 GOOGLE_API_KEY = os.environ.get("GOOGLE_API_KEY", "")
 GOOGLE_CX = os.environ.get("GOOGLE_CX", "")
@@ -236,6 +241,7 @@ def _generation_params(body):
 # Auth: real GitHub OAuth (authorization-code flow), client secret stays server-side
 # ---------------------------------------------------------------------------
 @app.route("/auth/github/login")
+@security.rate_limit("github_login", 10, 60)
 def github_login():
     if not GITHUB_OAUTH_CONFIGURED:
         return redirect("/?" + urlencode({
@@ -345,28 +351,14 @@ def _gateway_oidc_token() -> str | None:
 # Gateway authentication is server-side Vercel OIDC; no visitor key is required.
 # ---------------------------------------------------------------------------
 
-_TRANSCRIPTION_REQUESTS: dict[str, list[float]] = {}
 MAX_TRANSCRIPTION_SECONDS = 60
 MAX_TRANSCRIPTION_B64_CHARS = 3_400_000
 MAX_TRANSCRIPTION_BYTES = 2_500_000
 
 
-def _transcription_rate_limited(client_ip: str) -> bool:
-    """Small per-function guard against accidental rapid repeat recordings."""
-    now = time.monotonic()
-    recent = [stamp for stamp in _TRANSCRIPTION_REQUESTS.get(client_ip, []) if now - stamp < 60]
-    if len(recent) >= 8:
-        _TRANSCRIPTION_REQUESTS[client_ip] = recent
-        return True
-    recent.append(now)
-    if len(_TRANSCRIPTION_REQUESTS) > 512:
-        oldest = min(_TRANSCRIPTION_REQUESTS, key=lambda key: max(_TRANSCRIPTION_REQUESTS[key] or [0]))
-        _TRANSCRIPTION_REQUESTS.pop(oldest, None)
-    _TRANSCRIPTION_REQUESTS[client_ip] = recent
-    return False
-
-
 @app.route("/api/transcribe", methods=["POST"])
+@security.require_same_origin
+@security.rate_limit('transcribe', 8, 60)
 def transcribe():
     body = request.get_json(silent=True)
     if not isinstance(body, dict):
@@ -401,10 +393,6 @@ def transcribe():
     except (wave.Error, EOFError, OSError):
         return jsonify({"error": "The audio recording was not a valid WAV file. Please record again."}), 400
 
-    client_ip = request.headers.get("x-forwarded-for", request.remote_addr or "unknown").split(",")[0].strip()
-    if _transcription_rate_limited(client_ip):
-        return jsonify({"error": "Too many voice recordings in a short time. Please try again in a minute."}), 429
-
     try:
         result = hosted_model.transcribe_audio(
             audio_bytes,
@@ -424,6 +412,8 @@ def transcribe():
 
 
 @app.route("/api/chat", methods=["POST"])
+@security.require_same_origin
+@security.rate_limit('chat', 30, 60)
 def chat():
     body = request.get_json(silent=True) or {}
     messages, err, err_status = _normalize_messages(body.get("messages"))
@@ -458,6 +448,8 @@ def _sse(data):
 
 
 @app.route("/api/chat/stream", methods=["POST"])
+@security.require_same_origin
+@security.rate_limit('chat_stream', 30, 60)
 def chat_stream():
     """Stream hosted model output or send a clear provider error to the client."""
     body = request.get_json(silent=True) or {}
@@ -506,6 +498,8 @@ def chat_stream():
 
 
 @app.route("/api/feedback", methods=["POST"])
+@security.require_same_origin
+@security.rate_limit('feedback', 20, 60)
 def feedback():
     body = request.get_json(silent=True) or {}
     question = body.get("question", "")
@@ -518,6 +512,8 @@ def feedback():
 # Web search: Google Custom Search (server-side key)
 # ---------------------------------------------------------------------------
 @app.route("/api/search", methods=["POST"])
+@security.require_same_origin
+@security.rate_limit('search', 20, 60)
 def web_search():
     body = request.get_json(silent=True) or {}
     query = body.get("query", "").strip()
@@ -573,6 +569,8 @@ def get_state():
 
 
 @app.route("/api/state", methods=["POST"])
+@security.require_same_origin
+@security.rate_limit('state_save', 60, 60)
 def save_state():
     body = request.get_json(silent=True)
     state, error, status = _normalize_workspace_state(body)
@@ -644,6 +642,8 @@ def _parse_flashcard_json(raw: str) -> list[dict]:
 
 
 @app.route("/api/tools/<name>", methods=["POST"])
+@security.require_same_origin
+@security.rate_limit('tools', 30, 60)
 def run_tool(name):
     body = request.get_json(silent=True) or {}
     raw_messages = body.get("messages", [])

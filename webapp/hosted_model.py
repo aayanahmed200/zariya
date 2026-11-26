@@ -46,7 +46,7 @@ def connection_status(oidc_token: str | None = None) -> dict:
     return {
         "configured": True,
         "available": True,
-        "status": "Free AI enabled · shared anonymous model pool",
+        "status": "Connected",
         "model": KILO_MODEL,
         "provider": "Kilo AI Gateway",
     }

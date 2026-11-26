@@ -531,9 +531,9 @@ def test_deleting_or_restoring_notes_selects_a_valid_note():
 def test_voice_settings_explain_hosted_transcription_and_privacy():
     html = (ROOT / "webapp" / "templates" / "index.html").read_text(encoding="utf-8")
     assert "English and Urdu voice transcription" in html
-    assert "Zariya does not save microphone audio" in html
-    assert "Vercel AI Gateway and Microsoft Azure" in html
-    assert "about $0.10 per audio hour" in html
+    assert "not stored by Zariya" in html
+    assert "hosted speech service" in html
+    assert "not stored by Zariya" in html
     assert "Ollama replies" not in html
     assert "sent with your messages to Ollama" not in html
     assert "Hosted AI" in html
@@ -609,7 +609,7 @@ def test_flashcard_empty_state_supports_manual_deck_creation():
 
 def test_hosted_ai_copy_has_no_leftover_ollama_instructions():
     html = (ROOT / "webapp" / "templates" / "index.html").read_text(encoding="utf-8")
-    assert "Checking hosted AI" in html
+    assert "Hosted AI" in html
     assert "works with Ollama" not in html
     assert "Checking Ollama" not in html
 
@@ -723,7 +723,7 @@ def test_urdu_uses_readable_noto_sans_arabic_and_transcription_cost_is_disclosed
     css = (ROOT / "webapp" / "static" / "style.css").read_text(encoding="utf-8")
     assert "Noto+Sans+Arabic" in html
     assert "English and Urdu voice transcription" in html
-    assert "about $0.10 per audio hour" in html
+    assert "not stored by Zariya" in html
     assert "Noto Sans Arabic" in css
     assert "line-height:1.85" in css
     assert "Noto Nastaliq Urdu" not in css
