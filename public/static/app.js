@@ -422,14 +422,15 @@ async function loadServerState(){
   decks.forEach(d=> (Array.isArray(d.cards) ? d.cards : []).forEach(migrateCardForSpacedRepetition));
   currentSessionId = sessions.length ? sessions[0].id : null;
 
-  const storageDescription=document.getElementById('storageDescription');
-  if(storageDescription){
-    storageDescription.textContent=serverConfig.supabaseConfigured
-      ? 'Your workspace syncs securely across devices.'
-      : (serverConfig.hostedMode
-        ? 'Your workspace is saved in this browser only.'
-        : 'Your workspace is saved by this local development server.');
-  }
+  const storageCopy = serverConfig.supabaseConfigured
+    ? 'Your workspace syncs securely across devices.'
+    : (serverConfig.hostedMode
+      ? 'Your workspace is saved in this browser only.'
+      : 'Your workspace is saved by this local development server.');
+  ['storageDescription','storageDescriptionSettings'].forEach(id=>{
+    const el = document.getElementById(id);
+    if(el) el.textContent = storageCopy;
+  });
   const backupDescription=document.getElementById('workspaceBackupDescription');
   if(backupDescription){
     backupDescription.textContent=serverConfig.supabaseConfigured
@@ -1851,6 +1852,7 @@ function renderDeckGrid(){
   document.getElementById('studyArea').style.display='none';
   document.getElementById('quizArea').style.display='none';
   const grid = document.getElementById('deckGrid'); grid.style.display='grid'; grid.innerHTML='';
+  document.getElementById('deckTagFilterRow').style.display='';
     decks.forEach(d=>{ if(!d.tags) d.tags = []; });
     renderDeckTagFilterRow();
     const visibleDecks = activeDeckTagFilter ? decks.filter(d=>(d.tags||[]).includes(activeDeckTagFilter)) : decks;
@@ -1971,6 +1973,7 @@ function openDeck(id){
   reviewingAllCards = false;
   studyQueue = cardsDue(deck.cards); studyIndex=0; studyFlipped=false;
   document.getElementById('deckGrid').style.display='none';
+  document.getElementById('deckTagFilterRow').style.display='none';
   document.getElementById('studyArea').style.display='block';
   renderStudy();
 }
@@ -1990,7 +1993,7 @@ function renderStudy(){
     saveServerState(); return;
   }
   const c = studyQueue[studyIndex];
-  area.innerHTML = '<div class="study-progress-text">Card '+(studyIndex+1)+' of '+studyQueue.length+' -- '+escapeHtml(deck.name)+'</div>'+
+  area.innerHTML = '<div class="study-topbar"><button class="study-back" type="button" id="studyBack">Back to decks</button><span class="study-progress-text">Card '+(studyIndex+1)+' of '+studyQueue.length+' · '+escapeHtml(deck.name)+'</span></div>'+
     '<div class="card-flip-zone"><div class="flip-card '+(studyFlipped?'flipped':'')+'" id="flipCard">'+
     '<div class="flip-face front '+(isPureUrdu(c.front)?'is-urdu urdu':'')+'" dir="auto">'+wrapUrduRuns(escapeHtml(c.front))+'</div>'+
     '<div class="flip-face back '+(isPureUrdu(c.back)?'is-urdu urdu':'')+'" dir="auto">'+wrapUrduRuns(escapeHtml(c.back))+'</div></div></div>'+
@@ -1998,6 +2001,7 @@ function renderStudy(){
       ? '<div class="study-controls"><button class="sc-btn again" data-q="0">Again</button><button class="sc-btn" data-q="3">Hard</button><button class="sc-btn known" data-q="4">Good</button><button class="sc-btn known" data-q="5">Easy</button></div>'
       : '<div class="study-controls"><button class="sc-btn" id="scFlip">Flip to grade</button></div>');
   document.getElementById('flipCard').addEventListener('click', ()=>{ studyFlipped=!studyFlipped; renderStudy(); });
+  document.getElementById('studyBack').addEventListener('click', renderDeckGrid);
   if(!studyFlipped){
     document.getElementById('scFlip').addEventListener('click', (e)=>{ e.stopPropagation(); studyFlipped=true; renderStudy(); });
   } else {
@@ -2126,6 +2130,7 @@ function startQuiz(deckId){
   const deck = decks.find(d=>d.id===deckId); if(!deck || deck.cards.length<2) return;
   quizQueue = buildQuizQuestions(deck); quizIndex=0; quizScore=0; quizAnswered=false;
   document.getElementById('deckGrid').style.display='none';
+  document.getElementById('deckTagFilterRow').style.display='none';
   document.getElementById('quizArea').style.display='block';
   renderQuiz();
 }
@@ -2145,12 +2150,13 @@ function renderQuiz(){
   let optionsHtml = q.options.map((opt,i)=>
     '<button class="quiz-option'+(isPureUrdu(opt)?' is-urdu urdu':'')+'" data-i="'+i+'" data-answer-index="'+i+'" aria-pressed="false" dir="auto">'+wrapUrduRuns(escapeHtml(opt))+'</button>'
   ).join('');
-  area.innerHTML = '<div class="study-progress-text">Question '+(quizIndex+1)+' of '+quizQueue.length+' -- '+escapeHtml(deck.name)+' · Score: '+quizScore+'</div>'+
+  area.innerHTML = '<div class="study-topbar"><button class="study-back" type="button" id="quizBack">Back to decks</button><span class="study-progress-text">Question '+(quizIndex+1)+' of '+quizQueue.length+' · '+escapeHtml(deck.name)+' · Score: '+quizScore+'</span></div>'+
     '<div class="quiz-question'+(isPureUrdu(q.front)?' is-urdu urdu':'')+'" dir="auto">'+wrapUrduRuns(escapeHtml(q.front))+'</div>'+
     '<div class="quiz-options">'+optionsHtml+'</div>'+
     '<div class="quiz-feedback" id="quizFeedback" role="status" aria-live="polite"></div>'+
     '<div class="study-controls" id="quizNextRow" style="display:none;"><button class="btn primary" id="quizNext">Next question</button></div>';
   quizAnswered = false;
+  document.getElementById('quizBack').addEventListener('click', renderDeckGrid);
   area.querySelectorAll('.quiz-option').forEach(btn=>{
     btn.addEventListener('click', ()=>{
       if(quizAnswered) return;
