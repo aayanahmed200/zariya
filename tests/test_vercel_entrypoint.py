@@ -750,8 +750,8 @@ def test_github_sign_in_is_disabled_with_setup_instructions_when_not_configured(
     assert "GITHUB_CLIENT_ID" in html
     assert "GITHUB_CLIENT_SECRET" in html
     assert "GitHub sign-in is not configured on this deployment" in html
-    assert "signInButton.disabled=true" in source
-    assert "signInButton.removeAttribute('aria-disabled')" in source
+    assert "githubButton.disabled=!serverConfig.githubConfigured" in source
+    assert "githubButton.setAttribute('aria-disabled',String(!serverConfig.githubConfigured))" in source
     assert "Set up GitHub sign-in" not in source
     assert "serverConfig.githubConfigured ? 'flex' : 'none'" not in source
 
