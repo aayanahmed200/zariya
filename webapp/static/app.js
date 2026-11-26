@@ -714,8 +714,12 @@ function closeSidebarMobile(){
   document.getElementById('sbScrim').classList.remove('show');
   document.getElementById('hamburgerBtn').setAttribute('aria-expanded','false');
 }
-document.getElementById('hamburgerBtn').addEventListener('click', openSidebarMobile);
+document.getElementById('hamburgerBtn').addEventListener('click', ()=>{
+  if(document.getElementById('sidebar').classList.contains('open')) closeSidebarMobile();
+  else openSidebarMobile();
+});
 document.getElementById('sbScrim').addEventListener('click', closeSidebarMobile);
+document.addEventListener('keydown', event=>{ if(event.key === 'Escape') closeSidebarMobile(); });
 
 /* ============ SESSIONS ============ */
 function newSession(){
@@ -832,6 +836,17 @@ function syncJumpLatest(){
   const scrollable = chatScrollEl.scrollHeight - chatScrollEl.clientHeight;
   jumpLatestBtn.hidden = scrollable < 200 || scrollable - chatScrollEl.scrollTop < 120;
 }
+const chatDockEl = document.querySelector('.chat-dock');
+function syncDockHeight(){
+  if(!chatDockEl) return;
+  document.documentElement.style.setProperty('--dock-h', Math.round(chatDockEl.getBoundingClientRect().height) + 'px');
+}
+const dockObserver = (chatDockEl && window.ResizeObserver) ? new ResizeObserver(syncDockHeight) : null;
+if(chatDockEl){
+  syncDockHeight();
+  if(dockObserver) dockObserver.observe(chatDockEl);
+  window.addEventListener('resize', syncDockHeight);
+}
 chatScrollEl.addEventListener('scroll', syncJumpLatest, {passive:true});
 if(jumpLatestBtn){
   jumpLatestBtn.addEventListener('click', ()=>{
@@ -881,6 +896,7 @@ function renderChat(){
   session.messages.forEach((m, idx)=>renderBubble(m, idx, idx===session.messages.length-1 && m.role==='assistant'));
   scroll.scrollTop = 999999;
   syncJumpLatest();
+  syncDockHeight();
 }
 function renderBubble(m, idx, isLast){
   const inner = document.getElementById('chat-inner');
@@ -891,7 +907,7 @@ function renderBubble(m, idx, isLast){
     row.innerHTML = '<div class="bubble-col user-col" style="max-width:92%;width:100%;"><textarea class="edit-textarea" id="editTa">'+escapeHtml(m.content)+'</textarea><div class="edit-actions"><button class="btn" id="editCancelBtn">Cancel</button><button class="btn primary" id="editSaveBtn">Save &amp; submit</button></div></div>';
     inner.appendChild(row);
     const ta = row.querySelector('#editTa');
-    ta.addEventListener('input', ()=>{ ta.style.height='auto'; ta.style.height=ta.scrollHeight+'px'; });
+    ta.addEventListener('input', ()=>{ ta.style.height='auto'; ta.style.height=ta.scrollHeight+'px'; syncDockHeight(); });
     setTimeout(()=>{ ta.focus(); ta.style.height='auto'; ta.style.height=ta.scrollHeight+'px'; },0);
     row.querySelector('#editCancelBtn').addEventListener('click', ()=>{ editingIndex=null; renderChat(); });
     row.querySelector('#editSaveBtn').addEventListener('click', ()=>saveEdit(idx));
@@ -999,6 +1015,7 @@ input.addEventListener('input', ()=>{
   syncUrduInput(input);
   input.style.height='auto';
   input.style.height=Math.min(input.scrollHeight,160)+'px';
+  syncDockHeight();
   syncSendState();
 });
 syncUrduInput(input);
@@ -1561,6 +1578,7 @@ async function stopVoiceRecognition(){
     syncUrduInput(input);
     input.style.height='auto';
     input.style.height=Math.min(input.scrollHeight,160)+'px';
+    syncDockHeight();
     syncSendState();
     resetVoiceUI('Transcript ready. Review it, then press send.');
     input.focus();
