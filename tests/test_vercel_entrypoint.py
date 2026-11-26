@@ -858,3 +858,20 @@ def test_urdu_direction_updates_in_custom_instructions_and_flashcard_editor():
     assert "frontInput.addEventListener('input',()=>syncUrduInput(frontInput));" in source
     assert "backInput.addEventListener('input',()=>syncUrduInput(backInput));" in source
     assert "#personaInput.input-urdu,.deck-front.input-urdu,.deck-back.input-urdu" in css
+
+
+def test_new_design_has_explicit_responsive_navigation_and_control_contrast():
+    css = (ROOT / "webapp" / "static" / "style.css").read_text(encoding="utf-8")
+    public_css = (ROOT / "public" / "static" / "style.css").read_text(encoding="utf-8")
+    html = (ROOT / "webapp" / "templates" / "index.html").read_text(encoding="utf-8")
+    assert css == public_css
+    assert "--control-border:#958678" in css
+    assert "--control-border:#6f797f" in css
+    assert ".hamburger{display:none}" in css
+    assert ".sidebar-toggle{display:none!important}" in css
+    assert ".hamburger{display:inline-flex!important}" in css
+    assert "::-webkit-slider-runnable-track" in css
+    assert "::-moz-range-track" in css
+    assert "min-width:0;flex:1 1 0" in css
+    assert 'href="/static/style.css?v=20261126-11"' in html
+
