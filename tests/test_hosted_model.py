@@ -86,6 +86,25 @@ def test_stream_uses_only_answer_content_not_reasoning(monkeypatch):
     assert "private thought" not in result
 
 
+def test_stream_decodes_utf8_events_instead_of_latin1(monkeypatch):
+    chunks = [
+        b'data: {"choices":[{"delta":{"content":"it\xe2\x80\x99s"}}]}',
+        b'data: {"choices":[{"delta":{"content":" \xd8\xa7\xd8\xb1\xd8\xaf\xd9\x88"}}]}',
+        b"data: [DONE]",
+    ]
+
+    def fake_post(_url, **_kwargs):
+        return FakeResponse(lines=chunks)
+
+    monkeypatch.setattr(hosted_model.requests, "post", fake_post)
+    result = "".join(hosted_model.stream_reply(
+        [{"role": "user", "content": "Hi"}],
+        "Be concise.",
+    ))
+    assert result == "it\u2019s \u0627\u0631\u062f\u0648"
+    assert "\u00e2\u20ac\u2122" not in result
+
+
 def test_shared_limit_is_returned_as_an_error_not_a_fake_reply(monkeypatch):
     def fake_post(_url, **_kwargs):
         return FakeResponse(status_code=429)

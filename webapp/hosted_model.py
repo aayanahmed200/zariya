@@ -210,11 +210,14 @@ def _iter_sse_reply(url: str, headers: dict[str, str], payload: dict) -> Iterato
             if url.startswith(KILO_BASE_URL):
                 raise GatewayError(_kilo_http_error(response))
             _raise_for_status(response)
-        for line in response.iter_lines(decode_unicode=True):
-            if not line:
+        # Iterate raw bytes: requests would otherwise decode a text/event-stream
+        # body as ISO-8859-1 (its default for text types without a charset),
+        # which turns every UTF-8 apostrophe or Urdu character into mojibake.
+        response.encoding = "utf-8"
+        for raw_line in response.iter_lines():
+            if not raw_line:
                 continue
-            if isinstance(line, bytes):
-                line = line.decode("utf-8", errors="replace")
+            line = raw_line.decode("utf-8", errors="replace") if isinstance(raw_line, bytes) else raw_line
             line = line.strip()
             if not line.startswith("data:"):
                 continue
