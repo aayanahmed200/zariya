@@ -378,7 +378,7 @@ async function loadServerState(){
     hostedMode:true, aiConfigured:false, aiAvailable:false, aiProvider:'Kilo AI Gateway',
     aiStatus:'The app server could not be reached. Refresh to retry.',
     aiModel:'kilo-auto/free', searchConfigured:false, githubConfigured:false,
-    supabaseConfigured:false, storageMode:'browser'
+    supabaseConfigured:false, supabaseAuthConfigured:false, storageMode:'browser'
   };
   me = results[1].status === 'fulfilled' ? results[1].value : { signedIn:false, githubConfigured:false };
 
@@ -388,32 +388,30 @@ async function loadServerState(){
   stateBackendAvailable=false;
   localStateMessage='';
 
-  if(serverConfig.supabaseConfigured || !serverConfig.hostedMode){
+  const userAuthCloud=!!(serverConfig.supabaseAuthConfigured && me.signedIn && me.authProvider==='supabase');
+  const cloudStorage=!!serverConfig.supabaseConfigured || userAuthCloud;
+  if(cloudStorage || !serverConfig.hostedMode){
     try{
       const remote=await apiGet('/api/state');
       stateBackendAvailable=true;
-      if(serverConfig.supabaseConfigured){
-        state=window.ZariyaWorkspaceSync.stamp(mergeWorkspaceState(remote,cached),remote);
-        if(JSON.stringify(state)!==JSON.stringify(remote)){
-          try{
-            await apiPost('/api/state',state);
-          }catch(syncError){
-            localStateMessage='Some local changes could not be synced yet. They are still saved in this browser.';
-          }
+      state=window.ZariyaWorkspaceSync.stamp(mergeWorkspaceState(remote,cached),remote);
+      if(JSON.stringify(state)!==JSON.stringify(remote)){
+        try{
+          await apiPost('/api/state',state);
+        }catch(syncError){
+          localStateMessage='Some local changes could not be synced yet. They are still saved in this browser.';
         }
-      }else{
-        state=remote;
       }
       LS.set(stateKey,state);
     }catch(error){
       state=cached;
       stateBackendAvailable=false;
-      localStateMessage=serverConfig.supabaseConfigured
+      localStateMessage=cloudStorage
         ? 'Cloud sync is unavailable. Your changes are being kept in this browser.'
         : 'The local server could not be reached. Your changes are being kept in this browser.';
     }
   }else{
-    localStateMessage='Saved in this browser only. Connect Supabase to sync across devices.';
+    localStateMessage='Saved in this browser only. Sign in to sync across devices.';
   }
 
   sessions = Array.isArray(state.sessions) ? state.sessions : [];
@@ -422,7 +420,8 @@ async function loadServerState(){
   decks.forEach(d=> (Array.isArray(d.cards) ? d.cards : []).forEach(migrateCardForSpacedRepetition));
   currentSessionId = sessions.length ? sessions[0].id : null;
 
-  const storageCopy = serverConfig.supabaseConfigured
+  const userAuthCloud=!!(serverConfig.supabaseAuthConfigured && me.signedIn && me.authProvider==='supabase');
+  const storageCopy = (serverConfig.supabaseConfigured || userAuthCloud)
     ? 'Your workspace syncs securely across devices.'
     : (serverConfig.hostedMode
       ? 'Your workspace is saved in this browser only.'
@@ -433,19 +432,19 @@ async function loadServerState(){
   });
   const backupDescription=document.getElementById('workspaceBackupDescription');
   if(backupDescription){
-    backupDescription.textContent=serverConfig.supabaseConfigured
-      ? 'Chats, notes and flashcards sync to your account. You can still export a private backup at any time.'
+    backupDescription.textContent=(serverConfig.supabaseConfigured || userAuthCloud)
+      ? 'Chats, notes and flashcards sync securely to your signed-in account. You can still export a private backup at any time.'
       : 'Chats, notes and flashcards are saved in this browser only. Export a backup before clearing browser data or moving devices.';
   }
   const githubStorageNote=document.getElementById('githubStorageNote');
   if(githubStorageNote){
-    githubStorageNote.textContent=serverConfig.supabaseConfigured
-      ? 'With Supabase connected, your workspace syncs across devices for this GitHub account.'
-      : 'GitHub sign-in identifies your profile. Without Supabase, chats, notes and flashcards remain on this device.';
+    githubStorageNote.textContent=(serverConfig.supabaseConfigured || userAuthCloud)
+      ? 'Your signed-in account uses row-level security so only you can access your workspace.'
+      : 'Guest workspaces are stored locally in this browser until you sign in.';
   }
   updateStorageStatus((stateBackendAvailable || !serverConfig.hostedMode) && !localStateMessage,
-    localStateMessage || (serverConfig.supabaseConfigured && stateBackendAvailable
-      ? 'Connected to Supabase. Workspace data is synced.'
+    localStateMessage || (cloudStorage && stateBackendAvailable
+      ? 'Connected securely. Workspace data is synced to your account.'
       : (serverConfig.hostedMode
         ? 'Saved in this browser only.'
         : 'Saved by this local development server.')));
@@ -467,13 +466,14 @@ function saveServerState(){
   decks=snapshot.decks;
   const saved=LS.set(stateKey,snapshot);
 
-  if(serverConfig.supabaseConfigured){
+  const userAuthCloud=!!(serverConfig.supabaseAuthConfigured && me.signedIn && me.authProvider==='supabase');
+  if(serverConfig.supabaseConfigured || userAuthCloud){
     saveTimer=setTimeout(async()=>{
       try{
         await saveCloudSnapshot(snapshot);
         stateBackendAvailable=true;
         localStateMessage='';
-        updateStorageStatus(true,'Synced securely with Supabase.');
+        updateStorageStatus(true,'Synced securely to your account.');
       }catch(error){
         stateBackendAvailable=false;
         localStateMessage='Cloud sync failed. Your changes are saved in this browser; retry after reconnecting.';
@@ -482,7 +482,7 @@ function saveServerState(){
           : 'Cloud sync failed and this browser could not save more data. Export a backup.');
       }
     },350);
-    if(!saved) updateStorageStatus(false,'Saving to Supabase. Browser storage is unavailable.');
+    if(!saved) updateStorageStatus(false,'Saving securely. Browser storage is unavailable.');
     return true;
   }
 
