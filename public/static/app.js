@@ -735,11 +735,26 @@ function deleteSession(id, ev){
   if(currentSessionId===id) currentSessionId = sessions.length? sessions[0].id : null;
   saveServerState(); renderSessionList(); renderChat();
 }
+function sessionTimestamp(session){
+  const value = Number(session && (session.updatedAt || session.createdAt));
+  return Number.isFinite(value) ? value : 0;
+}
+function sessionGroupLabel(timestamp){
+  const now = new Date();
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  if(timestamp >= startOfToday) return 'Today';
+  if(timestamp >= startOfToday - 86400000) return 'Yesterday';
+  if(timestamp >= startOfToday - 6 * 86400000) return 'Previous 7 days';
+  return 'Older';
+}
 function renderSessionList(){
   const wrap = document.getElementById('sessList');
   const q = document.getElementById('sessSearch').value.trim().toLowerCase();
   wrap.innerHTML = '<div class="sb-sessions-label">Recents</div>';
-  const filtered = sessions.filter(s=> !q || s.title.toLowerCase().includes(q) || s.messages.some(m=>m.content.toLowerCase().includes(q)));
+  const filtered = sessions
+    .filter(s=> !q || s.title.toLowerCase().includes(q) || s.messages.some(m=>m.content.toLowerCase().includes(q)))
+    .slice()
+    .sort((a,b)=>sessionTimestamp(b)-sessionTimestamp(a));
   if(!filtered.length){
     const empty=document.createElement('div');
     empty.className='sess-empty';
@@ -757,7 +772,18 @@ function renderSessionList(){
     }
     wrap.appendChild(empty);
   }
+  let lastGroup = '';
   filtered.forEach(s=>{
+    if(!q){
+      const group = sessionGroupLabel(sessionTimestamp(s));
+      if(group !== lastGroup){
+        const groupLabel = document.createElement('div');
+        groupLabel.className = 'sess-group';
+        groupLabel.textContent = group;
+        wrap.appendChild(groupLabel);
+        lastGroup = group;
+      }
+    }
     const div = document.createElement('div');
     div.className = 'sess-item' + (s.id===currentSessionId?' active':'');
     div.tabIndex = 0;
@@ -782,6 +808,37 @@ function renderSessionList(){
 }
 document.getElementById('sessSearch').addEventListener('input', renderSessionList);
 document.getElementById('newChatBtn').addEventListener('click', newSession);
+
+/* Sidebar rail and jump-to-latest control */
+const SIDEBAR_COLLAPSED_KEY = 'zariya_sidebar_collapsed';
+const sidebarToggleBtn = document.getElementById('sidebarToggleBtn');
+function applySidebarCollapsed(collapsed, persist=true){
+  document.body.classList.toggle('sb-collapsed', collapsed);
+  if(sidebarToggleBtn){
+    sidebarToggleBtn.setAttribute('aria-pressed', String(collapsed));
+    sidebarToggleBtn.setAttribute('aria-label', collapsed ? 'Expand sidebar' : 'Collapse sidebar');
+    sidebarToggleBtn.title = collapsed ? 'Expand sidebar' : 'Collapse sidebar';
+  }
+  if(persist) LS.set(SIDEBAR_COLLAPSED_KEY, collapsed);
+}
+applySidebarCollapsed(LS.get(SIDEBAR_COLLAPSED_KEY, false), false);
+if(sidebarToggleBtn){
+  sidebarToggleBtn.addEventListener('click', ()=>applySidebarCollapsed(!document.body.classList.contains('sb-collapsed')));
+}
+const chatScrollEl = document.getElementById('chat-scroll');
+const jumpLatestBtn = document.getElementById('jumpLatestBtn');
+function syncJumpLatest(){
+  if(!jumpLatestBtn) return;
+  const scrollable = chatScrollEl.scrollHeight - chatScrollEl.clientHeight;
+  jumpLatestBtn.hidden = scrollable < 200 || scrollable - chatScrollEl.scrollTop < 120;
+}
+chatScrollEl.addEventListener('scroll', syncJumpLatest, {passive:true});
+if(jumpLatestBtn){
+  jumpLatestBtn.addEventListener('click', ()=>{
+    const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    chatScrollEl.scrollTo({top:chatScrollEl.scrollHeight, behavior:reduceMotion ? 'auto' : 'smooth'});
+  });
+}
 document.addEventListener('keydown', e=>{
   if((e.ctrlKey || e.metaKey) && e.key.toLowerCase()==='k'){
     e.preventDefault();
@@ -823,6 +880,7 @@ function renderChat(){
   scroll.classList.remove('empty-mode'); inner.classList.remove('empty-mode');
   session.messages.forEach((m, idx)=>renderBubble(m, idx, idx===session.messages.length-1 && m.role==='assistant'));
   scroll.scrollTop = 999999;
+  syncJumpLatest();
 }
 function renderBubble(m, idx, isLast){
   const inner = document.getElementById('chat-inner');
