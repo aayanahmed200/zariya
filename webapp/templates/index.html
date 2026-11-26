@@ -128,6 +128,21 @@
         <div class="mobile-brand"><img src="/static/logo.png" alt=""><span>zariya</span></div>
         <span class="topbar-divider"></span>
         <span class="topbar-section" id="topbarSection">Chat</span>
+        <div class="model-picker" id="modelPicker">
+          <button class="model-picker-trigger" id="modelPickerButton" type="button" aria-haspopup="listbox" aria-expanded="false" aria-controls="modelPickerMenu">
+            <span class="model-picker-copy">
+              <strong>Custom Zariya Model</strong>
+              <small>Hosted assistant</small>
+            </span>
+            <svg viewBox="0 0 16 16" aria-hidden="true"><path d="m4 6 4 4 4-4"/></svg>
+          </button>
+          <div class="model-picker-menu" id="modelPickerMenu" role="listbox" aria-label="Model">
+            <button type="button" class="model-picker-option selected" role="option" aria-selected="true" data-model="zariya">
+              <span class="model-picker-check">✓</span>
+              <span><strong>Custom Zariya Model</strong><small>Zariya's hosted assistant</small></span>
+            </button>
+          </div>
+        </div>
       </div>
       <div class="topbar-right">
         <button class="topbar-settings" type="button" data-view="settings" aria-label="Open settings" title="Settings">
@@ -306,34 +321,56 @@
           <div class="skeleton-settings-card"><span class="skeleton skeleton-settings-heading"></span><span class="skeleton skeleton-settings-row"></span><span class="skeleton skeleton-settings-row"></span></div>
         </div>
         <div class="settings-layout">
-          <div class="setting-group">
+          <nav class="settings-nav" aria-label="Settings sections">
+            <span class="settings-nav-label">Settings</span>
+            <button type="button" class="settings-nav-item active" data-settings-target="accountSettings">Account</button>
+            <button type="button" class="settings-nav-item" data-settings-target="appearanceSettings">Appearance</button>
+            <button type="button" class="settings-nav-item" data-settings-target="personalizationSettings">Personalization</button>
+            <button type="button" class="settings-nav-item" data-settings-target="speechSettings">Speech</button>
+            <button type="button" class="settings-nav-item" data-settings-target="modelSettings">Model</button>
+            <button type="button" class="settings-nav-item" data-settings-target="toolsSettings">Tools</button>
+            <button type="button" class="settings-nav-item" data-settings-target="aboutSettings">About</button>
+          </nav>
+          <div class="settings-main">
+          <div class="setting-group" id="accountSettings">
             <div class="setting-heading">
               <span class="setting-icon">◎</span>
               <div><h3>Account &amp; storage</h3><p class="desc" id="storageDescriptionSettings">Your workspace is saved in this browser only.</p></div>
             </div>
             <div class="setting-content">
-              <div class="setting-row" id="accountSignedOutRow">
-                <div class="account-connect-copy"><label>Connect your GitHub account</label><div class="sub" id="githubConfigNote">GitHub sign-in is not configured on this deployment. Everything below still works without an account.</div></div>
+              <div class="account-signed-out" id="accountSignedOutRow">
+                <div class="account-connect-copy">
+                  <strong class="account-title">Welcome to Zariya</strong>
+                  <div class="sub" id="githubConfigNote">Sign in to sync your chats, notes and flashcards across devices.</div>
+                </div>
+                <div class="auth-mode-tabs" role="tablist" aria-label="Account access">
+                  <button type="button" class="auth-mode-tab active" id="authModeSignIn" data-auth-mode="signin" role="tab" aria-selected="true">Sign in</button>
+                  <button type="button" class="auth-mode-tab" id="authModeSignUp" data-auth-mode="signup" role="tab" aria-selected="false">Create account</button>
+                </div>
+                <form id="emailAuthForm" class="email-auth-form" novalidate>
+                  <label for="authEmail">Email address</label>
+                  <input id="authEmail" name="email" type="email" autocomplete="email" inputmode="email" placeholder="you@example.com" maxlength="254" required>
+                  <label for="authPassword">Password</label>
+                  <input id="authPassword" name="password" type="password" autocomplete="current-password" placeholder="At least 8 characters" minlength="8" maxlength="128" required>
+                  <div id="authConfirmWrap" hidden>
+                    <label for="authPasswordConfirm">Confirm password</label>
+                    <input id="authPasswordConfirm" name="passwordConfirm" type="password" autocomplete="new-password" placeholder="Enter your password again" minlength="8" maxlength="128">
+                  </div>
+                  <button type="submit" class="btn primary auth-submit-btn" id="emailAuthSubmit">
+                    <span id="emailAuthSubmitLabel">Continue with email</span>
+                    <span class="auth-submit-arrow" aria-hidden="true">↗</span>
+                  </button>
+                  <p class="auth-form-hint" id="authFormHint">Your account is protected by Supabase Auth.</p>
+                </form>
+                <div class="auth-divider"><span></span><small>OR</small><span></span></div>
                 <button class="btn github-sign-in" id="githubSignInBtn" type="button" disabled aria-disabled="true" title="GitHub sign-in is not configured on this deployment">
                   <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 .8a11.2 11.2 0 0 0-3.54 21.82c.56.1.77-.24.77-.54v-2.1c-3.14.68-3.8-1.33-3.8-1.33-.51-1.3-1.26-1.65-1.26-1.65-1.02-.7.08-.69.08-.69 1.13.08 1.73 1.16 1.73 1.16 1 .1.77 1.48 2.55 1.1.1-.72.4-1.2.73-1.48-2.5-.28-5.13-1.25-5.13-5.57 0-1.23.44-2.24 1.16-3.03-.12-.28-.5-1.43.1-2.98 0 0 .94-.3 3.08 1.16a10.7 10.7 0 0 1 5.6 0c2.14-1.46 3.08-1.16 3.08-1.16.6 1.55.22 2.7.1 2.98.72.79 1.15 1.8 1.15 3.03 0 4.33-2.63 5.28-5.14 5.56.4.35.77 1.03.77 2.08v3.08c0 .3.2.65.78.54A11.2 11.2 0 0 0 12 .8Z"/></svg>
-                  <span>Sign-in unavailable</span>
+                  <span>Continue with GitHub</span>
                 </button>
-              </div>
-              <div class="github-setup-panel" id="githubSetupPanel" hidden>
-                <div class="github-setup-heading"><strong>Finish the one-time GitHub setup</strong><span>About two minutes</span></div>
-                <p>Create a GitHub OAuth App, then add its Client ID and Client Secret to your Vercel project. Keep the secret in Vercel; never paste it into this page or commit it to GitHub.</p>
-                <div class="github-url-field">
-                  <span>Homepage URL</span>
-                  <code>https://zariyas.vercel.app</code>
+                <div class="github-setup-panel" id="githubSetupPanel" hidden>
+                  <p>GitHub sign-in needs a GitHub OAuth App configured by the site owner. Email sign-in is available above.</p>
+                  <a class="github-setup-link" href="https://github.com/settings/developers" target="_blank" rel="noopener noreferrer">GitHub developer settings ↗</a>
                 </div>
-                <div class="github-url-field">
-                  <span>Authorization callback URL</span>
-                  <code>https://zariyas.vercel.app/auth/github/callback</code>
-                  <button type="button" class="github-copy-url" id="copyGithubCallbackBtn">Copy</button>
-                </div>
-                <a class="github-setup-link" href="https://github.com/settings/developers" target="_blank" rel="noopener noreferrer">Open GitHub Developer settings ↗</a>
-                <p class="github-setup-footnote">In Vercel → Project Settings → Environment Variables, add <code>GITHUB_CLIENT_ID</code> and <code>GITHUB_CLIENT_SECRET</code> for Production, Preview and Development. A stable session secret and the callback URL have already been prepared in this project.</p>
-                <p class="github-setup-footnote" id="githubStorageNote">GitHub sign-in identifies your profile. Without Supabase, chats, notes and flashcards remain on this device.</p>
               </div>
               <div class="account-auth-status" id="accountAuthStatus" role="status" aria-live="polite" hidden></div>
               <div class="setting-row signed-in-row" id="accountSignedInRow" style="display:none;">
@@ -356,7 +393,7 @@
             </div>
           </div>
 
-          <div class="setting-group">
+          <div class="setting-group" id="appearanceSettings">
             <div class="setting-heading">
               <span class="setting-icon">◐</span>
               <div><h3>Appearance</h3><p class="desc">Keep the workspace comfortable to read.</p></div>
@@ -380,7 +417,7 @@
             </div>
           </div>
 
-          <div class="setting-group">
+          <div class="setting-group" id="personalizationSettings">
             <div class="setting-heading">
               <span class="setting-icon">✎</span>
               <div><h3>Response style</h3><p class="desc">Adjust the tone and creativity of hosted model replies.</p></div>
@@ -413,7 +450,7 @@
             </div>
           </div>
 
-          <div class="setting-group">
+          <div class="setting-group" id="speechSettings">
             <div class="setting-heading">
               <span class="setting-icon">◖</span>
               <div><h3>Voice</h3><p class="desc">Use the speech features available in your browser.</p></div>
@@ -430,7 +467,7 @@
             </div>
           </div>
 
-          <div class="setting-group hosted-ai-setting">
+          <div class="setting-group hosted-ai-setting" id="modelSettings">
             <div class="setting-heading">
               <span class="setting-icon hosted-ai-icon">✦</span>
               <div><h3>Hosted AI</h3><p class="desc">Free hosted model access. No install, account, or personal API key.</p></div>
@@ -451,7 +488,7 @@
             </div>
           </div>
 
-          <div class="setting-group">
+          <div class="setting-group" id="toolsSettings">
             <div class="setting-heading">
               <span class="setting-icon">⌕</span>
               <div><h3>Optional tools</h3><p class="desc">Some tools need a separate service configuration.</p></div>
@@ -461,7 +498,7 @@
             </div>
           </div>
 
-          <div class="setting-group about-setting">
+          <div class="setting-group about-setting" id="aboutSettings">
             <div class="setting-heading">
               <span class="setting-icon">i</span>
               <div><h3>About Zariya</h3><p class="desc">An Urdu and English workspace for questions, notes and learning.</p></div>
@@ -471,6 +508,7 @@
             </div>
           </div>
         </div>
+          </div>
       </div>
     </section>
   </main>
