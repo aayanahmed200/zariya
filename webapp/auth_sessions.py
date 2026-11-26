@@ -159,9 +159,9 @@ def load_session(flask_session: MutableMapping[str, Any]) -> tuple[Any, Any, Any
         clear_session(flask_session)
         return None
     except Exception:
-        # Invalid, expired, revoked, or unreachable Auth sessions are not
-        # treated as authenticated. Do not leak token or provider details.
-        clear_session(flask_session)
+        # A transient network/Auth outage must not destroy a user's refresh
+        # token. The request is treated as unauthenticated until verification
+        # succeeds on a later request.
         return None
 
 
