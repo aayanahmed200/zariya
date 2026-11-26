@@ -1,0 +1,33 @@
+name: Prune automatic deployment aliases
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  prune:
+    runs-on: ubuntu-latest
+    env:
+      VERCEL_TEAM_ID: team_rJivbQJoQ1ZjGdom8wLsqn3X
+      VERCEL_PROJECT_ID: prj_vnLRtGvIaoqHNJIOQrz04qfALEYt
+      KEEP_ALIAS: zariyas.vercel.app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Delete project and branch aliases
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          if [ -z "${VERCEL_TOKEN}" ]; then
+            echo "::warning::VERCEL_TOKEN is not set, so automatic aliases are left in place."
+            exit 0
+          fi
+          python scripts/prune_vercel_aliases.py
