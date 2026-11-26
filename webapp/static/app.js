@@ -1063,7 +1063,8 @@ function showThinking(){
   const inner = document.getElementById('chat-inner');
   const row = document.createElement('div');
   row.className='msg-row assistant'; row.id='thinkingRow';
-  row.innerHTML = '<div class="thinking-row"><img class="thinking-logo" src="/static/logo.png" alt=""><span class="thinking-label">Thinking…</span></div>';
+  row.setAttribute('aria-live','polite');
+  row.innerHTML = '<div class="thinking-row"><img class="thinking-logo" src="/static/logo.png" alt=""><div class="thinking-content"><span class="thinking-label">Thinking…</span><div class="thinking-bars" aria-hidden="true"><i></i><i></i><i></i></div></div></div>';
   inner.appendChild(row);
   document.getElementById('chat-scroll').scrollTop = 999999;
 }
@@ -2270,15 +2271,23 @@ function downloadFile(filename, content, type='text/plain;charset=utf-8'){
 
 /* ============ INIT ============ */
 (async function init(){
-  await loadServerState();
-  applyUiPrefs();
-  applyGenPrefs();
-  updateStatusPill();
-  renderAccountUI();
-  renderSessionList();
-  renderChat();
-  const initialView=(window.location.hash||'').replace('#','');
-  if(initialView && initialView!=='chat') switchView(initialView, {fromHistory:true});
+  try{
+    await loadServerState();
+    applyUiPrefs();
+    applyGenPrefs();
+    updateStatusPill();
+    renderAccountUI();
+    renderSessionList();
+    renderChat();
+    const initialView=(window.location.hash||'').replace('#','');
+    if(initialView && initialView!=='chat') switchView(initialView, {fromHistory:true});
+  }catch(error){
+    console.error('Zariya could not finish loading the workspace.',error);
+    renderSessionList();
+    renderChat();
+  }finally{
+    document.body.classList.remove('app-loading');
+  }
 })();
 
 
