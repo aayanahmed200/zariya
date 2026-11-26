@@ -25,6 +25,7 @@ from flask import Flask, jsonify, redirect, request, session, url_for, render_te
 import kb_engine
 import hosted_model
 import supabase_store
+import auth_sessions
 import security
 
 load_dotenv()
@@ -51,6 +52,7 @@ HOSTED_MODE = bool(os.environ.get("VERCEL"))
 # stale session cookie doesn't stay valid forever.
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 app.config["SESSION_COOKIE_SECURE"] = HOSTED_MODE or not DEBUG_MODE
+app.config["SESSION_COOKIE_HTTPONLY"] = True
 app.config["PERMANENT_SESSION_LIFETIME"] = 60 * 60 * 24 * 7  # 7 days
 
 # Request size ceiling, security headers, same-origin CORS policy and sanitised
@@ -72,6 +74,8 @@ SUPABASE_STORE = supabase_store.SupabaseWorkspaceStore(
     os.environ.get("SUPABASE_URL", ""),
     os.environ.get("SUPABASE_SECRET_KEY", "") or os.environ.get("SUPABASE_SERVICE_ROLE_KEY", ""),
 )
+SUPABASE_USER_WORKSPACE_STORE = supabase_store.SupabaseUserWorkspaceStore()
+SUPABASE_AUTH_CONFIGURED = auth_sessions.configured()
 MAX_WORKSPACE_STATE_BYTES = 2 * 1024 * 1024
 
 DATA_DIR = Path(__file__).parent / "server"
@@ -79,7 +83,9 @@ PUBLIC_DIR = Path(__file__).resolve().parents[1] / "public"
 STORE_PATH = DATA_DIR / "store.json"
 
 SYSTEM_PROMPT = (
-    "You are Zariya, a clear, capable bilingual assistant for Urdu and English. "
+    "You are Zariya's Custom Zariya Model, a clear, capable bilingual assistant for Urdu and English. "
+    "If asked which model you are, reply exactly: I'm the Custom Zariya Model from Zariya. "
+    "Do not claim that Zariya independently trained the underlying base model. If asked how it is supplied, explain that it is Zariya's hosted assistant. "
     "Reply in the language the user uses. If the user writes in English, reply in "
     "natural, correctly written English. If the user writes in Urdu, reply in Urdu "
     "script. If they mix languages, mirror that mix naturally. Keep every English "
@@ -237,6 +243,136 @@ def _generation_params(body):
 
     return system_prompt, temperature
 
+
+def _supabase_auth_context():
+    """Return a request-scoped verified Supabase user/session, if present."""
+    if not session.get(auth_sessions.SESSION_FIELD):
+        return None
+    return auth_sessions.load_session(session)
+
+
+def _auth_redirect_error(message: str):
+    return redirect("/?" + urlencode({"authError": message}) + "#settings")
+
+
+def _auth_credentials():
+    body = request.get_json(silent=True)
+    if not isinstance(body, dict):
+        return None, None, (jsonify({"error": "Enter your email address and password."}), 400)
+    email = body.get("email")
+    password = body.get("password")
+    if not isinstance(email, str) or len(email.strip()) > 254 or "@" not in email:
+        return None, None, (jsonify({"error": "Enter a valid email address."}), 400)
+    if not isinstance(password, str) or not (8 <= len(password) <= 128):
+        return None, None, (jsonify({"error": "Your password must be between 8 and 128 characters."}), 400)
+    return email.strip().lower(), password, None
+
+
+@app.route("/api/auth/signup", methods=["POST"])
+@security.require_same_origin
+@security.rate_limit("supabase_signup", 6, 300)
+def supabase_signup():
+    email, password, invalid = _auth_credentials()
+    if invalid:
+        return invalid
+    if not SUPABASE_AUTH_CONFIGURED:
+        return jsonify({"error": "Email sign-up is not configured on this deployment."}), 503
+    try:
+        client = auth_sessions.create_auth_client()
+        response = client.auth.sign_up({
+            "email": email,
+            "password": password,
+            "options": {"email_redirect_to": APP_BASE_URL + "/auth/confirm"},
+        })
+        signed_in = auth_sessions.store_auth_response(session, response)
+        return jsonify({
+            "ok": True,
+            "signedIn": signed_in,
+            "confirmationRequired": not signed_in,
+            "message": (
+                "Your account is ready."
+                if signed_in
+                else "Check your inbox for the confirmation email, then return here to sign in."
+            ),
+        }), 201
+    except Exception:
+        app.logger.info("Supabase sign-up request could not be completed.")
+        # Keep the response generic to avoid exposing provider internals or
+        # confirming whether an email address is already registered.
+        return jsonify({"error": "We couldn't create that account. Check the details and try again."}), 400
+
+
+@app.route("/api/auth/login", methods=["POST"])
+@security.require_same_origin
+@security.rate_limit("supabase_login", 10, 300)
+def supabase_login():
+    email, password, invalid = _auth_credentials()
+    if invalid:
+        return invalid
+    if not SUPABASE_AUTH_CONFIGURED:
+        return jsonify({"error": "Email sign-in is not configured on this deployment."}), 503
+    try:
+        client = auth_sessions.create_auth_client()
+        response = client.auth.sign_in_with_password({"email": email, "password": password})
+        if not auth_sessions.store_auth_response(session, response):
+            return jsonify({"error": "Email verification is required. Check your inbox first."}), 403
+        return jsonify({"ok": True, "signedIn": True, "message": "You're signed in."})
+    except Exception:
+        app.logger.info("Supabase sign-in attempt was rejected.")
+        return jsonify({"error": "Email or password is incorrect. Check your details and try again."}), 401
+
+
+@app.route("/api/auth/session", methods=["POST"])
+@security.require_same_origin
+@security.rate_limit("supabase_session", 8, 60)
+def supabase_session_exchange():
+    """Accept a confirmation-link session fragment and store it in an encrypted cookie."""
+    body = request.get_json(silent=True)
+    if not isinstance(body, dict):
+        return jsonify({"error": "The email confirmation could not be completed."}), 400
+    try:
+        user, _auth_session = auth_sessions.establish_session(
+            session, body.get("access_token"), body.get("refresh_token")
+        )
+        return jsonify({"ok": True, "signedIn": True, "email": getattr(user, "email", "")})
+    except Exception:
+        app.logger.info("Supabase confirmation session could not be verified.")
+        return jsonify({"error": "The confirmation link is invalid or has expired. Request a new one."}), 400
+
+
+@app.route("/auth/confirm")
+@security.rate_limit("supabase_confirm", 10, 300)
+def supabase_email_confirm():
+    """Verify a token-hash confirmation email when the project template uses PKCE-style links."""
+    token_hash = request.args.get("token_hash", "")
+    email = request.args.get("email", "").strip().lower()
+    otp_type = request.args.get("type", "email")
+    allowed_types = {"email", "signup", "recovery", "invite", "magiclink", "email_change"}
+    if not SUPABASE_AUTH_CONFIGURED:
+        return _auth_redirect_error("Email confirmation is not configured on this deployment.")
+    if not token_hash:
+        # Supabase's default confirmation email redirects with tokens in the
+        # URL fragment. Fragments are not sent to the server, so render the app
+        # at this path and let its client exchange the tokens once.
+        response = app.make_response(render_template("index.html"))
+        response.headers["Cache-Control"] = "no-store"
+        return response
+    if len(token_hash) > 4096 or otp_type not in allowed_types:
+        return _auth_redirect_error("That confirmation link is invalid. Please request a new email.")
+    try:
+        client = auth_sessions.create_auth_client()
+        payload = {"token_hash": token_hash, "type": otp_type}
+        if email:
+            payload["email"] = email
+        response = client.auth.verify_otp(payload)
+        if not auth_sessions.store_auth_response(session, response):
+            return _auth_redirect_error("Your email was verified. Please sign in to continue.")
+        return redirect("/?" + urlencode({"authSuccess": "Email verified. You're signed in."}))
+    except Exception:
+        app.logger.info("Supabase email confirmation could not be verified.")
+        return _auth_redirect_error("That confirmation link is invalid or has expired. Request a new one.")
+
+
 # ---------------------------------------------------------------------------
 # Auth: real GitHub OAuth (authorization-code flow), client secret stays server-side
 # ---------------------------------------------------------------------------
@@ -316,7 +452,10 @@ def github_callback():
         return redirect("/?" + urlencode({
             "authError": "GitHub did not return a usable account profile. Please try again."
         }))
+    auth_sessions.clear_session(session)
+    session.pop(auth_sessions.USER_ID_FIELD, None)
     session.permanent = True
+    session["auth_provider"] = "github"
     session["github_login"] = login
     session["github_name"] = profile.get("name") or login
     session["github_avatar"] = profile.get("avatar_url")
@@ -324,12 +463,45 @@ def github_callback():
     return redirect("/")
 
 @app.route("/auth/logout", methods=["POST"])
+@security.require_same_origin
+@security.rate_limit("auth_logout", 12, 60)
 def logout():
+    auth_context = _supabase_auth_context()
+    if auth_context:
+        try:
+            auth_context[0].auth.sign_out()
+        except Exception:
+            app.logger.info("Supabase sign-out could not be confirmed at the provider.")
     session.clear()
     return jsonify({"ok": True})
 
+
 @app.route("/api/me")
 def me():
+    if session.get(auth_sessions.SESSION_FIELD):
+        auth_context = _supabase_auth_context()
+        if auth_context:
+            _client, user, _auth_session = auth_context
+            email = getattr(user, "email", "") or session.get(auth_sessions.EMAIL_FIELD, "")
+            return jsonify({
+                "signedIn": True,
+                "login": email,
+                "email": email,
+                "name": email,
+                "avatar": None,
+                "bio": "",
+                "authProvider": "supabase",
+                "githubConfigured": GITHUB_OAUTH_CONFIGURED,
+                "supabaseAuthConfigured": SUPABASE_AUTH_CONFIGURED,
+            })
+        # Keep an encrypted cookie during temporary Auth outages; it is not
+        # considered authenticated until the provider verifies it again.
+        return jsonify({
+            "signedIn": False,
+            "authUnavailable": True,
+            "githubConfigured": GITHUB_OAUTH_CONFIGURED,
+            "supabaseAuthConfigured": SUPABASE_AUTH_CONFIGURED,
+        })
     if session.get("github_login"):
         return jsonify({
             "signedIn": True,
@@ -337,9 +509,15 @@ def me():
             "name": session.get("github_name"),
             "avatar": session.get("github_avatar"),
             "bio": session.get("github_bio"),
+            "authProvider": "github",
             "githubConfigured": GITHUB_OAUTH_CONFIGURED,
+            "supabaseAuthConfigured": SUPABASE_AUTH_CONFIGURED,
         })
-    return jsonify({"signedIn": False, "githubConfigured": GITHUB_OAUTH_CONFIGURED})
+    return jsonify({
+        "signedIn": False,
+        "githubConfigured": GITHUB_OAUTH_CONFIGURED,
+        "supabaseAuthConfigured": SUPABASE_AUTH_CONFIGURED,
+    })
 
 def _gateway_oidc_token() -> str | None:
     """Read Vercel's runtime-injected OIDC token from the incoming request."""
@@ -547,6 +725,18 @@ def web_search():
 # ---------------------------------------------------------------------------
 @app.route("/api/state", methods=["GET"])
 def get_state():
+    if session.get(auth_sessions.SESSION_FIELD):
+        auth_context = _supabase_auth_context()
+        if not auth_context:
+            return jsonify({"error": "Your account could not be verified right now. Please retry."}), 503
+        client, user, _auth_session = auth_context
+        try:
+            state = SUPABASE_USER_WORKSPACE_STORE.get_state(str(user.id), client)
+        except Exception:
+            app.logger.exception("Authenticated Supabase workspace read failed")
+            return jsonify({"error": "Cloud storage could not be reached. Your browser copy is still available."}), 503
+        return jsonify(state or {"sessions": [], "notes": [], "decks": []})
+
     if SUPABASE_STORE.configured:
         try:
             state = SUPABASE_STORE.get_state(_workspace_owner_id())
@@ -555,8 +745,7 @@ def get_state():
             return jsonify({"error": "Cloud storage could not be reached. Your local browser copy is still available."}), 503
         return jsonify(state or {"sessions": [], "notes": [], "decks": []})
 
-    # Vercel Functions do not provide a durable writable project filesystem.
-    # Without Supabase, the browser remains the safe hosted fallback.
+    # Guest workspaces remain browser-local on hosted deployments.
     if HOSTED_MODE:
         return jsonify({"sessions": [], "notes": [], "decks": [], "storage": "browser"})
     store = _load_store()
@@ -570,12 +759,24 @@ def get_state():
 
 @app.route("/api/state", methods=["POST"])
 @security.require_same_origin
-@security.rate_limit('state_save', 60, 60)
+@security.rate_limit("state_save", 60, 60)
 def save_state():
     body = request.get_json(silent=True)
     state, error, status = _normalize_workspace_state(body)
     if error:
         return jsonify({"error": error}), status
+
+    if session.get(auth_sessions.SESSION_FIELD):
+        auth_context = _supabase_auth_context()
+        if not auth_context:
+            return jsonify({"error": "Your account session could not be verified. Please retry."}), 503
+        client, user, _auth_session = auth_context
+        try:
+            SUPABASE_USER_WORKSPACE_STORE.save_state(str(user.id), state, client)
+        except Exception:
+            app.logger.exception("Authenticated Supabase workspace save failed")
+            return jsonify({"error": "Cloud sync failed. Your browser copy has been kept; please retry."}), 503
+        return jsonify({"ok": True, "storage": "supabase_auth"})
 
     if SUPABASE_STORE.configured:
         try:
@@ -586,7 +787,7 @@ def save_state():
         return jsonify({"ok": True, "storage": "supabase"})
 
     if HOSTED_MODE:
-        return jsonify({"ok": False, "error": "Hosted mode uses browser-local storage until Supabase is configured."}), 409
+        return jsonify({"ok": False, "error": "Guest workspaces are saved in this browser. Sign in to enable secure cloud sync."}), 409
     store = _load_store()
     key = _current_user_key()
     store["users"][key] = state
@@ -722,7 +923,8 @@ def config():
     return jsonify({
         "hostedMode": HOSTED_MODE,
         "supabaseConfigured": SUPABASE_STORE.configured,
-        "storageMode": "supabase" if SUPABASE_STORE.configured else ("browser" if HOSTED_MODE else "server_file"),
+        "supabaseAuthConfigured": SUPABASE_AUTH_CONFIGURED,
+        "storageMode": "supabase" if SUPABASE_STORE.configured else ("supabase_auth" if SUPABASE_AUTH_CONFIGURED else ("browser" if HOSTED_MODE else "server_file")),
         "aiConfigured": ai["configured"],
         "aiAvailable": ai["available"],
         "aiProvider": ai["provider"],
@@ -740,7 +942,7 @@ def health():
         "ok": True,
         "service": "zariya",
         "mode": "hosted" if HOSTED_MODE else "local",
-        "storageMode": "supabase" if SUPABASE_STORE.configured else ("browser" if HOSTED_MODE else "server_file"),
+        "storageMode": "supabase" if SUPABASE_STORE.configured else ("supabase_auth" if SUPABASE_AUTH_CONFIGURED else ("browser" if HOSTED_MODE else "server_file")),
         "aiConfigured": ai["configured"],
         "aiProvider": ai["provider"],
         "knowledgeEntries": len(kb_engine.KB),
