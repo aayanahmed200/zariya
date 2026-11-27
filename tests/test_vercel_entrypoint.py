@@ -453,7 +453,8 @@ def test_voice_input_records_wav_and_offers_urdu_english_language_choice():
     assert "Microphone permission was blocked" in source
     assert "Transcript ready. Review it, then press send." in source
     assert "stopVoiceRecognition();" in source
-    assert "SpeechRecognition" not in source
+    assert "SpeechRecognitionClass" in source
+    assert "function startDictation()" in source
 
 
 def test_workspace_backup_and_flashcard_edit_controls_exist():
@@ -531,9 +532,9 @@ def test_deleting_or_restoring_notes_selects_a_valid_note():
 def test_voice_settings_explain_hosted_transcription_and_privacy():
     html = (ROOT / "webapp" / "templates" / "index.html").read_text(encoding="utf-8")
     assert "English and Urdu voice transcription" in html
-    assert "not stored by Zariya" in html
-    assert "hosted speech service" in html
-    assert "not stored by Zariya" in html
+    assert "browser's speech engine" in html
+    assert "nothing is uploaded" in html
+    assert "transcribes it on the server" in html
     assert "Ollama replies" not in html
     assert "sent with your messages to Ollama" not in html
     assert "Hosted AI" in html
@@ -711,7 +712,8 @@ def test_microphone_uses_recorded_wav_and_custom_accessible_language_dropdown():
     assert "navigator.mediaDevices.getUserMedia" in source
     assert "function encodeWav(samples,sampleRate)" in source
     assert "fetch('/api/transcribe'" in source
-    assert "SpeechRecognition" not in source
+    assert "SpeechRecognitionClass" in source
+    assert "function startDictation()" in source
     capture = source[source.index("async function startVoiceRecognition()"):source.index("async function stopVoiceRecognition()")]
     assert capture.index("pendingStreamPromise=navigator.mediaDevices.getUserMedia") < capture.index("const resumePromise=recordingContext.resume()")
     assert "await Promise.all([pendingStreamPromise,resumePromise])" in capture
@@ -723,7 +725,7 @@ def test_urdu_uses_readable_noto_sans_arabic_and_transcription_cost_is_disclosed
     css = (ROOT / "webapp" / "static" / "style.css").read_text(encoding="utf-8")
     assert "Noto+Sans+Arabic" in html
     assert "English and Urdu voice transcription" in html
-    assert "not stored by Zariya" in html
+    assert "browser's speech engine" in html
     assert "Noto Sans Arabic" in css
     assert "line-height:1.85" in css
     assert "Noto Nastaliq Urdu" not in css

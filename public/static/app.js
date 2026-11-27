@@ -1288,6 +1288,9 @@ let recordingFrames = 0;
 let recordingSampleRate = 0;
 let recordingTimer = null;
 const MAX_VOICE_SECONDS = 60;
+const SpeechRecognitionClass = window.SpeechRecognition || window.webkitSpeechRecognition || null;
+let speechRecognition = null;
+let speechTranscript = '';
 const savedVoiceLanguage = LS.get('zariya_voice_language', 'auto');
 const initialVoiceLanguage = savedVoiceLanguage === 'en-US' ? 'en' : savedVoiceLanguage === 'ur-PK' ? 'ur' : ['en','ur'].includes(savedVoiceLanguage) ? savedVoiceLanguage : 'auto';
 
@@ -1394,6 +1397,12 @@ function cleanupVoiceCapture(){
   }
 }
 function resetVoiceUI(message){
+  if(speechRecognition){
+    const stale=speechRecognition;
+    speechRecognition=null;speechTranscript='';
+    stale.onend=null;stale.onerror=null;stale.onresult=null;
+    try{stale.abort();}catch(error){}
+  }
   voiceState='idle';listening=false;shouldListen=false;
   micBtn.disabled=false;
   micBtn.classList.remove('active','transcribing');
@@ -1404,8 +1413,86 @@ function resetVoiceUI(message){
   syncSendState();
   if(message) showVoiceHint(message);
 }
+function startDictation(){
+  if(voiceState!=='idle') return;
+  voiceState='starting';shouldListen=true;listening=false;
+  micBtn.disabled=true;
+  showVoiceHint('Requesting microphone access…');
+  let recognition;
+  try{
+    recognition=new SpeechRecognitionClass();
+  }catch(error){
+    resetVoiceUI('Voice typing is not available in this browser. Try the latest Chrome or Edge.');
+    return;
+  }
+  const lang=voiceLanguage.value==='ur' ? 'ur-PK' : voiceLanguage.value==='en' ? 'en-US' : (navigator.language||'en-US');
+  speechRecognition=recognition;
+  speechTranscript='';
+  recognition.lang=lang;
+  recognition.continuous=true;
+  recognition.interimResults=true;
+  recognition.onresult=event=>{
+    let interim='';
+    for(let i=event.resultIndex;i<event.results.length;i++){
+      const result=event.results[i];
+      if(!result) continue;
+      const text=(result[0] && result[0].transcript) || '';
+      if(result.isFinal) speechTranscript+=text+' ';
+      else interim+=text;
+    }
+    const preview=(speechTranscript+interim).replace(/\s+/g,' ').trim();
+    showVoiceHint(preview ? ('Listening… '+preview.slice(-60)) : 'Listening… speak now.', 'recording');
+  };
+  recognition.onerror=event=>{
+    const name=(event && event.error) || '';
+    if(name==='aborted') return;
+    if(name==='no-speech'){ finishDictation('No speech was detected. Try speaking a little closer to the microphone.'); return; }
+    if(name==='not-allowed'||name==='service-not-allowed'){ finishDictation('Microphone permission was blocked. Allow microphone access for this site, then try again.'); return; }
+    finishDictation('Voice typing stopped. Please try again.');
+  };
+  recognition.onend=()=>{ finishDictation(); };
+  try{
+    recognition.start();
+  }catch(error){
+    resetVoiceUI('Voice typing could not start. Please try again.');
+    return;
+  }
+  voiceState='recording';listening=true;shouldListen=true;
+  micBtn.disabled=false;
+  micBtn.classList.add('active');
+  micBtn.setAttribute('aria-pressed','true');
+  micBtn.setAttribute('aria-label','Stop voice typing');
+  micBtn.title='Stop voice typing';
+  composerBox.classList.add('listening');
+  showVoiceHint('Listening in '+voiceLanguageName(voiceLanguage.value)+'… press the microphone again to stop.', 'recording');
+  recordingTimer=setTimeout(()=>stopVoiceRecognition(),MAX_VOICE_SECONDS*1000);
+}
+function finishDictation(message){
+  if(recordingTimer){clearTimeout(recordingTimer);recordingTimer=null;}
+  const recognition=speechRecognition;
+  speechRecognition=null;
+  if(recognition){
+    recognition.onend=null;recognition.onerror=null;recognition.onresult=null;
+    try{recognition.stop();}catch(error){}
+  }
+  const text=(speechTranscript||'').replace(/\s+/g,' ').trim();
+  speechTranscript='';
+  if(message){ resetVoiceUI(message); return; }
+  if(voiceState==='idle') return;
+  if(!text){ resetVoiceUI('No speech was detected. Try speaking a little closer to the microphone.'); return; }
+  const existing=input.value.trim();
+  input.value=existing ? existing+'\n'+text : text;
+  syncUrduInput(input);
+  input.style.height='auto';
+  input.style.height=Math.min(input.scrollHeight,160)+'px';
+  syncDockHeight();
+  syncSendState();
+  resetVoiceUI('Transcript ready. Review it, then press send.');
+  input.focus();
+}
 async function startVoiceRecognition(){
   if(voiceState!=='idle') return;
+  if(SpeechRecognitionClass){ startDictation(); return; }
   let pendingStreamPromise=null;
   if(!window.isSecureContext || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia || !AudioContextClass){
     showVoiceHint('Microphone recording needs HTTPS and a browser that supports audio capture. Try the latest Chrome or Edge.');
@@ -1471,6 +1558,7 @@ async function startVoiceRecognition(){
   }
 }
 async function stopVoiceRecognition(){
+  if(speechRecognition){ finishDictation(); return; }
   if(voiceState==='starting'||voiceState==='transcribing') return;
   if(voiceState!=='recording') return;
   voiceState='transcribing';listening=false;shouldListen=true;
@@ -2242,53 +2330,26 @@ document.addEventListener('click', async event=>{
 });
 })();
 
-/* Settings rail: jump to a section and keep the active item in sync. */
+/* Settings rail: one section at a time. */
 (() => {
-  const body = document.getElementById('settings-body');
   const rail = document.getElementById('settingsRail');
-  if (!body || !rail) return;
+  const pane = document.getElementById('settingsPane');
+  if (!rail || !pane) return;
   const items = Array.from(rail.querySelectorAll('[data-settings-target]'));
   const sections = items.map((item) => document.getElementById(item.dataset.settingsTarget)).filter(Boolean);
   if (!sections.length) return;
-
-  const setActive = (id) => {
+  const show = (id) => {
     items.forEach((item) => {
       const on = item.dataset.settingsTarget === id;
       item.classList.toggle('active', on);
       if (on) item.setAttribute('aria-current', 'true');
       else item.removeAttribute('aria-current');
     });
+    sections.forEach((section) => section.classList.toggle('active', section.id === id));
+    const body = document.getElementById('settings-body');
+    if (body) body.scrollTop = 0;
   };
-
-  const scrollToSection = (section) => {
-    const bodyTop = body.getBoundingClientRect().top;
-    const targetTop = section.getBoundingClientRect().top;
-    body.scrollTo({ top: body.scrollTop + (targetTop - bodyTop) - 8, behavior: 'smooth' });
-  };
-
-  items.forEach((item) => {
-    item.addEventListener('click', () => {
-      const section = document.getElementById(item.dataset.settingsTarget);
-      if (!section) return;
-      setActive(item.dataset.settingsTarget);
-      scrollToSection(section);
-    });
-  });
-
-  let ticking = false;
-  body.addEventListener('scroll', () => {
-    if (ticking) return;
-    ticking = true;
-    requestAnimationFrame(() => {
-      ticking = false;
-      const line = body.getBoundingClientRect().top + 48;
-      let current = sections[0];
-      sections.forEach((section) => {
-        if (section.getBoundingClientRect().top <= line) current = section;
-      });
-      const atBottom = body.scrollTop + body.clientHeight >= body.scrollHeight - 4;
-      setActive(atBottom ? sections[sections.length - 1].id : current.id);
-    });
-  }, { passive: true });
+  items.forEach((item) => item.addEventListener('click', () => show(item.dataset.settingsTarget)));
+  show(items[0].dataset.settingsTarget);
 })();
 

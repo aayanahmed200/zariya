@@ -30,7 +30,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Lora:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/static/style.css?v=20261127-4">
+<link rel="stylesheet" href="/static/style.css?v=20261127-6">
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
@@ -249,8 +249,6 @@
             <button class="settings-rail-item" type="button" data-settings-target="settings-replies">Replies</button>
             <button class="settings-rail-item" type="button" data-settings-target="settings-voice">Voice</button>
             <button class="settings-rail-item" type="button" data-settings-target="settings-hosted">Hosted AI</button>
-            <button class="settings-rail-item" type="button" data-settings-target="settings-tools">Tools</button>
-            <button class="settings-rail-item" type="button" data-settings-target="settings-about">About</button>
           </nav>
           <div class="settings-pane" id="settingsPane">
           <div class="setting-group" id="settings-account">
@@ -339,7 +337,7 @@
               </div>
               <div class="voice-typing-note">
                 <strong>English and Urdu voice transcription</strong>
-                <p>Record up to 60 seconds. The recording is sent to the hosted speech service for transcription and is not stored by Zariya. Avoid recording private conversations.</p>
+                <p>Voice typing uses your browser's speech engine, so nothing is uploaded. If your browser has no speech engine, Zariya records up to 60 seconds and transcribes it on the server instead.</p>
               </div>
             </div>
           </div>
@@ -364,23 +362,7 @@
             </div>
           </div>
 
-          <div class="setting-group" id="settings-tools">
-            <div class="setting-heading">
-              <div><h3>Optional tools</h3><p class="desc">Some tools need a separate service configuration.</p></div>
-            </div>
-            <div class="setting-content">
-              <div class="setting-row"><div><label>Web search</label><div class="sub">Used by the Search web chat tool.</div></div><span class="setting-value" id="searchStatusText">Not configured</span></div>
-            </div>
-          </div>
 
-          <div class="setting-group about-setting" id="settings-about">
-            <div class="setting-heading">
-              <div><h3>About Zariya</h3><p class="desc">An Urdu and English workspace for questions, notes and learning.</p></div>
-            </div>
-            <div class="setting-content about-copy">
-              Zariya is an Urdu and English workspace for chat, notes and flashcards. Your workspace syncs to secure cloud storage when available, with a copy in this browser as a fallback.
-            </div>
-          </div>
           </div>
         </div>
       </div>
@@ -405,7 +387,7 @@
 </div>
 <script src="/static/workspace-sync.js?v=20261122-6"></script>
 <script src="/static/sse.js?v=20261122-4"></script>
-<script src="/static/app.js?v=20261127-5"></script>
+<script src="/static/app.js?v=20261127-6"></script>
 <script>
   window.va = window.va || function () {
     (window.vaq = window.vaq || []).push(arguments);
