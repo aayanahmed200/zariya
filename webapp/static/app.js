@@ -755,7 +755,7 @@ function renderSessionList(){
 document.getElementById('sessSearch').addEventListener('input', renderSessionList);
 document.getElementById('newChatBtn').addEventListener('click', newSession);
 
-/* Sidebar rail and jump-to-latest control */
+/* Sidebar rail */
 const SIDEBAR_COLLAPSED_KEY = 'zariya_sidebar_collapsed';
 const sidebarToggleBtn = document.getElementById('sidebarToggleBtn');
 function applySidebarCollapsed(collapsed, persist=true){
@@ -770,18 +770,6 @@ function applySidebarCollapsed(collapsed, persist=true){
 applySidebarCollapsed(LS.get(SIDEBAR_COLLAPSED_KEY, false), false);
 if(sidebarToggleBtn){
   sidebarToggleBtn.addEventListener('click', ()=>applySidebarCollapsed(!document.body.classList.contains('sb-collapsed')));
-}
-const chatScrollEl = document.getElementById('chat-scroll');
-const chatDockEl = document.querySelector('.chat-dock');
-function syncDockHeight(){
-  if(!chatDockEl) return;
-  document.documentElement.style.setProperty('--dock-h', Math.round(chatDockEl.getBoundingClientRect().height) + 'px');
-}
-const dockObserver = (chatDockEl && window.ResizeObserver) ? new ResizeObserver(syncDockHeight) : null;
-if(chatDockEl){
-  syncDockHeight();
-  if(dockObserver) dockObserver.observe(chatDockEl);
-  window.addEventListener('resize', syncDockHeight);
 }
 document.addEventListener('keydown', e=>{
   if((e.ctrlKey || e.metaKey) && e.key.toLowerCase()==='k'){
@@ -801,7 +789,7 @@ function renderChat(){
   updateQuickToolsState();
   inner.innerHTML = '';
   if(!session || !session.messages.length){
-    scroll.classList.add('empty-mode'); inner.classList.add('empty-mode');
+    inner.classList.add('empty-mode');
     document.getElementById('view-chat').classList.add('empty-chat');
     const hero = document.createElement('div');
     hero.className = 'empty-hero';
@@ -809,11 +797,10 @@ function renderChat(){
     inner.appendChild(hero);
     return;
   }
-  scroll.classList.remove('empty-mode'); inner.classList.remove('empty-mode');
+  inner.classList.remove('empty-mode');
   document.getElementById('view-chat').classList.remove('empty-chat');
   session.messages.forEach((m, idx)=>renderBubble(m, idx, idx===session.messages.length-1 && m.role==='assistant'));
   scroll.scrollTop = 999999;
-  syncDockHeight();
 }
 function renderBubble(m, idx, isLast){
   const inner = document.getElementById('chat-inner');
@@ -824,7 +811,7 @@ function renderBubble(m, idx, isLast){
     row.innerHTML = '<div class="bubble-col user-col" style="max-width:92%;width:100%;"><textarea class="edit-textarea" id="editTa">'+escapeHtml(m.content)+'</textarea><div class="edit-actions"><button class="btn" id="editCancelBtn">Cancel</button><button class="btn primary" id="editSaveBtn">Save &amp; submit</button></div></div>';
     inner.appendChild(row);
     const ta = row.querySelector('#editTa');
-    ta.addEventListener('input', ()=>{ ta.style.height='auto'; ta.style.height=ta.scrollHeight+'px'; syncDockHeight(); });
+    ta.addEventListener('input', ()=>{ ta.style.height='auto'; ta.style.height=ta.scrollHeight+'px'; });
     setTimeout(()=>{ ta.focus(); ta.style.height='auto'; ta.style.height=ta.scrollHeight+'px'; },0);
     row.querySelector('#editCancelBtn').addEventListener('click', ()=>{ editingIndex=null; renderChat(); });
     row.querySelector('#editSaveBtn').addEventListener('click', ()=>saveEdit(idx));
@@ -933,7 +920,6 @@ input.addEventListener('input', ()=>{
   syncUrduInput(input);
   input.style.height='auto';
   input.style.height=Math.min(input.scrollHeight,160)+'px';
-  syncDockHeight();
   syncSendState();
 });
 syncUrduInput(input);
@@ -1084,7 +1070,7 @@ async function respondTo(session){
 function appendStreamingBubble(){
   const inner = document.getElementById('chat-inner');
   const scroll = document.getElementById('chat-scroll');
-  scroll.classList.remove('empty-mode'); inner.classList.remove('empty-mode');
+  inner.classList.remove('empty-mode');
   document.getElementById('view-chat').classList.remove('empty-chat');
   const row = document.createElement('div');
   row.className = 'msg-row assistant';
@@ -1470,7 +1456,6 @@ function finishDictation(message){
   syncUrduInput(input);
   input.style.height='auto';
   input.style.height=Math.min(input.scrollHeight,160)+'px';
-  syncDockHeight();
   syncSendState();
   resetVoiceUI('Transcript ready. Review it, then press send.');
   input.focus();
@@ -1596,7 +1581,6 @@ async function stopVoiceRecognition(){
     syncUrduInput(input);
     input.style.height='auto';
     input.style.height=Math.min(input.scrollHeight,160)+'px';
-    syncDockHeight();
     syncSendState();
     resetVoiceUI('Transcript ready. Review it, then press send.');
     input.focus();

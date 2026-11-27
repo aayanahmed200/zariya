@@ -145,10 +145,6 @@ button{color:inherit}
 .empty-hero h1{margin:0;color:var(--text);font-family:var(--serif);font-size:clamp(29px,4.3vw,43px);font-weight:600;letter-spacing:-1px;line-height:1.2}
 .empty-hero .urdu-line{margin:9px 0 7px;color:var(--accent);font-family:var(--urdu);font-size:26px;line-height:2.4}
 .empty-hero p{margin:0 auto 27px;color:var(--text-soft);font-size:13px}
-.home-suggestions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;width:min(620px,100%);margin:0 auto}
-.suggest-card{min-height:55px;display:flex;align-items:center;justify-content:flex-start;padding:12px 15px;background:var(--surface);border:1px solid var(--border);border-radius:12px;color:var(--text-soft);font-size:11px;font-weight:550;text-align:left;cursor:pointer;transition:border-color .15s,background .15s,color .15s}
-.suggest-card::before{content:"↗";margin-right:10px;color:var(--accent);font-size:13px}
-.suggest-card:hover{border-color:var(--accent);background:var(--accent-tint);color:var(--text)}
 .chat-dock{width:100%;padding:10px 24px 17px;background:linear-gradient(to bottom,rgba(247,248,246,0),var(--bg) 13%)}
 [data-theme="dark"] .chat-dock{background:linear-gradient(to bottom,rgba(23,30,26,0),var(--bg) 13%)}
 .quick-tools{width:min(790px,100%);display:flex;justify-content:flex-start;flex-wrap:wrap;gap:6px;margin:0 auto 9px;padding:0 2px}
@@ -364,8 +360,6 @@ button{color:inherit}
   .empty-hero h1{font-size:30px}
   .empty-hero .urdu-line{font-size:22px}
   .empty-hero p{max-width:300px;font-size:11px}
-  .home-suggestions{grid-template-columns:1fr;gap:7px}
-  .suggest-card{min-height:45px}
   .chat-dock{padding:8px 11px 12px}
   .quick-tools{gap:5px;margin-bottom:8px}
   .qt-btn{height:26px;padding:0 7px;font-size:9px}
@@ -493,8 +487,6 @@ body{font-size:14px;line-height:1.6;direction:ltr;text-align:left}
 .empty-hero h1{font-size:clamp(32px,4vw,47px);letter-spacing:-1.2px;line-height:1.16}
 .empty-hero .urdu-line{margin:12px 0 9px;font-size:27px}
 .empty-hero p{max-width:520px;font-size:14px;line-height:1.7;margin-bottom:30px}
-.home-suggestions{width:min(650px,100%);gap:11px}
-.suggest-card{min-height:59px;padding:13px 16px;border-radius:13px;font-size:12px}
 .chat-dock{padding:11px 24px 18px}
 .quick-tools{width:min(820px,100%);gap:7px;margin-bottom:10px}
 .qt-btn{height:30px;padding-inline:11px;font-size:11px;border-radius:9px}
@@ -606,8 +598,6 @@ body{font-size:14px;line-height:1.6;direction:ltr;text-align:left}
   .empty-hero h1{font-size:clamp(29px,8vw,38px)}
   .empty-hero .urdu-line{font-size:23px}
   .empty-hero p{font-size:13px;margin-bottom:22px}
-  .home-suggestions{grid-template-columns:1fr;gap:8px}
-  .suggest-card{min-height:48px}
   .chat-dock{padding:8px 13px 13px}
   .quick-tools{gap:5px}
   .qt-btn{height:29px;padding-inline:8px;font-size:10px}
@@ -696,10 +686,6 @@ body{direction:ltr;text-align:left;background:var(--bg);color:var(--text)}
 .empty-hero h1{font-size:clamp(32px,4vw,46px);line-height:1.17;letter-spacing:-1.1px}
 .empty-hero .urdu-line{margin:12px 0 7px;color:var(--accent-strong);font-size:27px}
 .empty-hero p{max-width:550px;color:var(--text-soft);font-size:13px;line-height:1.75;margin-bottom:28px}
-.home-suggestions{width:min(650px,100%);gap:10px}
-.suggest-card{min-height:58px;padding:13px 16px;background:var(--surface);border-color:var(--border);border-radius:13px;color:var(--text-soft);font-size:12px}
-.suggest-card::before{color:var(--accent)}
-.suggest-card:hover{background:var(--accent-tint);border-color:#edb28d;color:var(--text);transform:translateY(-1px)}
 .chat-dock{padding:10px 22px 17px;background:linear-gradient(to bottom,transparent,var(--bg) 16%)}
 .quick-tools{width:min(820px,100%);gap:7px;margin-bottom:10px}
 .qt-btn{height:30px;padding:0 11px;border-radius:9px;font-size:10px;background:var(--surface);border-color:var(--border)}
@@ -792,7 +778,6 @@ body{direction:ltr;text-align:left;background:var(--bg);color:var(--text)}
   #chat-scroll{padding:20px 0 12px}#chat-inner{padding:8px 17px 22px;gap:24px}
   .empty-hero{padding:12px 0 20px}.empty-hero h1{font-size:clamp(29px,8vw,38px)}
   .empty-hero .urdu-line{font-size:23px}.empty-hero p{font-size:13px;margin-bottom:22px}
-  .home-suggestions{grid-template-columns:1fr;gap:8px}.suggest-card{min-height:48px}
   .chat-dock{padding:8px 13px 13px}.quick-tools{gap:5px}
   .qt-btn{height:29px;padding-inline:8px;font-size:10px}
   .composer-box{min-height:60px;padding:8px 8px 8px 12px}#chat-input{font-size:14px}
@@ -990,12 +975,6 @@ button:disabled,.btn:disabled,.qt-btn:disabled,.deck-action-btn:disabled{cursor:
   color:#fff;
   box-shadow:inset 0 1px 2px rgba(50,24,10,.12);
 }
-.suggest-card:active:not(:disabled){
-  background:var(--accent-soft);
-  border-color:var(--accent);
-  color:var(--text);
-  transform:translateY(1px);
-}
 .toggle:active:not(:disabled) .toggle-knob{width:19px}
 .toggle:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
 
@@ -1131,16 +1110,11 @@ button:disabled,.btn:disabled,.qt-btn:disabled,.deck-action-btn:disabled{cursor:
 .status-dot{width:6px;height:6px;box-shadow:none}
 #chat-scroll{padding:28px 0 23px}
 #chat-inner{width:min(900px,100%);gap:31px;padding:14px 42px 28px}
-#chat-inner.empty-mode{justify-content:center}
 .empty-hero{max-width:710px;margin:0;padding:8px 0 21px;text-align:left}
 .hero-kicker{margin-bottom:15px;font-size:9px;letter-spacing:1.9px}
 .empty-hero h1{max-width:660px;font-size:clamp(34px,4.2vw,48px);letter-spacing:-1.5px;line-height:1.13}
 .empty-hero .urdu-line{margin:11px 0 5px;font-size:25px;text-align:right}
 .empty-hero p{max-width:540px;margin:0 0 25px;color:var(--text-soft);font-size:13px;line-height:1.75}
-.home-suggestions{width:min(650px,100%);margin:0;gap:9px}
-.suggest-card{min-height:59px;padding:12px 14px;background:transparent;border:1px solid var(--border);border-radius:10px;color:var(--text-soft);font-size:11px;line-height:1.5;box-shadow:none}
-.suggest-card::before{content:"↗";margin-right:9px;color:var(--accent);font-size:12px}
-.suggest-card:hover{background:var(--surface);border-color:var(--border-strong);color:var(--text)}
 .chat-dock{padding:8px 25px 16px;background:linear-gradient(to bottom,transparent,var(--bg) 18%)}
 [data-theme="dark"] .chat-dock{background:linear-gradient(to bottom,transparent,var(--bg) 18%)}
 .quick-tools{width:min(820px,100%);gap:5px;margin-bottom:8px}
@@ -1183,8 +1157,6 @@ button:disabled,.btn:disabled,.qt-btn:disabled,.deck-action-btn:disabled{cursor:
   .empty-hero h1{font-size:clamp(31px,8vw,39px);letter-spacing:-1px}
   .empty-hero p{font-size:12px;margin-bottom:21px}
   .empty-hero .urdu-line{font-size:22px}
-  .home-suggestions{grid-template-columns:1fr;gap:7px}
-  .suggest-card{min-height:48px}
   .chat-dock{padding:7px 12px 12px}
   .quick-tools{gap:4px;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;padding-bottom:2px}
   .quick-tools::-webkit-scrollbar{display:none}
@@ -1205,10 +1177,6 @@ button:disabled,.btn:disabled,.qt-btn:disabled,.deck-action-btn:disabled{cursor:
 .empty-hero .urdu-line{margin:10px 0 6px;font-size:clamp(21px,2.3vw,25px);text-align:left}
 
 /* Suggestions read as choices rather than empty inputs. */
-.suggest-card{background:var(--surface)}
-.suggest-card:hover{border-color:var(--accent);background:var(--accent-tint);transform:translateY(-1px)}
-.suggest-card::before{transition:transform .16s}
-.suggest-card:hover::before{transform:translate(1px,-1px)}
 
 /* Messages: comfortable measure, quieter action row that appears on hover or keyboard focus. */
 .bubble-col.assistant-col{max-width:min(100%,74ch)}
@@ -1261,12 +1229,7 @@ body.sb-collapsed .sb-profile-row{justify-content:center;padding:6px}
 body.sb-collapsed .sb-footer-bottom{flex-direction:column;gap:9px;padding:0}
 }
 #view-chat{position:relative}
-.jump-latest{position:absolute;right:clamp(16px,4vw,42px);bottom:calc(var(--dock-h,117px) + 14px);z-index:20;width:36px;height:36px;display:flex;align-items:center;justify-content:center;background:var(--surface);border:1px solid var(--border-strong);border-radius:50%;box-shadow:var(--shadow-soft);color:var(--text-soft);cursor:pointer;transition:background .15s,border-color .15s,color .15s}
-.jump-latest[hidden]{display:none}
-.jump-latest:hover{background:var(--accent-soft);border-color:var(--accent);color:var(--accent-strong)}
-.jump-latest svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 @media(max-width:920px){.sidebar-toggle{display:none}}
-@media(max-width:700px){.jump-latest{right:12px;width:34px;height:34px;bottom:calc(var(--dock-h,135px) + 12px)}}
 @media(max-width:620px){.hamburger{width:38px;height:38px}}
 
 @media(prefers-reduced-motion:reduce){
@@ -1389,10 +1352,6 @@ body{background:var(--bg);color:var(--text);font:14px/1.6 var(--font);-webkit-fo
 .empty-hero h1{margin:0 0 10px;font-family:var(--font);font-size:30px;font-weight:600;letter-spacing:-.6px;line-height:1.25}
 .empty-hero .urdu-line{margin:0 0 8px;color:var(--text-soft);font-size:19px;line-height:2}
 .empty-hero p{margin:0 auto;color:var(--text-soft);font-size:14px;max-width:46ch}
-.home-suggestions{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;width:min(600px,100%);margin-top:22px}
-.suggest-card{min-height:48px;padding:12px 14px;background:var(--surface);border:1px solid var(--border);border-radius:12px;color:var(--text);font-size:13px;font-weight:400}
-.suggest-card::before{content:"+";color:var(--muted);font-size:15px;margin-right:8px}
-.suggest-card:hover{background:var(--surface-soft);border-color:var(--border-strong);color:var(--text)}
 
 /* Messages */
 .msg-row{gap:12px}
@@ -1437,8 +1396,6 @@ body{background:var(--bg);color:var(--text);font:14px/1.6 var(--font);-webkit-fo
 .composer-btn.mic.active{background:var(--danger);color:#fff}
 .composer-footer{padding:8px 4px 0;gap:12px}
 .composer-hint,.composer-enter{font-size:11px;color:var(--muted);line-height:1.5}
-.jump-latest{background:var(--surface);border:1px solid var(--border-strong);box-shadow:var(--shadow-soft);color:var(--text-soft)}
-.jump-latest:hover{background:var(--hover);border-color:var(--border-strong);color:var(--text)}
 
 /* Page headers and buttons */
 .page-head{min-height:0;padding:26px 32px 18px;gap:16px;background:var(--bg);border-bottom:0}
@@ -1598,7 +1555,6 @@ body{background:var(--bg);color:var(--text);font:14px/1.6 var(--font);-webkit-fo
   .page-head-actions .btn{flex:1 1 auto}
   .empty-hero h1{font-size:26px}
   .empty-hero .urdu-line{font-size:17px}
-  .home-suggestions{grid-template-columns:minmax(0,1fr)}
   #notepad-body{flex-direction:column}
   .notes-list-wrap{width:100%;min-width:0;max-height:210px;border-right:0;border-bottom:1px solid var(--border)}
   .note-editor-fields{padding:16px}
@@ -1656,33 +1612,10 @@ body{background:var(--bg);color:var(--text);font:14px/1.6 var(--font);-webkit-fo
 [data-theme="dark"] .topbar{background:var(--bg)}
 .nav-item:focus,.nav-item:focus-visible,.sess-item:focus,.sess-item:focus-visible{outline:none;box-shadow:none}
 .nav-item:focus-visible,.sess-item:focus-visible{background:var(--hover)}
-#view-chat.empty-chat{justify-content:center}
-#view-chat.empty-chat #chat-scroll{flex:0 0 auto;overflow:visible;padding:0}
-#view-chat.empty-chat #chat-inner{justify-content:flex-start;gap:0;padding:0 24px}
-#view-chat.empty-chat .empty-hero{max-width:720px;padding:0;margin:0 auto;text-align:center}
-#view-chat.empty-chat .empty-hero h1{font-size:28px;margin-bottom:14px}
-#view-chat.empty-chat .empty-hero p{margin-bottom:18px}
-#view-chat.empty-chat .home-suggestions{margin-top:14px}
-#view-chat.empty-chat .chat-dock{padding:0 16px 4px;background:transparent}
-[data-theme="dark"] #view-chat.empty-chat .chat-dock{background:transparent}
-#view-chat.empty-chat .composer-footer{padding-top:10px}
-@media(max-width:700px){#view-chat.empty-chat #chat-inner{padding:0 16px}#view-chat.empty-chat .empty-hero h1{font-size:24px}}
-
 /* Icon buttons keep a clear keyboard focus ring; only sidebar pages drop it. */
 .icon-btn:focus-visible,.topbar-settings:focus-visible,.hamburger:focus-visible,.dialog-close:focus-visible,.composer-btn:focus-visible,.sess-del:focus-visible{outline:2px solid var(--text);outline-offset:2px}
 
 /* Short screens: centre with auto margins so the block scrolls instead of clipping. */
-#view-chat.empty-chat{justify-content:flex-start;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain}
-#view-chat.empty-chat #chat-scroll{margin-top:auto}
-#view-chat.empty-chat .chat-dock{margin-bottom:auto}
-@media(max-height:680px){
-  #view-chat.empty-chat .empty-hero h1{font-size:24px;margin-bottom:10px}
-  #view-chat.empty-chat .empty-hero .urdu-line{font-size:17px;margin-bottom:6px}
-  #view-chat.empty-chat .empty-hero p{margin-bottom:14px;font-size:13px}
-  #view-chat.empty-chat .home-suggestions{margin-top:10px;gap:8px}
-  #view-chat.empty-chat .suggest-card{min-height:40px}
-}
-
 /* Settings: ChatGPT-style section rail with flat rows */
 #view-settings .page-head{padding:24px 32px 4px;border-bottom:0}
 #view-settings .page-head h2{font-size:20px;letter-spacing:-.01em}
@@ -1766,7 +1699,6 @@ body.sb-collapsed .new-chat-btn{margin-top:12px}
 
 /* ---------- Layout pass: centred start screen, wider chat, calmer notepad ---------- */
 .empty-hero{margin:0 auto;max-width:760px}
-.home-suggestions{width:min(640px,100%);margin:22px auto 0}
 #chat-inner{width:min(1080px,100%)}
 .composer-inner{width:min(1080px,100%)}
 .quick-tools{width:min(1080px,100%)}
@@ -1774,7 +1706,6 @@ body.sb-collapsed .new-chat-btn{margin-top:12px}
 .bubble-col.user-col{max-width:74%}
 @media(max-width:700px){
   #chat-inner,.composer-inner,.quick-tools{width:100%}
-  .home-suggestions{margin-top:16px}
 }
 
 /* Sidebar: the label must stay readable on hover in both themes */
@@ -1846,24 +1777,6 @@ body.sb-collapsed .new-chat-btn{margin-top:12px}
   .config-input{width:100%}
 }
 
-/* ---------- Start screen: greeting centred, composer pinned to the bottom ---------- */
-#view-chat.empty-chat{justify-content:flex-start;overflow:hidden}
-#view-chat.empty-chat #chat-scroll{flex:1 1 auto;margin:0;padding:0;display:flex;align-items:center;justify-content:center;overflow:visible}
-#view-chat.empty-chat #chat-inner{width:100%;justify-content:center;padding:0 24px}
-#view-chat.empty-chat .empty-hero{margin:0 auto;padding:0;text-align:center}
-#view-chat.empty-chat .chat-dock{margin:0;padding:0 16px 10px;background:transparent}
-[data-theme="dark"] #view-chat.empty-chat .chat-dock{background:transparent}
-@media(max-height:680px){
-  #view-chat.empty-chat{overflow-y:auto}
-  #view-chat.empty-chat #chat-scroll{display:block;padding:18px 0 10px}
-}
-@media(max-width:700px){
-  #view-chat.empty-chat #chat-inner{padding:0 14px}
-  #view-chat.empty-chat .chat-dock{padding:0 10px 8px}
-  #view-chat.empty-chat .composer-footer{padding-top:8px;gap:6px}
-  #view-chat.empty-chat .composer-enter{display:none}
-}
-
 /* ---------- Settings on phones: the rail becomes a chip row ---------- */
 @media(max-width:700px){
   .settings-shell{display:flex;flex-direction:column;gap:0}
@@ -1876,3 +1789,29 @@ body.sb-collapsed .new-chat-btn{margin-top:12px}
 
 /* Desktop: never keep the phone drawer offset after a resize */
 @media(min-width:921px){#sidebar{transform:none}}
+
+/* ---------- Start screen: greeting centred, composer pinned to the bottom ---------- */
+#view-chat.empty-chat{display:flex;flex-direction:column;justify-content:flex-start;overflow:hidden;overscroll-behavior:contain}
+#view-chat.empty-chat #chat-scroll{flex:1 1 auto;margin:0;padding:0;display:flex;align-items:center;justify-content:center;overflow:visible}
+#view-chat.empty-chat #chat-inner{width:100%;justify-content:center;gap:0;padding:0 24px}
+#view-chat.empty-chat .empty-hero{max-width:720px;margin:0 auto;padding:0;text-align:center}
+#view-chat.empty-chat .empty-hero h1{font-size:28px;margin-bottom:14px}
+#view-chat.empty-chat .empty-hero p{margin-bottom:18px}
+#view-chat.empty-chat .chat-dock{margin:0;padding:0 16px 10px;background:transparent}
+[data-theme="dark"] #view-chat.empty-chat .chat-dock{background:transparent}
+#view-chat.empty-chat .composer-footer{padding-top:10px}
+/* Short screens scroll the block instead of clipping the greeting. */
+@media(max-height:680px){
+  #view-chat.empty-chat{overflow-y:auto}
+  #view-chat.empty-chat #chat-scroll{display:block;padding:18px 0 10px}
+  #view-chat.empty-chat .empty-hero h1{font-size:24px;margin-bottom:10px}
+  #view-chat.empty-chat .empty-hero .urdu-line{font-size:17px;margin-bottom:6px}
+  #view-chat.empty-chat .empty-hero p{margin-bottom:14px;font-size:13px}
+}
+@media(max-width:700px){
+  #view-chat.empty-chat #chat-inner{padding:0 14px}
+  #view-chat.empty-chat .empty-hero h1{font-size:24px}
+  #view-chat.empty-chat .chat-dock{padding:0 10px 8px}
+  #view-chat.empty-chat .composer-footer{padding-top:8px;gap:6px}
+  #view-chat.empty-chat .composer-enter{display:none}
+}
