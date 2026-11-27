@@ -1874,3 +1874,6 @@ body.sb-collapsed .new-chat-btn{margin-top:12px}
   .settings-rail-item.active{background:var(--text);color:var(--bg);border-color:var(--text)}
   .settings-pane{padding-top:0;max-width:none}
 }
+
+/* Desktop: never keep the phone drawer offset after a resize */
+@media(min-width:921px){#sidebar{transform:none}}
