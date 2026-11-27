@@ -30,7 +30,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Lora:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/static/style.css?v=20261127-1">
+<link rel="stylesheet" href="/static/style.css?v=20261127-3">
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
@@ -78,13 +78,6 @@
   <div class="sb-scrim" id="sbScrim"></div>
 
   <aside id="sidebar" aria-label="Main navigation">
-    <div class="sb-header">
-      <a class="sb-brand" href="/" aria-label="Zariya home">
-        <img class="sb-mark" src="/static/logo.png" alt="">
-        <span class="sb-name">zariya</span>
-      </a>
-    </div>
-
     <button class="new-chat-btn" id="newChatBtn" type="button">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
       <span>New chat</span>
@@ -136,14 +129,9 @@
   <main id="main">
     <header class="topbar">
       <div class="topbar-left">
-        <button class="icon-btn sidebar-toggle" id="sidebarToggleBtn" type="button" aria-label="Collapse sidebar" aria-pressed="false" title="Collapse sidebar">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M9.5 4.5v15"/></svg>
-        </button>
         <button class="hamburger" id="hamburgerBtn" type="button" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
         </button>
-        <div class="mobile-brand"><img src="/static/logo.png" alt=""><span>zariya</span></div>
-        <span class="topbar-divider"></span>
         <span class="topbar-section" id="topbarSection">Chat</span>
       </div>
       <div class="topbar-right">
@@ -468,7 +456,7 @@
 </div>
 <script src="/static/workspace-sync.js?v=20261122-6"></script>
 <script src="/static/sse.js?v=20261122-4"></script>
-<script src="/static/app.js?v=20261127-1"></script>
+<script src="/static/app.js?v=20261127-2"></script>
 <script>
   window.va = window.va || function () {
     (window.vaq = window.vaq || []).push(arguments);

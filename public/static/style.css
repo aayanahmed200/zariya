@@ -1778,3 +1778,17 @@ body.auth-gate-open{overflow:hidden}
 .flip-card:hover{border-color:var(--border-strong)}
 .study-controls .sc-btn:hover{border-color:var(--muted)}
 .tag-chip.active:hover{filter:brightness(1.05)}
+
+/* Chrome cleanup: one menu button, logo only on the sign-in screen */
+.hamburger{display:flex;color:var(--text)}
+.hamburger:hover{background:var(--hover);color:var(--text)}
+.new-chat-btn{margin-top:12px}
+.new-chat-btn:hover,.new-chat-btn:focus-visible{background:var(--hover);color:var(--text)}
+.new-chat-btn:hover svg,.new-chat-btn:focus-visible svg{color:inherit}
+.empty-hero .urdu-line{text-align:center}
+body.sb-collapsed .new-chat-btn{margin-top:12px}
+
+/* Composer: centre the language picker against the mic */
+.voice-dropdown{align-self:center;margin-bottom:2px}
+.voice-dropdown-trigger{height:30px;min-width:68px;padding:0 8px;gap:6px}
+.voice-dropdown-trigger svg{opacity:.75}

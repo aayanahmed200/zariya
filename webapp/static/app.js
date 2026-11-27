@@ -737,8 +737,14 @@ function closeSidebarMobile(){
   document.getElementById('hamburgerBtn').setAttribute('aria-expanded','false');
 }
 document.getElementById('hamburgerBtn').addEventListener('click', ()=>{
-  if(document.getElementById('sidebar').classList.contains('open')) closeSidebarMobile();
-  else openSidebarMobile();
+  const drawerLayout=window.matchMedia('(max-width:920px)').matches;
+  if(drawerLayout){
+    if(document.getElementById('sidebar').classList.contains('open')) closeSidebarMobile();
+    else openSidebarMobile();
+    return;
+  }
+  applySidebarCollapsed(!document.body.classList.contains('sb-collapsed'));
+  document.getElementById('hamburgerBtn').setAttribute('aria-expanded', String(!document.body.classList.contains('sb-collapsed')));
 });
 document.getElementById('sbScrim').addEventListener('click', closeSidebarMobile);
 document.addEventListener('keydown', event=>{ if(event.key === 'Escape') closeSidebarMobile(); });
