@@ -30,7 +30,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Lora:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/static/style.css?v=20261126-8">
+<link rel="stylesheet" href="/static/style.css?v=20261126-10">
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
@@ -213,7 +213,6 @@
             </div>
           </div>
           <div class="note-editor-empty" id="noteEmptyState">
-            <span class="note-empty-mark" aria-hidden="true">✎</span>
             <h3>Your notes start here</h3>
             <p>Create a note to collect ideas, class notes and things you want to remember.</p>
             <button class="btn primary" id="createFirstNoteBtn" type="button">Create your first note</button>
@@ -255,10 +254,19 @@
         </div>
       </div>
       <div id="settings-body">
-        <div class="settings-layout">
-          <div class="setting-group">
+        <div class="settings-shell">
+          <nav class="settings-rail" id="settingsRail" aria-label="Settings sections">
+            <button class="settings-rail-item active" type="button" data-settings-target="settings-account">Account</button>
+            <button class="settings-rail-item" type="button" data-settings-target="settings-appearance">Appearance</button>
+            <button class="settings-rail-item" type="button" data-settings-target="settings-replies">Replies</button>
+            <button class="settings-rail-item" type="button" data-settings-target="settings-voice">Voice</button>
+            <button class="settings-rail-item" type="button" data-settings-target="settings-hosted">Hosted AI</button>
+            <button class="settings-rail-item" type="button" data-settings-target="settings-tools">Tools</button>
+            <button class="settings-rail-item" type="button" data-settings-target="settings-about">About</button>
+          </nav>
+          <div class="settings-pane" id="settingsPane">
+          <div class="setting-group" id="settings-account">
             <div class="setting-heading">
-              <span class="setting-icon">◎</span>
               <div><h3>Account &amp; storage</h3><p class="desc" id="storageDescriptionSettings">Your workspace is saved in this browser only.</p></div>
             </div>
             <div class="setting-content">
@@ -306,9 +314,8 @@
             </div>
           </div>
 
-          <div class="setting-group">
+          <div class="setting-group" id="settings-appearance">
             <div class="setting-heading">
-              <span class="setting-icon">◐</span>
               <div><h3>Appearance</h3><p class="desc">Keep the workspace comfortable to read.</p></div>
             </div>
             <div class="setting-content">
@@ -330,9 +337,8 @@
             </div>
           </div>
 
-          <div class="setting-group">
+          <div class="setting-group" id="settings-replies">
             <div class="setting-heading">
-              <span class="setting-icon">✎</span>
               <div><h3>Response style</h3><p class="desc">Adjust the tone and creativity of hosted model replies.</p></div>
             </div>
             <div class="setting-content">
@@ -363,9 +369,8 @@
             </div>
           </div>
 
-          <div class="setting-group">
+          <div class="setting-group" id="settings-voice">
             <div class="setting-heading">
-              <span class="setting-icon">◖</span>
               <div><h3>Voice</h3><p class="desc">Use the speech features available in your browser.</p></div>
             </div>
             <div class="setting-content">
@@ -380,9 +385,8 @@
             </div>
           </div>
 
-          <div class="setting-group hosted-ai-setting">
+          <div class="setting-group hosted-ai-setting" id="settings-hosted">
             <div class="setting-heading">
-              <span class="setting-icon hosted-ai-icon">✦</span>
               <div><h3>Hosted AI</h3><p class="desc">Free hosted model access. No install, account, or personal API key.</p></div>
             </div>
             <div class="setting-content">
@@ -401,9 +405,8 @@
             </div>
           </div>
 
-          <div class="setting-group">
+          <div class="setting-group" id="settings-tools">
             <div class="setting-heading">
-              <span class="setting-icon">⌕</span>
               <div><h3>Optional tools</h3><p class="desc">Some tools need a separate service configuration.</p></div>
             </div>
             <div class="setting-content">
@@ -411,14 +414,14 @@
             </div>
           </div>
 
-          <div class="setting-group about-setting">
+          <div class="setting-group about-setting" id="settings-about">
             <div class="setting-heading">
-              <span class="setting-icon">i</span>
               <div><h3>About Zariya</h3><p class="desc">An Urdu and English workspace for questions, notes and learning.</p></div>
             </div>
             <div class="setting-content about-copy">
               Zariya is an Urdu and English workspace for chat, notes and flashcards. Your workspace syncs to secure cloud storage when available, with a copy in this browser as a fallback.
             </div>
+          </div>
           </div>
         </div>
       </div>
@@ -443,7 +446,7 @@
 </div>
 <script src="/static/workspace-sync.js?v=20261122-6"></script>
 <script src="/static/sse.js?v=20261122-4"></script>
-<script src="/static/app.js?v=20261126-3"></script>
+<script src="/static/app.js?v=20261126-4"></script>
 <script>
   window.va = window.va || function () {
     (window.vaq = window.vaq || []).push(arguments);
