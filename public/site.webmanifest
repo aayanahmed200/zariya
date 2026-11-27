@@ -1,5 +1,5 @@
 {
-  "name": "Zariya — Free Urdu & English AI Workspace",
+  "name": "Zariya \u2014 Free Urdu & English AI Workspace",
   "short_name": "Zariya",
   "description": "A hosted Urdu and English AI workspace for chat, notes and flashcards.",
   "start_url": "/",
@@ -9,12 +9,21 @@
   "theme_color": "#ef702f",
   "icons": [
     {
-      "src": "/favicon.png?v=20261122-5",
+      "src": "/favicon.png?v=20261127-1",
       "sizes": "128x128",
       "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/favicon.svg?v=20261127-1",
+      "sizes": "any",
+      "type": "image/svg+xml",
       "purpose": "any"
     }
   ],
   "lang": "en",
-  "categories": ["education", "productivity"]
+  "categories": [
+    "education",
+    "productivity"
+  ]
 }

@@ -417,13 +417,17 @@ def web_search():
         return jsonify({"error": "No query provided"}), 400
     if len(query) > MAX_TOTAL_CONTENT_CHARS:
         return jsonify({"error": f"Search query is too long (max {MAX_TOTAL_CONTENT_CHARS} characters)"}), 413
-    if not (GOOGLE_API_KEY and GOOGLE_CX):
-        return jsonify({"error": "Web search isn't configured on this server. "
-                                  "Set GOOGLE_API_KEY and GOOGLE_CX in .env."}), 400
+    key = (body.get("key") or "").strip() or GOOGLE_API_KEY
+    cx = (body.get("cx") or "").strip() or GOOGLE_CX
+    if not (key and cx):
+        return jsonify({"error": "Web search needs a Google API key and Search engine ID. "
+                                  "Add them in Settings - Web search."}), 400
+    if len(key) > 200 or len(cx) > 64:
+        return jsonify({"error": "The saved web search keys look invalid. Re-enter them in Settings."}), 400
     try:
         res = requests.get(
             "https://www.googleapis.com/customsearch/v1",
-            params={"key": GOOGLE_API_KEY, "cx": GOOGLE_CX, "q": query},
+            params={"key": key, "cx": cx, "q": query},
             timeout=15,
         )
         res.raise_for_status()
@@ -665,6 +669,11 @@ def favicon():
 @app.route("/favicon.png")
 def favicon_png():
     return send_from_directory(PUBLIC_DIR, "favicon.png", mimetype="image/png", max_age=3600)
+
+@app.route("/apple-touch-icon.png")
+def apple_touch_icon():
+    return send_from_directory(PUBLIC_DIR, "apple-touch-icon.png", mimetype="image/png", max_age=3600)
+
 
 @app.route("/robots.txt")
 def robots_txt():

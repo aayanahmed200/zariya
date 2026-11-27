@@ -11,8 +11,10 @@
 <meta name="author" content="Zariya">
 <title>Zariya — Free Urdu &amp; English AI Workspace</title>
 <link rel="canonical" href="https://zariyas.vercel.app/">
-<link rel="icon" type="image/png" sizes="128x128" href="/favicon.png?v=20261122-5">
-<link rel="shortcut icon" type="image/png" href="/favicon.png?v=20261122-5">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg?v=20261127-1">
+<link rel="icon" type="image/png" sizes="128x128" href="/favicon.png?v=20261127-1">
+<link rel="shortcut icon" type="image/png" href="/favicon.png?v=20261127-1">
+<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png?v=20261127-1">
 <link rel="apple-touch-icon" sizes="128x128" href="/static/logo.png?v=20261122-4">
 <link rel="manifest" href="/site.webmanifest?v=20261122-5">
 <meta property="og:type" content="website">
@@ -30,7 +32,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Lora:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/static/style.css?v=20261127-6">
+<link rel="stylesheet" href="/static/style.css?v=20261127-7">
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
@@ -52,6 +54,11 @@
 </script>
 </head>
 <body>
+<div class="boot-splash" id="bootSplash" aria-hidden="true">
+  <img class="boot-mark" src="/favicon.svg?v=20261127-1" alt="">
+  <span class="boot-word">zariya</span>
+</div>
+
 <div id="app">
   <div class="sb-scrim" id="sbScrim"></div>
 
@@ -249,6 +256,8 @@
             <button class="settings-rail-item" type="button" data-settings-target="settings-replies">Replies</button>
             <button class="settings-rail-item" type="button" data-settings-target="settings-voice">Voice</button>
             <button class="settings-rail-item" type="button" data-settings-target="settings-hosted">Hosted AI</button>
+            <button class="settings-rail-item" type="button" data-settings-target="settings-learning">Learning</button>
+            <button class="settings-rail-item" type="button" data-settings-target="settings-search">Web search</button>
           </nav>
           <div class="settings-pane" id="settingsPane">
           <div class="setting-group" id="settings-account">
@@ -342,6 +351,48 @@
             </div>
           </div>
 
+
+          <div class="setting-group" id="settings-learning">
+            <div class="setting-heading">
+              <div><h3>Learning from your feedback</h3><p class="desc">Every answer and rating is saved on this device as training data for a future Zariya model.</p></div>
+            </div>
+            <div class="setting-content">
+              <div class="learning-stats">
+                <div><strong id="trainingTotal">0</strong><span>Answers saved</span></div>
+                <div><strong id="trainingUp">0</strong><span>Marked helpful</span></div>
+                <div><strong id="trainingDown">0</strong><span>Not helpful</span></div>
+              </div>
+              <p class="learning-note" id="trainingNote">Use Helpful or Not helpful under any reply to rate it. Nothing leaves this browser.</p>
+              <div class="workspace-backup-actions">
+                <button class="btn primary" id="exportTrainingBtn" type="button">Export training data</button>
+                <button class="btn" id="clearTrainingBtn" type="button">Clear data</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="setting-group" id="settings-search">
+            <div class="setting-heading">
+              <div><h3>Web search</h3><p class="desc">Add your own Google Programmable Search key to use the Search web tool.</p></div>
+            </div>
+            <div class="setting-content">
+              <div class="setting-row search-config-row">
+                <div><label for="searchKeyInput">Google API key</label><div class="sub">Created in Google Cloud Console for Custom Search API.</div></div>
+                <input class="config-input" id="searchKeyInput" type="password" autocomplete="off" spellcheck="false" placeholder="AIza…">
+              </div>
+              <div class="setting-row search-config-row">
+                <div><label for="searchCxInput">Search engine ID</label><div class="sub">The cx value from your Programmable Search Engine.</div></div>
+                <input class="config-input" id="searchCxInput" type="text" autocomplete="off" spellcheck="false" placeholder="0123456789abcdef0">
+              </div>
+              <div class="setting-row">
+                <div><span class="sub" id="searchConfigStatus">Not configured</span></div>
+                <div class="workspace-backup-actions">
+                  <button class="btn primary" id="saveSearchConfigBtn" type="button">Save keys</button>
+                  <button class="btn" id="clearSearchConfigBtn" type="button">Remove</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
           <div class="setting-group hosted-ai-setting" id="settings-hosted">
             <div class="setting-heading">
               <div><h3>Hosted AI</h3><p class="desc">Free hosted model access. No install, account, or personal API key.</p></div>
@@ -387,7 +438,7 @@
 </div>
 <script src="/static/workspace-sync.js?v=20261122-6"></script>
 <script src="/static/sse.js?v=20261122-4"></script>
-<script src="/static/app.js?v=20261127-7"></script>
+<script src="/static/app.js?v=20261127-9"></script>
 <script>
   window.va = window.va || function () {
     (window.vaq = window.vaq || []).push(arguments);

@@ -735,9 +735,11 @@ def test_transparent_favicon_is_used_by_page_and_manifest():
     import json
     html = (ROOT / "webapp" / "templates" / "index.html").read_text(encoding="utf-8")
     manifest = json.loads((ROOT / "public" / "site.webmanifest").read_text(encoding="utf-8"))
-    assert 'href="/favicon.png?v=20261122-5"' in html
-    assert manifest["icons"][0]["src"] == "/favicon.png?v=20261122-5"
+    assert 'href="/favicon.svg?v=20261127-1"' in html
+    assert 'href="/favicon.png?v=20261127-1"' in html
+    assert manifest["icons"][0]["src"] == "/favicon.png?v=20261127-1"
     assert manifest["icons"][0]["type"] == "image/png"
+    assert any(icon["type"] == "image/svg+xml" for icon in manifest["icons"])
 
 
 def test_voice_state_is_initialized_before_composer_handlers():

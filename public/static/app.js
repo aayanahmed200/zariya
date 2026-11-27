@@ -596,7 +596,7 @@ function renderAccountUI(){
   const searchStatus=document.getElementById('searchStatusText');
   if(searchStatus) searchStatus.textContent=serverConfig.searchConfigured ? 'Available' : 'Not configured';
   const searchTool=document.querySelector('[data-tool="websearch"]');
-  if(searchTool) searchTool.hidden=!serverConfig.searchConfigured;
+  if(searchTool) searchTool.hidden=false;
   updateOnboardingBanner();
 }
   const ONBOARDING_DISMISS_KEY = 'zariya_onboarding_dismissed';
@@ -891,6 +891,7 @@ function sendFeedback(idx, rating, btn){
   const session = currentSession(); if(!session) return;
   const userMsg = session.messages.slice(0,idx).reverse().find(message=>message.role==='user');
   if(!userMsg || btn.dataset.pending==='true') return;
+  rateTrainingSample(userMsg.content, session.messages[idx] ? session.messages[idx].content : '', rating);
   const row = btn.closest('.msg-actions');
   const controls = row ? [...row.querySelectorAll('[data-act="up"],[data-act="down"]')] : [btn];
   controls.forEach(control=>{control.disabled=true;});
@@ -1101,6 +1102,7 @@ async function respondTo(session){
   }
   if(!reply) reply='I couldn’t generate a response. Please try again.';
   session.messages.push({role:'assistant',content:reply,ts:nowISO()});
+  logTrainingSample(([...session.messages].reverse().find(message=>message.role==='user')||{}).content, reply);
   saveServerState();
   if(currentSessionId===session.id) renderChat();
   if(uiPrefs.ttsEnabled) speak(reply);
@@ -1195,8 +1197,17 @@ async function runQuickTool(tool){
     } else if(tool==='websearch'){
       const lastUser=[...session.messages].reverse().find(m=>m.role==='user');
       if(!lastUser) return;
+      const searchConfig=loadSearchConfig();
+      if(!searchReady()){
+        const hint=document.getElementById('composerHint');
+        if(hint) hint.textContent='Web search needs a Google API key and Search engine ID. Add them in Settings → Web search.';
+        switchView('settings');
+        const railItem=document.querySelector('[data-settings-target="settings-search"]');
+        if(railItem) railItem.click();
+        return;
+      }
       showThinking();
-      const res=await apiPost('/api/search',{query:lastUser.content});
+      const res=await apiPost('/api/search',{query:lastUser.content,key:searchConfig.key,cx:searchConfig.cx});
       removeThinking();
       if(!res.results || !res.results.length){
         session.messages.push({role:'assistant',content:'No web results came back for that search.',ts:nowISO()});
@@ -2329,6 +2340,144 @@ document.addEventListener('click', async event=>{
   }
   window.setTimeout(()=>{ if(button.isConnected) button.textContent = originalLabel; }, 1400);
 });
+
+/* ============ LEARNING DATA ============ */
+const TRAINING_KEY = 'zariya_training_v1';
+const TRAINING_LIMIT = 1000;
+function loadTraining(){
+  try{
+    const parsed = JSON.parse(localStorage.getItem(TRAINING_KEY) || '[]');
+    return Array.isArray(parsed) ? parsed : [];
+  }catch(error){ return []; }
+}
+function saveTraining(list){
+  try{ localStorage.setItem(TRAINING_KEY, JSON.stringify(list.slice(-TRAINING_LIMIT))); }
+  catch(error){}
+  renderTrainingStats();
+}
+function logTrainingSample(prompt, answer){
+  if(!prompt || !answer) return;
+  const list = loadTraining();
+  list.push({
+    id: uid(),
+    ts: new Date().toISOString(),
+    prompt: String(prompt).slice(0, 4000),
+    answer: String(answer).slice(0, 8000),
+    model: serverConfig.aiModel || '',
+    rating: null
+  });
+  saveTraining(list);
+}
+function rateTrainingSample(prompt, answer, rating){
+  const list = loadTraining();
+  let target = null;
+  for(let i = list.length - 1; i >= 0; i--){
+    if(list[i].prompt === prompt && (!answer || list[i].answer === answer)){ target = list[i]; break; }
+  }
+  if(target){ target.rating = rating; target.ratedAt = new Date().toISOString(); }
+  else {
+    list.push({ id: uid(), ts: new Date().toISOString(), prompt: String(prompt || '').slice(0, 4000), answer: String(answer || '').slice(0, 8000), model: serverConfig.aiModel || '', rating });
+  }
+  saveTraining(list);
+}
+function renderTrainingStats(){
+  const list = loadTraining();
+  const total = document.getElementById('trainingTotal');
+  const up = document.getElementById('trainingUp');
+  const down = document.getElementById('trainingDown');
+  if(total) total.textContent = String(list.length);
+  if(up) up.textContent = String(list.filter(item => item.rating === 'up').length);
+  if(down) down.textContent = String(list.filter(item => item.rating === 'down').length);
+  const note = document.getElementById('trainingNote');
+  if(note){
+    note.textContent = list.length
+      ? 'Rate more answers to make the training set stronger. Nothing leaves this browser until you export it.'
+      : 'Use Helpful or Not helpful under any reply to rate it. Nothing leaves this browser.';
+  }
+  const exportBtn = document.getElementById('exportTrainingBtn');
+  if(exportBtn) exportBtn.disabled = list.length === 0;
+  const clearBtn = document.getElementById('clearTrainingBtn');
+  if(clearBtn) clearBtn.disabled = list.length === 0;
+}
+function exportTrainingData(){
+  const list = loadTraining();
+  if(!list.length) return;
+  const lines = list.map(item => JSON.stringify({
+    messages: [
+      { role: 'user', content: item.prompt },
+      { role: 'assistant', content: item.answer }
+    ],
+    rating: item.rating || null,
+    model: item.model || null,
+    created: item.ts
+  }));
+  const date = new Date().toISOString().slice(0, 10);
+  downloadFile('zariya-training-' + date + '.jsonl', lines.join('\n'), 'application/x-ndjson;charset=utf-8');
+}
+const exportTrainingBtn = document.getElementById('exportTrainingBtn');
+if(exportTrainingBtn) exportTrainingBtn.addEventListener('click', exportTrainingData);
+const clearTrainingBtn = document.getElementById('clearTrainingBtn');
+if(clearTrainingBtn) clearTrainingBtn.addEventListener('click', () => {
+  if(!window.confirm('Delete the answers and ratings saved for training?')) return;
+  saveTraining([]);
+});
+
+/* ============ WEB SEARCH KEYS ============ */
+const SEARCH_CONFIG_KEY = 'zariya_search_config_v1';
+function loadSearchConfig(){
+  try{
+    const parsed = JSON.parse(localStorage.getItem(SEARCH_CONFIG_KEY) || '{}');
+    return { key: typeof parsed.key === 'string' ? parsed.key : '', cx: typeof parsed.cx === 'string' ? parsed.cx : '' };
+  }catch(error){ return { key: '', cx: '' }; }
+}
+function searchReady(){
+  const config = loadSearchConfig();
+  return !!(serverConfig.searchConfigured || (config.key && config.cx));
+}
+function renderSearchConfig(){
+  const config = loadSearchConfig();
+  const keyInput = document.getElementById('searchKeyInput');
+  const cxInput = document.getElementById('searchCxInput');
+  if(keyInput && document.activeElement !== keyInput) keyInput.value = config.key;
+  if(cxInput && document.activeElement !== cxInput) cxInput.value = config.cx;
+  const status = document.getElementById('searchConfigStatus');
+  if(status){
+    status.textContent = serverConfig.searchConfigured
+      ? 'Configured on this server. Your own key is optional.'
+      : (config.key && config.cx ? 'Saved on this device. Search web is ready.' : 'Not configured');
+  }
+  const tool = document.querySelector('[data-tool="websearch"]');
+  if(tool) tool.hidden = false;
+  const searchStatus = document.getElementById('searchStatusText');
+  if(searchStatus) searchStatus.textContent = searchReady() ? 'Available' : 'Not configured';
+}
+const saveSearchConfigBtn = document.getElementById('saveSearchConfigBtn');
+if(saveSearchConfigBtn) saveSearchConfigBtn.addEventListener('click', () => {
+  const key = (document.getElementById('searchKeyInput').value || '').trim();
+  const cx = (document.getElementById('searchCxInput').value || '').trim();
+  try{ localStorage.setItem(SEARCH_CONFIG_KEY, JSON.stringify({ key, cx })); }catch(error){}
+  renderSearchConfig();
+  const hint = document.getElementById('composerHint');
+  if(hint && key && cx) hint.textContent = 'Web search keys saved on this device.';
+});
+const clearSearchConfigBtn = document.getElementById('clearSearchConfigBtn');
+if(clearSearchConfigBtn) clearSearchConfigBtn.addEventListener('click', () => {
+  try{ localStorage.removeItem(SEARCH_CONFIG_KEY); }catch(error){}
+  renderSearchConfig();
+});
+renderTrainingStats();
+renderSearchConfig();
+
+/* ============ BOOT SPLASH ============ */
+(() => {
+  const splash = document.getElementById('bootSplash');
+  if(!splash) return;
+  const hide = () => {
+    splash.classList.add('done');
+    window.setTimeout(() => { if(splash.parentNode) splash.parentNode.removeChild(splash); }, 600);
+  };
+  window.setTimeout(hide, 480);
+})();
 })();
 
 /* Settings rail: one section at a time. */
