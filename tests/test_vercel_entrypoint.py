@@ -41,7 +41,7 @@ def test_static_seo_assets_exist():
 def test_profile_avatar_has_nonempty_fallback_and_public_copy_matches():
     app_source = (ROOT / "webapp" / "static" / "app.js").read_text(encoding="utf-8")
     public_source = (ROOT / "public" / "static" / "app.js").read_text(encoding="utf-8")
-    assert "escapeHtml(me.avatar||'/static/logo.png')" in app_source
+    assert "sbAvatar.textContent='Z'" in app_source
     assert app_source == public_source
 
 
@@ -736,45 +736,6 @@ def test_transparent_favicon_is_used_by_page_and_manifest():
     assert 'href="/favicon.png?v=20261122-5"' in html
     assert manifest["icons"][0]["src"] == "/favicon.png?v=20261122-5"
     assert manifest["icons"][0]["type"] == "image/png"
-
-
-def test_github_sign_in_is_disabled_with_setup_instructions_when_not_configured():
-    html = (ROOT / "webapp" / "templates" / "index.html").read_text(encoding="utf-8")
-    source = (ROOT / "webapp" / "static" / "app.js").read_text(encoding="utf-8")
-    button = re.search(r'<button[^>]*id="githubSignInBtn"[^>]*>', html).group(0)
-    assert "disabled" in button
-    assert 'aria-disabled="true"' in button
-    assert 'id="githubSetupPanel"' in html
-    assert "https://zariyas.vercel.app/auth/github/callback" in html
-    assert "GITHUB_CLIENT_ID" in html
-    assert "GITHUB_CLIENT_SECRET" in html
-    assert "GitHub sign-in is not configured on this deployment" in html
-    assert "signInButton.disabled=true" in source
-    assert "signInButton.removeAttribute('aria-disabled')" in source
-    assert "Set up GitHub sign-in" not in source
-    assert "serverConfig.githubConfigured ? 'flex' : 'none'" not in source
-
-
-def test_github_login_uses_canonical_callback_and_signed_oauth_state(monkeypatch):
-    from webapp import app as webapp_module
-    monkeypatch.setattr(webapp_module, "GITHUB_OAUTH_CONFIGURED", True)
-    monkeypatch.setattr(webapp_module, "GITHUB_CLIENT_ID", "test-client-id")
-    monkeypatch.setattr(webapp_module, "APP_BASE_URL", "https://zariyas.vercel.app")
-    client = index.app.test_client()
-    response = client.get("/auth/github/login")
-    assert response.status_code == 302
-    from urllib.parse import urlparse, parse_qs
-    query = parse_qs(urlparse(response.location).query)
-    assert query["client_id"] == ["test-client-id"]
-    assert query["redirect_uri"] == ["https://zariyas.vercel.app/auth/github/callback"]
-    assert len(query["state"][0]) >= 32
-
-
-def test_github_callback_rejects_missing_or_wrong_state():
-    client = index.app.test_client()
-    response = client.get("/auth/github/callback?code=test&state=wrong")
-    assert response.status_code == 302
-    assert "authError=" in response.location
 
 
 def test_voice_state_is_initialized_before_composer_handlers():

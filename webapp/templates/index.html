@@ -30,7 +30,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Lora:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/static/style.css?v=20261127-3">
+<link rel="stylesheet" href="/static/style.css?v=20261127-4">
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
@@ -52,28 +52,6 @@
 </script>
 </head>
 <body>
-<div class="auth-gate" id="authGate" hidden>
-  <div class="auth-card">
-    <a class="auth-brand" href="/" aria-label="Zariya"><img src="/static/logo.png" alt=""><span>zariya</span></a>
-    <h1>Sign in to Zariya</h1>
-    <p class="auth-lead">Chat, notes and flashcards stay together — and follow you to any device.</p>
-    <div class="auth-actions">
-      <button class="auth-btn auth-google" id="authGoogleBtn" type="button">
-        <svg viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
-        <span>Continue with Google</span>
-      </button>
-      <button class="auth-btn auth-github" id="authGithubBtn" type="button">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 .8a11.2 11.2 0 0 0-3.54 21.82c.56.1.77-.24.77-.54v-2.1c-3.14.68-3.8-1.33-3.8-1.33-.51-1.3-1.26-1.65-1.26-1.65-1.02-.7.08-.69.08-.69 1.13.08 1.73 1.16 1.73 1.16 1 .1.77 1.48 2.55 1.1.1-.72.4-1.2.73-1.48-2.5-.28-5.13-1.25-5.13-5.57 0-1.23.44-2.24 1.16-3.03-.12-.28-.5-1.43.1-2.98 0 0 .94-.3 3.08 1.16a10.7 10.7 0 0 1 5.6 0c2.14-1.46 3.08-1.16 3.08-1.16.6 1.55.22 2.7.1 2.98.72.79 1.15 1.8 1.15 3.03 0 4.33-2.63 5.28-5.14 5.56.4.35.77 1.03.77 2.08v3.08c0 .3.2.65.78.54A11.2 11.2 0 0 0 12 .8Z"/></svg>
-        <span>Continue with GitHub</span>
-      </button>
-    </div>
-    <div class="auth-or"><span>or</span></div>
-    <button class="auth-guest" id="authGuestBtn" type="button">Continue as guest</button>
-    <p class="auth-note">Guest mode keeps your chats, notes and flashcards on this device. Nothing is uploaded.</p>
-    <p class="auth-error" id="authError" role="alert" hidden></p>
-  </div>
-</div>
-
 <div id="app">
   <div class="sb-scrim" id="sbScrim"></div>
 
@@ -266,7 +244,7 @@
       <div id="settings-body">
         <div class="settings-shell">
           <nav class="settings-rail" id="settingsRail" aria-label="Settings sections">
-            <button class="settings-rail-item active" type="button" data-settings-target="settings-account">Account</button>
+            <button class="settings-rail-item active" type="button" data-settings-target="settings-account">Storage</button>
             <button class="settings-rail-item" type="button" data-settings-target="settings-appearance">Appearance</button>
             <button class="settings-rail-item" type="button" data-settings-target="settings-replies">Replies</button>
             <button class="settings-rail-item" type="button" data-settings-target="settings-voice">Voice</button>
@@ -277,38 +255,9 @@
           <div class="settings-pane" id="settingsPane">
           <div class="setting-group" id="settings-account">
             <div class="setting-heading">
-              <div><h3>Account &amp; storage</h3><p class="desc" id="storageDescriptionSettings">Your workspace is saved in this browser only.</p></div>
+              <div><h3>Storage</h3><p class="desc" id="storageDescriptionSettings">Your workspace is saved in this browser only.</p></div>
             </div>
             <div class="setting-content">
-              <div class="setting-row" id="accountSignedOutRow">
-                <div class="account-connect-copy"><label>Connect your GitHub account</label><div class="sub" id="githubConfigNote">GitHub sign-in is not configured on this deployment. Everything below still works without an account.</div></div>
-                <button class="btn github-sign-in" id="githubSignInBtn" type="button" disabled aria-disabled="true" title="GitHub sign-in is not configured on this deployment">
-                  <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 .8a11.2 11.2 0 0 0-3.54 21.82c.56.1.77-.24.77-.54v-2.1c-3.14.68-3.8-1.33-3.8-1.33-.51-1.3-1.26-1.65-1.26-1.65-1.02-.7.08-.69.08-.69 1.13.08 1.73 1.16 1.73 1.16 1 .1.77 1.48 2.55 1.1.1-.72.4-1.2.73-1.48-2.5-.28-5.13-1.25-5.13-5.57 0-1.23.44-2.24 1.16-3.03-.12-.28-.5-1.43.1-2.98 0 0 .94-.3 3.08 1.16a10.7 10.7 0 0 1 5.6 0c2.14-1.46 3.08-1.16 3.08-1.16.6 1.55.22 2.7.1 2.98.72.79 1.15 1.8 1.15 3.03 0 4.33-2.63 5.28-5.14 5.56.4.35.77 1.03.77 2.08v3.08c0 .3.2.65.78.54A11.2 11.2 0 0 0 12 .8Z"/></svg>
-                  <span>Sign-in unavailable</span>
-                </button>
-              </div>
-              <div class="github-setup-panel" id="githubSetupPanel" hidden>
-                <div class="github-setup-heading"><strong>Finish the one-time GitHub setup</strong><span>About two minutes</span></div>
-                <p>Create a GitHub OAuth App, then add its Client ID and Client Secret to your Vercel project. Keep the secret in Vercel; never paste it into this page or commit it to GitHub.</p>
-                <div class="github-url-field">
-                  <span>Homepage URL</span>
-                  <code>https://zariyas.vercel.app</code>
-                </div>
-                <div class="github-url-field">
-                  <span>Authorization callback URL</span>
-                  <code>https://zariyas.vercel.app/auth/github/callback</code>
-                  <button type="button" class="github-copy-url" id="copyGithubCallbackBtn">Copy</button>
-                </div>
-                <a class="github-setup-link" href="https://github.com/settings/developers" target="_blank" rel="noopener noreferrer">Open GitHub Developer settings ↗</a>
-                <p class="github-setup-footnote">In Vercel → Project Settings → Environment Variables, add <code>GITHUB_CLIENT_ID</code> and <code>GITHUB_CLIENT_SECRET</code> for Production, Preview and Development. A stable session secret and the callback URL have already been prepared in this project.</p>
-                <p class="github-setup-footnote" id="githubStorageNote">GitHub sign-in identifies your profile. Without Supabase, chats, notes and flashcards remain on this device.</p>
-              </div>
-              <div class="account-auth-status" id="accountAuthStatus" role="status" aria-live="polite" hidden></div>
-              <div class="setting-row signed-in-row" id="accountSignedInRow" style="display:none;">
-                <img id="accountAvatar" src="/static/logo.png" alt="Profile avatar">
-                <div class="account-details"><strong id="accountName"></strong><span class="sub" id="accountBio"></span></div>
-                <button class="btn danger" id="githubSignOutBtn" type="button">Sign out</button>
-              </div>
               <div class="workspace-backup">
                 <div>
                   <strong>Protect your workspace</strong>
@@ -456,7 +405,7 @@
 </div>
 <script src="/static/workspace-sync.js?v=20261122-6"></script>
 <script src="/static/sse.js?v=20261122-4"></script>
-<script src="/static/app.js?v=20261127-2"></script>
+<script src="/static/app.js?v=20261127-3"></script>
 <script>
   window.va = window.va || function () {
     (window.vaq = window.vaq || []).push(arguments);

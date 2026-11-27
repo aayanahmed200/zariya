@@ -214,7 +214,7 @@ function updateStorageIndicators(){
   const synced=!!(signedIn && serverConfig.supabaseConfigured && stateBackendAvailable && !localStateMessage);
   const profileName=document.getElementById('sbProfileName');
   const caption=document.getElementById('storageCaption');
-  if(profileName && !signedIn) profileName.textContent='Guest';
+  if(profileName && !signedIn) profileName.textContent='This device';
   if(profileName && signedIn) profileName.textContent=synced ? 'Cloud workspace' : 'Saved in this browser';
   if(caption) caption.textContent=synced ? 'Synced to cloud' : 'This device only';
 }
@@ -375,14 +375,13 @@ function mergeWorkspaceState(remote, cached){
 }
 
 async function loadServerState(){
-  const results = await Promise.allSettled([apiGet('/api/config'), apiGet('/api/me')]);
+  const results = await Promise.allSettled([apiGet('/api/config')]);
   serverConfig = results[0].status === 'fulfilled' ? results[0].value : {
     hostedMode:true, aiConfigured:false, aiAvailable:false, aiProvider:'Kilo AI Gateway',
     aiStatus:'The app server could not be reached. Refresh to retry.',
     aiModel:'kilo-auto/free', searchConfigured:false, githubConfigured:false,
     supabaseConfigured:false, storageMode:'browser'
   };
-  me = results[1].status === 'fulfilled' ? results[1].value : { signedIn:false, githubConfigured:false };
 
   const stateKey=localWorkspaceStateKey();
   const cached=LS.get(stateKey,emptyWorkspaceState());
@@ -429,22 +428,14 @@ async function loadServerState(){
     ? 'Your workspace syncs securely across devices.'
     : (me.signedIn
       ? 'Your workspace is saved in this browser only.'
-      : 'Guest mode: your workspace is saved on this device.');
+      : 'Your workspace is saved on this device.');
   ['storageDescription','storageDescriptionSettings'].forEach(id=>{
     const el = document.getElementById(id);
     if(el) el.textContent = storageCopy;
   });
   const backupDescription=document.getElementById('workspaceBackupDescription');
   if(backupDescription){
-    backupDescription.textContent=serverConfig.supabaseConfigured
-      ? 'Chats, notes and flashcards sync to your account. You can still export a private backup at any time.'
-      : 'Chats, notes and flashcards are saved in this browser only. Export a backup before clearing browser data or moving devices.';
-  }
-  const githubStorageNote=document.getElementById('githubStorageNote');
-  if(githubStorageNote){
-    githubStorageNote.textContent=serverConfig.supabaseConfigured
-      ? 'With Supabase connected, your workspace syncs across devices for this GitHub account.'
-      : 'GitHub sign-in identifies your profile. Without Supabase, chats, notes and flashcards remain on this device.';
+    backupDescription.textContent='Chats, notes and flashcards are saved in this browser only. Export a backup before clearing browser data or moving devices.';
   }
   updateStorageStatus((stateBackendAvailable || !serverConfig.hostedMode) && !localStateMessage,
     localStateMessage || (serverConfig.supabaseConfigured && stateBackendAvailable
@@ -493,7 +484,7 @@ function saveServerState(){
     updateStorageStatus(saved,saved
       ? (localStateMessage || (me.signedIn
         ? 'Saved in this browser only. Connect Supabase to sync across devices.'
-        : 'Guest mode: saved on this device only.'))
+        : 'Saved on this device only.'))
       : 'This browser could not save more data. Export a backup and free up browser storage.');
     return saved;
   }
@@ -585,41 +576,10 @@ function updateStatusPill(){
 function renderAccountUI(){
   const sbAvatar=document.getElementById('sbProfileAvatar');
   const sbName=document.getElementById('sbProfileName');
-  const signedOutRow=document.getElementById('accountSignedOutRow');
-  const signedInRow=document.getElementById('accountSignedInRow');
-  const configNote=document.getElementById('githubConfigNote');
-
-  if(me.signedIn){
-    sbName.textContent=me.name || me.login;
-    sbAvatar.innerHTML='<img src="'+escapeHtml(me.avatar||'/static/logo.png')+'" alt="">';
-    signedOutRow.style.display='none';
-    signedInRow.style.display='flex';
-    document.getElementById('accountAvatar').src=me.avatar || '/static/logo.png';
-    document.getElementById('accountName').textContent=me.name || me.login;
-    document.getElementById('accountBio').textContent=me.bio || '';
-  }else{
-    sbName.textContent='Guest';
-    const guestCaption=document.getElementById('sbProfileCaption');
-    if(guestCaption) guestCaption.textContent='Sign in to sync';
-    sbAvatar.textContent='Z';
-    signedOutRow.style.display='flex';
-    signedInRow.style.display='none';
-  }
-  const setupPanel=document.getElementById('githubSetupPanel');
-  const signInButton=document.getElementById('githubSignInBtn');
-  if(serverConfig.githubConfigured){
-    configNote.textContent='Connect your GitHub profile. Your workspace data remains saved on this device.';
-    signInButton.disabled=false;
-    signInButton.removeAttribute('aria-disabled');
-    signInButton.querySelector('span').textContent='Sign in with GitHub';
-    if(setupPanel) setupPanel.hidden=true;
-  }else{
-    configNote.textContent='GitHub sign-in is not configured on this deployment. Everything else works without an account.';
-    signInButton.disabled=true;
-    signInButton.setAttribute('aria-disabled','true');
-    signInButton.querySelector('span').textContent='Sign-in unavailable';
-    if(setupPanel) setupPanel.hidden=false;
-  }
+  sbName.textContent='This device';
+  const localCaption=document.getElementById('sbProfileCaption');
+  if(localCaption) localCaption.textContent='Saved locally';
+  sbAvatar.textContent='Z';
 
   const modelStatus=document.getElementById('aiModelStatusText');
   if(modelStatus) modelStatus.textContent=serverConfig.aiStatus || 'Checking hosted model…';
@@ -650,54 +610,7 @@ function renderAccountUI(){
   }
   const onboardingDismissBtn = document.getElementById('onboardingDismissBtn');
   if(onboardingDismissBtn) onboardingDismissBtn.addEventListener('click', ()=>{ LS.set(ONBOARDING_DISMISS_KEY, true); updateOnboardingBanner(); });
-document.getElementById('sbProfileRow').addEventListener('click', ()=>{
-  if(!me.signedIn && window.zariyaShowAuthGate){ window.zariyaShowAuthGate(); return; }
-  switchView('settings');
-});
-document.getElementById('githubSignInBtn').addEventListener('click', ()=>{
-  if(!serverConfig.githubConfigured) return;
-  window.location.href = '/auth/github/login';
-});
-document.getElementById('copyGithubCallbackBtn').addEventListener('click', async ()=>{
-  const status=document.getElementById('accountAuthStatus');
-  const value='https://zariyas.vercel.app/auth/github/callback';
-  try{
-    if(!navigator.clipboard || !navigator.clipboard.writeText) throw new Error('Clipboard unavailable');
-    await navigator.clipboard.writeText(value);
-    status.textContent='Callback URL copied.';
-    status.hidden=false;
-  }catch(error){
-    status.textContent='Copy is not available in this browser. Select the callback URL above and copy it manually.';
-    status.hidden=false;
-  }
-});
-document.getElementById('githubSignOutBtn').addEventListener('click', async ()=>{
-  const button=document.getElementById('githubSignOutBtn');
-  button.disabled=true;
-  try{
-    const response=await fetch('/auth/logout', { method:'POST' });
-    if(!response.ok) throw new Error('Could not sign out. Please try again.');
-    me = { signedIn:false };
-    LS.set('zariya_guest_mode', false);
-    await loadServerState();
-    renderAccountUI();renderSessionList();renderChat();
-    if(window.zariyaShowAuthGate) window.zariyaShowAuthGate();
-  }catch(error){
-    const status=document.getElementById('accountAuthStatus');
-    status.textContent=error.message||'Could not sign out. Please try again.';
-    status.hidden=false;
-  }finally{
-    button.disabled=false;
-  }
-});
-const authError=new URLSearchParams(window.location.search).get('authError');
-if(authError){
-  const status=document.getElementById('accountAuthStatus');
-  status.textContent=authError;
-  status.hidden=false;
-  window.history.replaceState({},'',window.location.pathname+window.location.hash);
-  document.getElementById('githubSetupPanel').hidden=!serverConfig.githubConfigured;
-}
+document.getElementById('sbProfileRow').addEventListener('click', ()=>switchView('settings'));
 
 /* ============ VIEW SWITCHING ============ */
 let currentViewName = 'chat';
@@ -2297,7 +2210,6 @@ function downloadFile(filename, content, type='text/plain;charset=utf-8'){
   renderChat();
   const initialView=(window.location.hash||'').replace('#','');
   if(initialView && initialView!=='chat') switchView(initialView, {fromHistory:true});
-  initAuthGate();
 })();
 
 
@@ -2327,61 +2239,6 @@ document.addEventListener('click', async event=>{
   }
   window.setTimeout(()=>{ if(button.isConnected) button.textContent = originalLabel; }, 1400);
 });
-/* ============ AUTH GATE ============ */
-function initAuthGate(){
-  const gate=document.getElementById('authGate');
-  if(!gate) return;
-  const googleBtn=document.getElementById('authGoogleBtn');
-  const githubBtn=document.getElementById('authGithubBtn');
-  const guestBtn=document.getElementById('authGuestBtn');
-  const errorEl=document.getElementById('authError');
-  const params=new URLSearchParams(window.location.search);
-  const urlError=params.get('authError');
-
-  const showError=(message)=>{ if(!errorEl) return; errorEl.textContent=message; errorEl.hidden=!message; };
-  const open=()=>{
-    gate.hidden=false;
-    document.body.classList.add('auth-gate-open');
-    if(urlError) showError(urlError);
-  };
-  const close=()=>{
-    gate.hidden=true;
-    document.body.classList.remove('auth-gate-open');
-  };
-
-  window.zariyaShowAuthGate=open;
-
-  if(googleBtn) googleBtn.addEventListener('click', ()=>{
-    if(!serverConfig.googleConfigured){
-      showError('Google sign-in is not set up on this deployment yet. You can continue as a guest.');
-      return;
-    }
-    window.location.href='/auth/google/login';
-  });
-  if(githubBtn) githubBtn.addEventListener('click', ()=>{
-    if(!serverConfig.githubConfigured){
-      showError('GitHub sign-in is not set up on this deployment yet. You can continue as a guest.');
-      return;
-    }
-    window.location.href='/auth/github/login';
-  });
-  if(guestBtn) guestBtn.addEventListener('click', ()=>{
-    LS.set('zariya_guest_mode', true);
-    close();
-    renderAccountUI();
-    updateStorageIndicators();
-    renderSessionList();
-    renderChat();
-  });
-
-  if(urlError && window.history && window.history.replaceState){
-    window.history.replaceState({}, '', window.location.pathname + window.location.hash);
-  }
-
-  if(me.signedIn){ LS.set('zariya_guest_mode', false); close(); return; }
-  if(LS.get('zariya_guest_mode', false)){ close(); return; }
-  open();
-}
 })();
 
 /* Settings rail: jump to a section and keep the active item in sync. */
