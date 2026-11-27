@@ -580,7 +580,6 @@ function renderAccountUI(){
   sbName.textContent='This device';
   const localCaption=document.getElementById('sbProfileCaption');
   if(localCaption) localCaption.textContent='Saved locally';
-  sbAvatar.textContent='Z';
 
   const modelStatus=document.getElementById('aiModelStatusText');
   if(modelStatus) modelStatus.textContent=serverConfig.aiStatus || 'Checking hosted model…';

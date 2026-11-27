@@ -38,10 +38,12 @@ def test_static_seo_assets_exist():
     assert (ROOT / "public" / "sitemap.xml").is_file()
 
 
-def test_profile_avatar_has_nonempty_fallback_and_public_copy_matches():
+def test_profile_avatar_uses_brand_logo_and_public_copy_matches():
     app_source = (ROOT / "webapp" / "static" / "app.js").read_text(encoding="utf-8")
     public_source = (ROOT / "public" / "static" / "app.js").read_text(encoding="utf-8")
-    assert "sbAvatar.textContent='Z'" in app_source
+    template = (ROOT / "webapp" / "templates" / "index.html").read_text(encoding="utf-8")
+    assert '<span class="sb-profile-avatar" id="sbProfileAvatar"><img src="/static/logo.png" alt=""></span>' in template
+    assert "sbAvatar.textContent" not in app_source
     assert app_source == public_source
 
 
