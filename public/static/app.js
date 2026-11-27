@@ -1457,6 +1457,7 @@ function startDictation(){
     resetVoiceUI('Voice typing could not start. Please try again.');
     return;
   }
+  if(voiceState!=='starting') return;
   voiceState='recording';listening=true;shouldListen=true;
   micBtn.disabled=false;
   micBtn.classList.add('active');
