@@ -1736,3 +1736,9 @@ body{background:var(--bg);color:var(--text);font:14px/1.6 var(--font);-webkit-fo
 .settings-rail{padding-top:14px}
 .settings-pane{padding-top:6px}
 .workspace-backup{padding-bottom:6px}
+
+/* Deck actions and dialog labels: even rows, inline optional tag */
+.deck-card-actions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin-top:13px}
+.deck-action-btn{width:100%;min-width:0}
+.dialog-label{display:flex;align-items:baseline;gap:6px}
+.dialog-optional{font-size:12px;font-weight:400;color:var(--muted)}
