@@ -2447,9 +2447,9 @@ renderSearchConfig();
   if(!splash) return;
   const hide = () => {
     splash.classList.add('done');
-    window.setTimeout(() => { if(splash.parentNode) splash.parentNode.removeChild(splash); }, 600);
+    window.setTimeout(() => { if(splash.parentNode) splash.parentNode.removeChild(splash); }, 700);
   };
-  window.setTimeout(hide, 480);
+  window.setTimeout(hide, 5000);
 })();
 })();
 

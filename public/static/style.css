@@ -1818,11 +1818,10 @@ body.sb-collapsed .new-chat-btn{margin-top:12px}
 /* ---------- Boot splash ---------- */
 .boot-splash{position:fixed;inset:0;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;background:var(--bg);transition:opacity .45s ease,visibility .45s ease}
 .boot-splash.done{opacity:0;visibility:hidden}
-.boot-mark{width:58px;height:58px;display:block;animation:bootPulse 1.15s ease-in-out infinite}
-.boot-word{color:var(--text);font-family:var(--serif);font-size:19px;font-weight:600;letter-spacing:.02em;opacity:.85}
+.boot-mark{display:block;width:auto;height:76px;max-width:40vw;object-fit:contain;animation:bootPulse 1.15s ease-in-out infinite}
 @keyframes bootPulse{0%,100%{transform:scale(1);opacity:.85}50%{transform:scale(1.06);opacity:1}}
 @keyframes bootFallback{to{opacity:0;visibility:hidden}}
-.boot-splash{animation:bootFallback .3s ease 2.4s forwards}
+.boot-splash{animation:bootFallback .35s ease 5.7s forwards}
 @media(prefers-reduced-motion:reduce){.boot-mark{animation:none}.boot-splash{transition:none}}
 
 /* ---------- Toggles: knob inset on both sides ---------- */
