@@ -1729,3 +1729,10 @@ body{background:var(--bg);color:var(--text);font:14px/1.6 var(--font);-webkit-fo
 .settings-pane .hosted-ai-summary{padding:15px 0!important}
 .settings-pane .hosted-ai-privacy strong{font-size:13px}
 #personaInput{font:13.5px/1.6 var(--font)!important;min-height:92px!important;padding:12px 14px!important;border-radius:10px!important}
+
+/* Settings finishing touches: align the rail with the pane, drop dead rows */
+#view-settings .page-head{padding:22px 32px 0}
+.settings-shell{padding-top:0}
+.settings-rail{padding-top:14px}
+.settings-pane{padding-top:6px}
+.workspace-backup{padding-bottom:6px}
