@@ -415,7 +415,7 @@ async function loadServerState(){
         : 'The local server could not be reached. Your changes are being kept in this browser.';
     }
   }else{
-    localStateMessage='Saved in this browser only. Connect Supabase to sync across devices.';
+    localStateMessage='Saved in this browser only.';
   }
 
   sessions = Array.isArray(state.sessions) ? state.sessions : [];
