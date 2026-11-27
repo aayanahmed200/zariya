@@ -437,7 +437,8 @@ async function loadServerState(){
   if(backupDescription){
     backupDescription.textContent='Chats, notes and flashcards are saved in this browser only. Export a backup before clearing browser data or moving devices.';
   }
-  updateStorageStatus((stateBackendAvailable || !serverConfig.hostedMode) && !localStateMessage,
+  const plainLocalNotice=localStateMessage==='Saved in this browser only.';
+  updateStorageStatus(plainLocalNotice || ((stateBackendAvailable || !serverConfig.hostedMode) && !localStateMessage),
     localStateMessage || (serverConfig.supabaseConfigured && stateBackendAvailable
       ? 'Connected to Supabase. Workspace data is synced.'
       : (serverConfig.hostedMode
