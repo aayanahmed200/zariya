@@ -64,7 +64,11 @@ GITHUB_CLIENT_SECRET = os.environ.get("GITHUB_CLIENT_SECRET", "")
 VERCEL_HOST = os.environ.get("VERCEL_URL", "").strip()
 DEFAULT_BASE_URL = f"https://{VERCEL_HOST}" if VERCEL_HOST else "http://localhost:5000"
 APP_BASE_URL = (os.environ.get("APP_BASE_URL") or DEFAULT_BASE_URL).rstrip("/")
+GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID", "")
+GOOGLE_CLIENT_SECRET = os.environ.get("GOOGLE_CLIENT_SECRET", "")
 GITHUB_OAUTH_CONFIGURED = bool(GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET and SESSION_SECRET_CONFIGURED)
+GOOGLE_OAUTH_CONFIGURED = bool(GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET and SESSION_SECRET_CONFIGURED)
+ANY_OAUTH_CONFIGURED = GITHUB_OAUTH_CONFIGURED or GOOGLE_OAUTH_CONFIGURED
 
 # Supabase credentials are server-only. Prefer the new sb_secret_* key; the
 # legacy service-role JWT remains supported for existing projects.
@@ -113,21 +117,27 @@ def _save_store(store):
     tmp_path.write_text(json.dumps(store, ensure_ascii=False, indent=2), encoding="utf-8")
     tmp_path.replace(STORE_PATH)
 
+def _signed_in_subject():
+    """Return the provider-scoped identity of the signed-in account, if any."""
+    subject = session.get("auth_subject")
+    if isinstance(subject, str) and subject.strip():
+        return subject.strip().casefold()
+    return None
+
+
 def _current_user_key():
-    return session.get("github_login", "anonymous")
+    return _signed_in_subject() or "anonymous"
 
 
 def _workspace_owner_id():
-    """Return a stable, pseudonymous workspace key for Supabase rows."""
-    login = session.get("github_login")
-    if isinstance(login, str) and login.strip():
-        subject = "github:" + login.strip().casefold()
-    else:
-        visitor_id = session.get("zariya_visitor_id")
-        if not isinstance(visitor_id, str) or len(visitor_id) < 24:
-            visitor_id = secrets.token_urlsafe(32)
-            session["zariya_visitor_id"] = visitor_id
-        subject = "anonymous:" + visitor_id
+    """Return a stable, pseudonymous workspace key for Supabase rows.
+
+    Guests get None on purpose: guest mode is local-only, so an anonymous
+    visitor never gets a cloud workspace written on their behalf.
+    """
+    subject = _signed_in_subject()
+    if not subject:
+        return None
     session.permanent = True
     return hashlib.sha256(subject.encode("utf-8")).hexdigest()
 
@@ -321,7 +331,105 @@ def github_callback():
     session["github_name"] = profile.get("name") or login
     session["github_avatar"] = profile.get("avatar_url")
     session["github_bio"] = profile.get("bio") or ""
+    session["auth_subject"] = "github:" + login
+    session["auth_provider"] = "github"
+    session["auth_name"] = profile.get("name") or login
+    session["auth_avatar"] = profile.get("avatar_url") or ""
+    session["auth_email"] = profile.get("email") or ""
     return redirect("/")
+
+@app.route("/auth/google/login")
+@security.rate_limit("google_login", 10, 60)
+def google_login():
+    if not GOOGLE_OAUTH_CONFIGURED:
+        return redirect("/?" + urlencode({
+            "authError": "Google sign-in is not connected on this deployment yet."
+        }))
+    state = secrets.token_urlsafe(32)
+    session.permanent = True
+    session["oauth_state"] = state
+    redirect_uri = f"{APP_BASE_URL}/auth/google/callback"
+    authorize_url = "https://accounts.google.com/o/oauth2/v2/auth?" + urlencode({
+        "client_id": GOOGLE_CLIENT_ID,
+        "redirect_uri": redirect_uri,
+        "response_type": "code",
+        "scope": "openid email profile",
+        "state": state,
+        "access_type": "online",
+        "prompt": "select_account",
+    })
+    return redirect(authorize_url)
+
+
+@app.route("/auth/google/callback")
+def google_callback():
+    expected_state = session.pop("oauth_state", None)
+    returned_state = request.args.get("state", "")
+    if not expected_state or not secrets.compare_digest(returned_state, expected_state):
+        return redirect("/?" + urlencode({
+            "authError": "Google sign-in expired or could not be verified. Please try again."
+        }))
+    if request.args.get("error"):
+        return redirect("/?" + urlencode({"authError": "Google sign-in was cancelled."}))
+    code = request.args.get("code")
+    if not code:
+        return redirect("/?" + urlencode({
+            "authError": "Google did not return an authorization code. Please try again."
+        }))
+
+    try:
+        token_res = requests.post(
+            "https://oauth2.googleapis.com/token",
+            data={
+                "client_id": GOOGLE_CLIENT_ID,
+                "client_secret": GOOGLE_CLIENT_SECRET,  # server-side only, never sent to the browser
+                "code": code,
+                "grant_type": "authorization_code",
+                "redirect_uri": f"{APP_BASE_URL}/auth/google/callback",
+            },
+            timeout=10,
+        )
+        token_res.raise_for_status()
+        token_data = token_res.json()
+    except Exception as e:
+        app.logger.warning("Google token exchange failed: %s", e)
+        return redirect("/?" + urlencode({
+            "authError": "Google sign-in failed while exchanging the authorization code. Please try again."
+        }))
+
+    access_token = token_data.get("access_token")
+    if not access_token:
+        return redirect("/?" + urlencode({"authError": "Google sign-in failed -- no access token was returned."}))
+
+    try:
+        info_res = requests.get(
+            "https://openidconnect.googleapis.com/v1/userinfo",
+            headers={"Authorization": f"Bearer {access_token}"},
+            timeout=10,
+        )
+        info_res.raise_for_status()
+        profile = info_res.json()
+    except Exception as e:
+        app.logger.warning("Google profile fetch failed: %s", e)
+        return redirect("/?" + urlencode({
+            "authError": "Google sign-in failed while fetching your profile. Please try again."
+        }))
+
+    subject = profile.get("sub")
+    if not isinstance(subject, str) or not subject.strip():
+        return redirect("/?" + urlencode({
+            "authError": "Google did not return a usable account profile. Please try again."
+        }))
+
+    session.permanent = True
+    session.pop("github_login", None)
+    session["auth_subject"] = "google:" + subject.strip()
+    session["auth_provider"] = "google"
+    session["auth_name"] = profile.get("name") or profile.get("email") or "Google account"
+    session["auth_avatar"] = profile.get("picture") or ""
+    session["auth_email"] = profile.get("email") or ""
+    return redirect("/")
+
 
 @app.route("/auth/logout", methods=["POST"])
 def logout():
@@ -330,16 +438,22 @@ def logout():
 
 @app.route("/api/me")
 def me():
-    if session.get("github_login"):
+    providers = {
+        "githubConfigured": GITHUB_OAUTH_CONFIGURED,
+        "googleConfigured": GOOGLE_OAUTH_CONFIGURED,
+    }
+    if _signed_in_subject():
         return jsonify({
             "signedIn": True,
-            "login": session["github_login"],
-            "name": session.get("github_name"),
-            "avatar": session.get("github_avatar"),
-            "bio": session.get("github_bio"),
-            "githubConfigured": GITHUB_OAUTH_CONFIGURED,
+            "provider": session.get("auth_provider") or "github",
+            "login": session.get("github_login") or "",
+            "name": session.get("auth_name") or session.get("auth_email") or "Account",
+            "avatar": session.get("auth_avatar") or "",
+            "bio": session.get("github_bio") or "",
+            "email": session.get("auth_email") or "",
+            **providers,
         })
-    return jsonify({"signedIn": False, "githubConfigured": GITHUB_OAUTH_CONFIGURED})
+    return jsonify({"signedIn": False, **providers})
 
 def _gateway_oidc_token() -> str | None:
     """Read Vercel's runtime-injected OIDC token from the incoming request."""
@@ -548,8 +662,14 @@ def web_search():
 @app.route("/api/state", methods=["GET"])
 def get_state():
     if SUPABASE_STORE.configured:
+        owner = _workspace_owner_id()
+        if not owner:
+            return jsonify({
+                "sessions": [], "notes": [], "decks": [],
+                "storage": "local", "cloudSync": False,
+            })
         try:
-            state = SUPABASE_STORE.get_state(_workspace_owner_id())
+            state = SUPABASE_STORE.get_state(owner)
         except Exception:
             app.logger.exception("Supabase workspace read failed")
             return jsonify({"error": "Cloud storage could not be reached. Your local browser copy is still available."}), 503
@@ -578,8 +698,14 @@ def save_state():
         return jsonify({"error": error}), status
 
     if SUPABASE_STORE.configured:
+        owner = _workspace_owner_id()
+        if not owner:
+            return jsonify({
+                "ok": True, "storage": "local", "cloudSync": False,
+                "message": "Guest mode keeps this workspace on this device.",
+            })
         try:
-            SUPABASE_STORE.save_state(_workspace_owner_id(), state)
+            SUPABASE_STORE.save_state(owner, state)
         except Exception:
             app.logger.exception("Supabase workspace save failed")
             return jsonify({"error": "Cloud sync failed. Your browser copy has been kept; please retry."}), 503
@@ -730,6 +856,9 @@ def config():
         "aiModel": ai["model"],
         "searchConfigured": bool(GOOGLE_API_KEY and GOOGLE_CX),
         "githubConfigured": GITHUB_OAUTH_CONFIGURED,
+        "googleConfigured": GOOGLE_OAUTH_CONFIGURED,
+        "signInAvailable": ANY_OAUTH_CONFIGURED,
+        "cloudSyncAvailable": SUPABASE_STORE.configured,
     })
 
 

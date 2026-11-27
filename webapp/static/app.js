@@ -210,11 +210,13 @@ async function apiPost(url, body, signal){
 }
 
 function updateStorageIndicators(){
-  const synced=!!(serverConfig.supabaseConfigured && stateBackendAvailable && !localStateMessage);
+  const signedIn=!!(me && me.signedIn);
+  const synced=!!(signedIn && serverConfig.supabaseConfigured && stateBackendAvailable && !localStateMessage);
   const profileName=document.getElementById('sbProfileName');
   const caption=document.getElementById('storageCaption');
-  if(profileName) profileName.textContent=synced ? 'Cloud workspace' : 'Saved in this browser';
-  if(caption) caption.textContent=synced ? 'Synced to cloud' : 'Stored on this device';
+  if(profileName && !signedIn) profileName.textContent='Guest';
+  if(profileName && signedIn) profileName.textContent=synced ? 'Cloud workspace' : 'Saved in this browser';
+  if(caption) caption.textContent=synced ? 'Synced to cloud' : 'This device only';
 }
 async function updateStorageStatus(saved=true, message=''){
   updateStorageIndicators();
@@ -388,7 +390,8 @@ async function loadServerState(){
   stateBackendAvailable=false;
   localStateMessage='';
 
-  if(serverConfig.supabaseConfigured || !serverConfig.hostedMode){
+  const cloudEnabled=!!(me.signedIn && serverConfig.supabaseConfigured);
+  if(cloudEnabled || !serverConfig.hostedMode){
     try{
       const remote=await apiGet('/api/state');
       stateBackendAvailable=true;
@@ -422,11 +425,11 @@ async function loadServerState(){
   decks.forEach(d=> (Array.isArray(d.cards) ? d.cards : []).forEach(migrateCardForSpacedRepetition));
   currentSessionId = sessions.length ? sessions[0].id : null;
 
-  const storageCopy = serverConfig.supabaseConfigured
+  const storageCopy = (me.signedIn && serverConfig.supabaseConfigured)
     ? 'Your workspace syncs securely across devices.'
-    : (serverConfig.hostedMode
+    : (me.signedIn
       ? 'Your workspace is saved in this browser only.'
-      : 'Your workspace is saved by this local development server.');
+      : 'Guest mode: your workspace is saved on this device.');
   ['storageDescription','storageDescriptionSettings'].forEach(id=>{
     const el = document.getElementById(id);
     if(el) el.textContent = storageCopy;
@@ -467,7 +470,7 @@ function saveServerState(){
   decks=snapshot.decks;
   const saved=LS.set(stateKey,snapshot);
 
-  if(serverConfig.supabaseConfigured){
+  if(serverConfig.supabaseConfigured && me.signedIn){
     saveTimer=setTimeout(async()=>{
       try{
         await saveCloudSnapshot(snapshot);
@@ -488,7 +491,9 @@ function saveServerState(){
 
   if(serverConfig.hostedMode){
     updateStorageStatus(saved,saved
-      ? (localStateMessage || 'Saved in this browser only. Connect Supabase to sync across devices.')
+      ? (localStateMessage || (me.signedIn
+        ? 'Saved in this browser only. Connect Supabase to sync across devices.'
+        : 'Guest mode: saved on this device only.'))
       : 'This browser could not save more data. Export a backup and free up browser storage.');
     return saved;
   }
@@ -593,7 +598,9 @@ function renderAccountUI(){
     document.getElementById('accountName').textContent=me.name || me.login;
     document.getElementById('accountBio').textContent=me.bio || '';
   }else{
-    sbName.textContent=serverConfig.githubConfigured ? 'Sign in with GitHub' : 'Guest workspace';
+    sbName.textContent='Guest';
+    const guestCaption=document.getElementById('sbProfileCaption');
+    if(guestCaption) guestCaption.textContent='Sign in to sync';
     sbAvatar.textContent='Z';
     signedOutRow.style.display='flex';
     signedInRow.style.display='none';
@@ -643,7 +650,10 @@ function renderAccountUI(){
   }
   const onboardingDismissBtn = document.getElementById('onboardingDismissBtn');
   if(onboardingDismissBtn) onboardingDismissBtn.addEventListener('click', ()=>{ LS.set(ONBOARDING_DISMISS_KEY, true); updateOnboardingBanner(); });
-document.getElementById('sbProfileRow').addEventListener('click', ()=>switchView('settings'));
+document.getElementById('sbProfileRow').addEventListener('click', ()=>{
+  if(!me.signedIn && window.zariyaShowAuthGate){ window.zariyaShowAuthGate(); return; }
+  switchView('settings');
+});
 document.getElementById('githubSignInBtn').addEventListener('click', ()=>{
   if(!serverConfig.githubConfigured) return;
   window.location.href = '/auth/github/login';
@@ -668,8 +678,10 @@ document.getElementById('githubSignOutBtn').addEventListener('click', async ()=>
     const response=await fetch('/auth/logout', { method:'POST' });
     if(!response.ok) throw new Error('Could not sign out. Please try again.');
     me = { signedIn:false };
+    LS.set('zariya_guest_mode', false);
     await loadServerState();
     renderAccountUI();renderSessionList();renderChat();
+    if(window.zariyaShowAuthGate) window.zariyaShowAuthGate();
   }catch(error){
     const status=document.getElementById('accountAuthStatus');
     status.textContent=error.message||'Could not sign out. Please try again.';
@@ -2279,6 +2291,7 @@ function downloadFile(filename, content, type='text/plain;charset=utf-8'){
   renderChat();
   const initialView=(window.location.hash||'').replace('#','');
   if(initialView && initialView!=='chat') switchView(initialView, {fromHistory:true});
+  initAuthGate();
 })();
 
 
@@ -2308,6 +2321,61 @@ document.addEventListener('click', async event=>{
   }
   window.setTimeout(()=>{ if(button.isConnected) button.textContent = originalLabel; }, 1400);
 });
+/* ============ AUTH GATE ============ */
+function initAuthGate(){
+  const gate=document.getElementById('authGate');
+  if(!gate) return;
+  const googleBtn=document.getElementById('authGoogleBtn');
+  const githubBtn=document.getElementById('authGithubBtn');
+  const guestBtn=document.getElementById('authGuestBtn');
+  const errorEl=document.getElementById('authError');
+  const params=new URLSearchParams(window.location.search);
+  const urlError=params.get('authError');
+
+  const showError=(message)=>{ if(!errorEl) return; errorEl.textContent=message; errorEl.hidden=!message; };
+  const open=()=>{
+    gate.hidden=false;
+    document.body.classList.add('auth-gate-open');
+    if(urlError) showError(urlError);
+  };
+  const close=()=>{
+    gate.hidden=true;
+    document.body.classList.remove('auth-gate-open');
+  };
+
+  window.zariyaShowAuthGate=open;
+
+  if(googleBtn) googleBtn.addEventListener('click', ()=>{
+    if(!serverConfig.googleConfigured){
+      showError('Google sign-in is not set up on this deployment yet. You can continue as a guest.');
+      return;
+    }
+    window.location.href='/auth/google/login';
+  });
+  if(githubBtn) githubBtn.addEventListener('click', ()=>{
+    if(!serverConfig.githubConfigured){
+      showError('GitHub sign-in is not set up on this deployment yet. You can continue as a guest.');
+      return;
+    }
+    window.location.href='/auth/github/login';
+  });
+  if(guestBtn) guestBtn.addEventListener('click', ()=>{
+    LS.set('zariya_guest_mode', true);
+    close();
+    renderAccountUI();
+    updateStorageIndicators();
+    renderSessionList();
+    renderChat();
+  });
+
+  if(urlError && window.history && window.history.replaceState){
+    window.history.replaceState({}, '', window.location.pathname + window.location.hash);
+  }
+
+  if(me.signedIn){ LS.set('zariya_guest_mode', false); close(); return; }
+  if(LS.get('zariya_guest_mode', false)){ close(); return; }
+  open();
+}
 })();
 
 /* Settings rail: jump to a section and keep the active item in sync. */
@@ -2359,3 +2427,4 @@ document.addEventListener('click', async event=>{
     });
   }, { passive: true });
 })();
+
