@@ -772,12 +772,6 @@ if(sidebarToggleBtn){
   sidebarToggleBtn.addEventListener('click', ()=>applySidebarCollapsed(!document.body.classList.contains('sb-collapsed')));
 }
 const chatScrollEl = document.getElementById('chat-scroll');
-const jumpLatestBtn = document.getElementById('jumpLatestBtn');
-function syncJumpLatest(){
-  if(!jumpLatestBtn) return;
-  const scrollable = chatScrollEl.scrollHeight - chatScrollEl.clientHeight;
-  jumpLatestBtn.hidden = scrollable < 200 || scrollable - chatScrollEl.scrollTop < 120;
-}
 const chatDockEl = document.querySelector('.chat-dock');
 function syncDockHeight(){
   if(!chatDockEl) return;
@@ -788,13 +782,6 @@ if(chatDockEl){
   syncDockHeight();
   if(dockObserver) dockObserver.observe(chatDockEl);
   window.addEventListener('resize', syncDockHeight);
-}
-chatScrollEl.addEventListener('scroll', syncJumpLatest, {passive:true});
-if(jumpLatestBtn){
-  jumpLatestBtn.addEventListener('click', ()=>{
-    const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    chatScrollEl.scrollTo({top:chatScrollEl.scrollHeight, behavior:reduceMotion ? 'auto' : 'smooth'});
-  });
 }
 document.addEventListener('keydown', e=>{
   if((e.ctrlKey || e.metaKey) && e.key.toLowerCase()==='k'){
@@ -819,19 +806,6 @@ function renderChat(){
     const hero = document.createElement('div');
     hero.className = 'empty-hero';
     hero.innerHTML = '<h1>What can I help with?</h1><div class="urdu-line" lang="ur" dir="rtl">آئیے کچھ نیا سیکھتے ہیں</div><p>Ask anything in English or Urdu. Chats, notes and flashcards stay together.</p>';
-    const suggestions = document.createElement('div');
-    suggestions.className = 'home-suggestions';
-    ['Explain a difficult topic in simple words','Translate a sentence into Urdu','Help me revise for an exam','Summarise these notes'].forEach(label=>{
-      const button=document.createElement('button');
-      button.type='button'; button.className='suggest-card'; button.textContent=label;
-      button.addEventListener('click',()=>{
-        input.value=label;
-        input.dispatchEvent(new Event('input',{bubbles:true}));
-        sendMessage();
-      });
-      suggestions.appendChild(button);
-    });
-    hero.appendChild(suggestions);
     inner.appendChild(hero);
     return;
   }
@@ -839,7 +813,6 @@ function renderChat(){
   document.getElementById('view-chat').classList.remove('empty-chat');
   session.messages.forEach((m, idx)=>renderBubble(m, idx, idx===session.messages.length-1 && m.role==='assistant'));
   scroll.scrollTop = 999999;
-  syncJumpLatest();
   syncDockHeight();
 }
 function renderBubble(m, idx, isLast){

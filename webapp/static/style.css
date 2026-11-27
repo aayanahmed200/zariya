@@ -1846,3 +1846,31 @@ body.sb-collapsed .new-chat-btn{margin-top:12px}
   .search-config-row{align-items:flex-start;flex-direction:column;gap:8px}
   .config-input{width:100%}
 }
+
+/* ---------- Start screen: greeting centred, composer pinned to the bottom ---------- */
+#view-chat.empty-chat{justify-content:flex-start;overflow:hidden}
+#view-chat.empty-chat #chat-scroll{flex:1 1 auto;margin:0;padding:0;display:flex;align-items:center;justify-content:center;overflow:visible}
+#view-chat.empty-chat #chat-inner{width:100%;justify-content:center;padding:0 24px}
+#view-chat.empty-chat .empty-hero{margin:0 auto;padding:0;text-align:center}
+#view-chat.empty-chat .chat-dock{margin:0;padding:0 16px 10px;background:transparent}
+[data-theme="dark"] #view-chat.empty-chat .chat-dock{background:transparent}
+@media(max-height:680px){
+  #view-chat.empty-chat{overflow-y:auto}
+  #view-chat.empty-chat #chat-scroll{display:block;padding:18px 0 10px}
+}
+@media(max-width:700px){
+  #view-chat.empty-chat #chat-inner{padding:0 14px}
+  #view-chat.empty-chat .chat-dock{padding:0 10px 8px}
+  #view-chat.empty-chat .composer-footer{padding-top:8px;gap:6px}
+  #view-chat.empty-chat .composer-enter{display:none}
+}
+
+/* ---------- Settings on phones: the rail becomes a chip row ---------- */
+@media(max-width:700px){
+  .settings-shell{display:flex;flex-direction:column;gap:0}
+  .settings-rail{display:flex;flex-direction:row;width:100%;min-width:0;gap:6px;padding:6px 0 14px;position:static;overflow-x:auto;scrollbar-width:none}
+  .settings-rail::-webkit-scrollbar{display:none}
+  .settings-rail-item{flex:0 0 auto;min-height:32px;padding:0 12px;border:1px solid var(--border);border-radius:999px;font-size:13px}
+  .settings-rail-item.active{background:var(--text);color:var(--bg);border-color:var(--text)}
+  .settings-pane{padding-top:0;max-width:none}
+}
