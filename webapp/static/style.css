@@ -1855,3 +1855,12 @@ body.sb-collapsed .new-chat-btn{margin-top:12px}
 
 /* Quiet first-run copy in the rail. */
 .sess-empty{padding:8px 10px;color:var(--muted);font-size:12.5px;line-height:1.6}
+
+/* ---------- Start screen: the quick tools join the greeting instead of floating above the composer ---------- */
+#view-chat.empty-chat .empty-hero .quick-tools{width:100%;margin:22px auto 0;padding:0;gap:7px;justify-content:center;flex-wrap:wrap;overflow:visible}
+#view-chat.empty-chat .empty-hero .qt-btn{height:30px;padding:0 12px;font-size:11px;background:var(--surface);border-color:var(--border)}
+#view-chat.empty-chat .empty-hero .qt-btn:hover{background:var(--surface-muted);border-color:var(--border-strong);color:var(--text)}
+@media(max-width:700px){
+  #view-chat.empty-chat .empty-hero .quick-tools{margin-top:18px;gap:6px}
+  #view-chat.empty-chat .empty-hero .qt-btn{height:29px;padding:0 10px;font-size:11px}
+}

@@ -32,7 +32,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Lora:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/static/style.css?v=20261127-16">
+<link rel="stylesheet" href="/static/style.css?v=20261127-17">
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
@@ -140,19 +140,19 @@
             <h1>What can I help with?</h1>
             <div class="urdu-line" lang="ur" dir="rtl">آئیے کچھ نیا سیکھتے ہیں</div>
             <p>Ask anything in English or Urdu. Chats, notes and flashcards stay together.</p>
+            <div class="quick-tools" id="quickTools">
+              <button class="qt-btn" type="button" data-tool="summarize">Summarise</button>
+              <button class="qt-btn" type="button" data-tool="keypoints">Key points</button>
+              <button class="qt-btn" type="button" data-tool="flashcards">Make flashcards</button>
+              <button class="qt-btn" type="button" data-tool="translate">Translate</button>
+              <button class="qt-btn" type="button" data-tool="websearch">Search web</button>
+              <button class="qt-btn" type="button" data-tool="exportchat">Export chat</button>
+            </div>
           </div>
         </div>
       </div>
 
       <div class="chat-dock">
-        <div class="quick-tools" id="quickTools">
-          <button class="qt-btn" type="button" data-tool="summarize">Summarise</button>
-          <button class="qt-btn" type="button" data-tool="keypoints">Key points</button>
-          <button class="qt-btn" type="button" data-tool="flashcards">Make flashcards</button>
-          <button class="qt-btn" type="button" data-tool="translate">Translate</button>
-          <button class="qt-btn" type="button" data-tool="websearch">Search web</button>
-          <button class="qt-btn" type="button" data-tool="exportchat">Export chat</button>
-        </div>
         <div id="composer">
           <div class="composer-inner">
             <div class="composer-box" id="composerBox">
@@ -441,7 +441,7 @@
 </div>
 <script src="/static/workspace-sync.js?v=20261122-6"></script>
 <script src="/static/sse.js?v=20261122-4"></script>
-<script src="/static/app.js?v=20261127-12"></script>
+<script src="/static/app.js?v=20261127-14"></script>
 <script>
   window.va = window.va || function () {
     (window.vaq = window.vaq || []).push(arguments);

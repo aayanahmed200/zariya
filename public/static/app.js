@@ -781,11 +781,18 @@ document.addEventListener('keydown', e=>{
 
 
 /* ============ CHAT RENDER ============ */
+function restoreQuickTools(node){
+  const dock = document.querySelector('.chat-dock');
+  const tools = node || document.getElementById('quickTools');
+  const composer = document.getElementById('composer');
+  if(dock && tools && composer && tools.parentElement !== dock) dock.insertBefore(tools, composer);
+}
 function renderChat(){
   const inner = document.getElementById('chat-inner');
   const scroll = document.getElementById('chat-scroll');
   const session = currentSession();
-  updateQuickToolsState();
+  const tools = document.getElementById('quickTools');
+  if(tools && inner.contains(tools)) tools.remove();
   inner.innerHTML = '';
   if(!session || !session.messages.length){
     inner.classList.add('empty-mode');
@@ -793,11 +800,15 @@ function renderChat(){
     const hero = document.createElement('div');
     hero.className = 'empty-hero';
     hero.innerHTML = '<h1>What can I help with?</h1><div class="urdu-line" lang="ur" dir="rtl">آئیے کچھ نیا سیکھتے ہیں</div><p>Ask anything in English or Urdu. Chats, notes and flashcards stay together.</p>';
+    if(tools) hero.appendChild(tools);
     inner.appendChild(hero);
+    updateQuickToolsState();
     return;
   }
   inner.classList.remove('empty-mode');
   document.getElementById('view-chat').classList.remove('empty-chat');
+  restoreQuickTools(tools);
+  updateQuickToolsState();
   session.messages.forEach((m, idx)=>renderBubble(m, idx, idx===session.messages.length-1 && m.role==='assistant'));
   scroll.scrollTop = 999999;
 }
@@ -1112,10 +1123,11 @@ function regenerateLast(){
 document.querySelectorAll('.qt-btn').forEach(btn=> btn.addEventListener('click', ()=>runQuickTool(btn.dataset.tool)));
 function updateQuickToolsState(){
   const session=currentSession();
-  const ready=!!(session && session.messages.length) && !isGenerating && !isQuickToolBusy;
+  const busy=isGenerating || isQuickToolBusy;
+  const hasChat=!!(session && session.messages.length);
   document.querySelectorAll('.qt-btn').forEach(button=>{
-    button.disabled=!ready;
-    button.title=ready ? '' : (isGenerating || isQuickToolBusy ? 'Wait for the current action to finish.' : 'Start a chat before using this tool.');
+    button.disabled=busy;
+    button.title=busy ? 'Wait for the current action to finish.' : (hasChat ? '' : 'Start a chat before using this tool.');
   });
 }
 async function runQuickTool(tool){
