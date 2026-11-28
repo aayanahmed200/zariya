@@ -32,7 +32,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Lora:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/static/style.css?v=20261127-21">
+<link rel="stylesheet" href="/static/style.css?v=20261127-22">
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
@@ -159,7 +159,7 @@
               <div class="voice-dropdown" id="voiceDropdown">
                 <input type="hidden" id="voiceLanguage" value="auto">
                 <button class="voice-dropdown-trigger" id="voiceDropdownTrigger" type="button" aria-haspopup="listbox" aria-expanded="false" aria-controls="voiceDropdownMenu" aria-label="Transcription language: Auto detect">
-                  <span id="voiceDropdownLabel">AUTO</span>
+                  <span id="voiceDropdownLabel">Auto</span>
                   <svg viewBox="0 0 16 16" aria-hidden="true"><path d="m4 6 4 4 4-4"/></svg>
                 </button>
                 <div class="voice-dropdown-menu" id="voiceDropdownMenu" role="listbox" aria-label="Transcription language" hidden>
@@ -168,7 +168,7 @@
                   <button type="button" role="option" data-language="ur" aria-selected="false"><span lang="ur" dir="rtl">اردو</span><small>Urdu speech</small><i>✓</i></button>
                 </div>
               </div>
-              <textarea id="chat-input" rows="1" dir="auto" placeholder="Message Zariya…  اردو میں بھی لکھیں" aria-label="Message Zariya"></textarea>
+              <textarea id="chat-input" rows="1" dir="auto" placeholder="Message Zariya…" aria-label="Message Zariya"></textarea>
               <button class="composer-btn send" id="sendBtn" type="button" data-mode="send" disabled aria-label="Send message">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
               </button>
@@ -440,7 +440,7 @@
 </div>
 <script src="/static/workspace-sync.js?v=20261122-6"></script>
 <script src="/static/sse.js?v=20261122-4"></script>
-<script src="/static/app.js?v=20261127-16"></script>
+<script src="/static/app.js?v=20261127-17"></script>
 <script>
   window.va = window.va || function () {
     (window.vaq = window.vaq || []).push(arguments);

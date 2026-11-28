@@ -1329,7 +1329,7 @@ function setVoiceLanguage(value){
   if(voiceState!=='idle') return;
   voiceLanguage.value=value;
   LS.set('zariya_voice_language',value);
-  voiceDropdownLabel.textContent=value==='ur'?'اردو':value.toUpperCase();
+  voiceDropdownLabel.textContent=value==='ur'?'اردو':(value==='auto'?'Auto':'English');
   voiceDropdownTrigger.setAttribute('aria-label','Transcription language: '+voiceLanguageName(value));
   voiceOptions.forEach(option=>{
     option.setAttribute('aria-selected',String(option.dataset.language===value));
