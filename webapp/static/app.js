@@ -952,12 +952,6 @@ function saveEdit(idx){
 
 /* ============ SEND / RESPOND ============ */
 const input = document.getElementById('chat-input');
-const COMPOSER_PLACEHOLDER = 'Message Zariya…  اردو میں بھی لکھیں';
-const COMPOSER_PLACEHOLDER_NARROW = 'Message Zariya…';
-const narrowComposerQuery = window.matchMedia('(max-width: 560px)');
-function syncComposerPlaceholder(){ input.placeholder = narrowComposerQuery.matches ? COMPOSER_PLACEHOLDER_NARROW : COMPOSER_PLACEHOLDER; }
-syncComposerPlaceholder();
-if(narrowComposerQuery.addEventListener) narrowComposerQuery.addEventListener('change', syncComposerPlaceholder);
 const sendBtn = document.getElementById('sendBtn');
 const SEND_ICON = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M12 19V5M5 12l7-7 7 7"/></svg>';
 const STOP_ICON = '<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><rect x="5" y="5" width="14" height="14" rx="2"/></svg>';
