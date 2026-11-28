@@ -6,8 +6,13 @@ const LS = {
   get(k, d){ try{ const v = localStorage.getItem(k); return v===null? d : JSON.parse(v); }catch(e){ return d; } },
   set(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); return true; }catch(e){ return false; } }
 };
+const AVATARS = Array.from({length:10}, (_,index)=>'/static/avatars/avatar-'+String(index+1).padStart(2,'0')+'.png');
 const prefersDarkScheme = !!(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
-let uiPrefs = LS.get('zariya_ui_prefs', { theme: prefersDarkScheme?'dark':'light', fontSize:15, showTimestamps:true, ttsEnabled:false });
+let uiPrefs = LS.get('zariya_ui_prefs', { theme: prefersDarkScheme?'dark':'light', fontSize:15, showTimestamps:true, ttsEnabled:false, avatar: Math.floor(Math.random()*AVATARS.length) });
+if(typeof uiPrefs.avatar!=='number' || uiPrefs.avatar<0 || uiPrefs.avatar>=AVATARS.length){
+  uiPrefs.avatar = Math.floor(Math.random()*AVATARS.length);
+  LS.set('zariya_ui_prefs', uiPrefs);
+}
 let genPrefs = LS.get('zariya_gen_prefs', { persona:'', temperature:0.5, responseStyle:'balanced' });
 const responseStylePresets = {
   balanced:{
@@ -505,8 +510,39 @@ function saveServerState(){
 
 
 /* ============ THEME / UI PREFS ============ */
+function applyWorkspaceAvatar(){
+  const image = document.getElementById('profileAvatarImg');
+  if(image) image.src = AVATARS[uiPrefs.avatar||0];
+  renderAvatarPicker();
+}
+function renderAvatarPicker(){
+  const picker = document.getElementById('avatarPicker');
+  if(!picker) return;
+  if(!picker.children.length){
+    AVATARS.forEach((src,index)=>{
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'avatar-option';
+      button.dataset.avatar = String(index);
+      button.setAttribute('aria-label','Avatar '+(index+1));
+      button.innerHTML = '<img class="avatar-art" src="'+src+'" alt="">';
+      button.addEventListener('click', ()=>{
+        uiPrefs.avatar = index;
+        LS.set('zariya_ui_prefs', uiPrefs);
+        applyWorkspaceAvatar();
+      });
+      picker.appendChild(button);
+    });
+  }
+  [...picker.children].forEach((button,index)=>{
+    const selected = index === uiPrefs.avatar;
+    button.classList.toggle('selected', selected);
+    button.setAttribute('aria-pressed', String(selected));
+  });
+}
 function applyUiPrefs(){
   document.documentElement.setAttribute('data-theme', uiPrefs.theme);
+  applyWorkspaceAvatar();
   const themeColorMeta = document.querySelector('meta[name="theme-color"]');
   if(themeColorMeta){
     const surfaceColor = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim();
@@ -570,7 +606,7 @@ function updateStatusPill(){
   const hint=document.getElementById('composerHint');
   if(hint && !isGenerating){
     hint.textContent=serverConfig.aiAvailable
-      ? 'AI can make mistakes. Check important information.'
+      ? ''
       : 'The assistant is unavailable right now. Your saved chats are still here.';
   }
 }

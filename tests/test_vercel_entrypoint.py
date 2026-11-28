@@ -38,11 +38,14 @@ def test_static_seo_assets_exist():
     assert (ROOT / "public" / "sitemap.xml").is_file()
 
 
-def test_profile_avatar_uses_brand_logo_and_public_copy_matches():
+def test_profile_avatar_uses_illustrated_avatar_set_and_public_copy_matches():
     app_source = (ROOT / "webapp" / "static" / "app.js").read_text(encoding="utf-8")
     public_source = (ROOT / "public" / "static" / "app.js").read_text(encoding="utf-8")
     template = (ROOT / "webapp" / "templates" / "index.html").read_text(encoding="utf-8")
-    assert '<span class="sb-profile-avatar" id="sbProfileAvatar"><img src="/static/logo.png" alt=""></span>' in template
+    assert '<img id="profileAvatarImg" class="avatar-art" src="/static/avatars/avatar-01.png" alt="">' in template
+    assert 'id="avatarPicker"' in template
+    assert "const AVATARS = " in app_source
+    assert "function renderAvatarPicker()" in app_source
     assert "sbAvatar.textContent" not in app_source
     assert app_source == public_source
 
