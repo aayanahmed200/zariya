@@ -1828,16 +1828,18 @@ body.sb-collapsed .new-chat-btn{margin-top:12px}
 .sb-name{font-family:var(--font);font-size:15px;font-weight:600;letter-spacing:-.25px;color:var(--text)}
 @media(max-width:920px){.mobile-brand{gap:8px}.mobile-brand img{width:21px;height:21px}}
 
-/* The open view is a filled pill; hover is a soft tint, so the two never read alike. */
+/* Selection is a tint of the text colour, one step stronger than hover. */
+:root{--nav-hover:color-mix(in srgb,var(--text) 6%,transparent);--nav-active:color-mix(in srgb,var(--text) 12%,transparent)}
+[data-theme="dark"]{--nav-hover:color-mix(in srgb,var(--text) 8%,transparent);--nav-active:color-mix(in srgb,var(--text) 16%,transparent)}
 .nav-item{position:relative}
-.nav-item:hover:not(.active){background:var(--hover);color:var(--text)}
-.nav-item.active,.nav-item.active:hover{background:var(--text);color:var(--bg);font-weight:600}
+.nav-item:hover:not(.active){background:var(--nav-hover);color:var(--text)}
+.nav-item.active,.nav-item.active:hover{background:var(--nav-active);color:var(--text);font-weight:600}
 .nav-item.active svg{opacity:1}
 .sess-item{position:relative}
-.sess-item:hover:not(.active){background:var(--hover);color:var(--text)}
+.sess-item:hover:not(.active){background:var(--nav-hover);color:var(--text)}
 .sess-item.active{background:var(--surface);color:var(--text);font-weight:500;box-shadow:inset 0 0 0 1px var(--border-strong)}
-.settings-rail-item:hover:not(.active){background:var(--hover);color:var(--text)}
-.settings-rail-item.active,.settings-rail-item.active:hover{background:var(--text);color:var(--bg);font-weight:600}
+.settings-rail-item:hover:not(.active){background:var(--nav-hover);color:var(--text)}
+.settings-rail-item.active,.settings-rail-item.active:hover{background:var(--nav-active);color:var(--text);font-weight:600}
 
 /* Keyboard focus has to stay visible on the rail as well as in the panes. */
 .nav-item:focus-visible,.sess-item:focus-visible,.settings-rail-item:focus-visible{outline:2px solid var(--text);outline-offset:-2px}
